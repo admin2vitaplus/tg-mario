@@ -74,6 +74,20 @@ html, body {
 .btn.turbo { font-size: 10px; line-height: 1.2; text-align: center; }
 .btn.ab.on { background: rgba(255, 90, 50, 0.9); }
 
+/* Cross d-pad */
+#dpad {
+  display: grid;
+  grid-template-areas: ". up ." "left . right" ". down .";
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 46px);
+  gap: 0;
+}
+#dpad .btn { width: 46px; height: 46px; border-radius: 8px; font-size: 20px; }
+#dpad .up { grid-area: up; }
+#dpad .down { grid-area: down; }
+#dpad .left { grid-area: left; }
+#dpad .right { grid-area: right; }
+
 /* Dendy-style 2x2 block: turbo buttons above, B and A below */
 #actions { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
 .btn.on { background: rgba(255, 255, 255, 0.45); }
@@ -129,5 +143,7 @@ html, body {
   #controls { padding-left: 12px; padding-right: 12px; }
   #dpad, #actions { gap: 8px; }
   .btn { width: 56px; height: 56px; font-size: 22px; }
+  #dpad { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px); }
+  #dpad .btn { width: 42px; height: 42px; font-size: 18px; }
   .btn.turbo { font-size: 9px; }
 }
