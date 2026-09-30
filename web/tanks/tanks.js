@@ -606,6 +606,7 @@ function apiBase() {
   }
 }
 const API = apiBase();
+const BOT_NAME = 'agentmario_bot';
 
 let mode = 'local'; // local | host | guest
 let view = null;    // what the guest draws
@@ -706,7 +707,8 @@ function joinRoom(code) {
 $('btnJoin').addEventListener('click', () => { audio(); joinRoom($('code').value); });
 $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($('code').value); });
 $('btnInvite').addEventListener('click', () => {
-  const link = location.origin + location.pathname + '?room=' + net.code + '&api=' + encodeURIComponent(API);
+  // The bot answers /start tanks_<code> with a button that opens the game inside Telegram.
+  const link = 'https://t.me/' + BOT_NAME + '?start=tanks_' + net.code;
   const text = 'Сыграем в «Танкодром» вдвоём? Код комнаты: ' + net.code;
   try {
     if (tg && tg.openTelegramLink) {
