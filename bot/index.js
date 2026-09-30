@@ -2,6 +2,7 @@ import { Bot, InlineKeyboard } from "grammy";
 import { openDb } from "./db.js";
 import { ACHIEVEMENTS } from "./achievements.js";
 import { createApiServer } from "./server.js";
+import { attachTanksRooms } from "./tanks-rooms.js";
 import { startTunnel } from "./tunnel.js";
 
 const token = process.env.BOT_TOKEN;
@@ -27,6 +28,7 @@ const server = createApiServer({
       .sendMessage(userId, "Новые достижения!\n" + list.map((a) => `${a.icon} ${a.title}: ${a.text}`).join("\n"))
       .catch(() => {}),
 });
+attachTanksRooms(server, { allowedOrigins });
 await new Promise((ok) => server.listen(port, ok));
 console.log(`Сервер очков слушает порт ${port}`);
 
@@ -42,21 +44,39 @@ if (!apiUrl && process.env.TUNNEL !== "off") {
 }
 
 // Адрес сервера передаётся игре в ссылке, поэтому при смене туннеля ничего не надо перенастраивать.
-const gameUrl = apiUrl ? `${baseGameUrl}${baseGameUrl.includes("?") ? "&" : "?"}api=${encodeURIComponent(apiUrl)}` : baseGameUrl;
+const withApi = (url) => {
+  const u = new URL(url);
+  if (apiUrl) u.searchParams.set("api", apiUrl);
+  return u.toString();
+};
+const gameUrl = withApi(baseGameUrl);
+
+// Приглашение в «Танкодром»: t.me/<бот>?start=tanks_1234 открывает комнату 1234.
+const tanksRoomUrl = (code) => {
+  const u = new URL(withApi(new URL("tanks/", baseGameUrl).toString()));
+  u.searchParams.set("room", code);
+  return u.toString();
+};
 
 // ---------- Бот ----------
 const playKeyboard = () => new InlineKeyboard().webApp("🎮 Играть", gameUrl);
 
 const medal = (place) => ["🥇", "🥈", "🥉"][place - 1] || `${place}.`;
 
-bot.command("start", (ctx) =>
-  ctx.reply(
+bot.command("start", (ctx) => {
+  const room = /^tanks_(\d{4})$/.exec(ctx.match || "");
+  if (room) {
+    return ctx.reply(`Тебя позвали в «Танкодром», комната ${room[1]}.`, {
+      reply_markup: new InlineKeyboard().webApp("🛡 В бой", tanksRoomUrl(room[1])),
+    });
+  }
+  return ctx.reply(
     "Привет! Это «Прыг-Скок» — платформер прямо в Telegram.\n" +
       "Собирай монеты, прыгай на жуков и доберись до флага.\n\n" +
       "/top — таблица рекордов, /me — мои достижения",
     { reply_markup: playKeyboard() },
-  ),
-);
+  );
+});
 
 bot.command("play", (ctx) => ctx.reply("Поехали!", { reply_markup: playKeyboard() }));
 
