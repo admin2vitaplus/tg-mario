@@ -36,14 +36,18 @@ Node.js + [grammY](https://grammy.dev). Один процесс делает д�
 
 Бот и сервер работают, пока запущен процесс. Для работы 24/7 нужен компьютер, который не выключается:
 
-- **VPS на Ubuntu/Debian** (от ~200 ₽/мес): одна команда ставит Node.js, cloudflared, код и службу systemd,
-  которая поднимается сама после перезагрузки. Токен спросит при первом запуске:
+- **Чистый VPS на Ubuntu/Debian** (от ~200 ₽/мес): скрипт ставит Node.js и cloudflared
+  (оба с проверкой контрольных сумм), код и службу systemd в песочнице с лимитом памяти.
+  Перед установкой он прогоняет тесты бота. Токен спросит при первом запуске:
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/admin2vitaplus/tg-mario/main/bot/deploy/install.sh | sudo bash
+  curl -fsSLo install.sh https://raw.githubusercontent.com/admin2vitaplus/tg-mario/main/bot/deploy/install.sh
+  less install.sh        # прочитайте, что он делает
+  sudo bash install.sh
   ```
-  Эта же команда обновляет бота. Логи: `journalctl -u prygskok-bot -f`.
-  Если у сервера есть свой домен с https, передайте его: `… | sudo PUBLIC_API_URL=https://ваш.домен bash`,
-  тогда туннель не нужен. Очки лежат в `/opt/tg-mario/bot/scores.db`.
+  Если на сервере бот уже запущен по-другому, скрипт откажется ставить второй: два бота
+  с одним токеном мешают друг другу. Повторный запуск обновляет эту же установку.
+  Логи: `journalctl -u prygskok-bot -f`, база: `/opt/tg-mario/data/scores.db`.
+  Свой домен с https вместо туннеля: `sudo PUBLIC_API_URL=https://ваш.домен bash install.sh`.
 - **Railway / Render / Fly.io**: корень сервиса — папка `bot`, команда запуска `npm start`,
   переменные `BOT_TOKEN` и `TUNNEL=off` задаются в настройках сервиса, а `PUBLIC_API_URL` —
   адрес, который выдаст платформа. Для базы нужен постоянный диск (volume), иначе очки
