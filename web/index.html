@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>Прыг-Скок</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="lib/phaser.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="hud">
+      <div>СЧЁТ<br><span id="score">000000</span></div>
+      <div>МОНЕТЫ<br><span id="coins">×00</span></div>
+      <div>ЖИЗНИ<br><span id="lives">3</span></div>
+      <div>ВРЕМЯ<br><span id="time">300</span></div>
+    </div>
+    <div id="game"></div>
+    <div id="controls">
+      <div id="dpad">
+        <div class="btn">◀</div>
+        <div class="btn">▶</div>
+      </div>
+      <div id="actions">
+        <div class="btn round" id="btnRun">БЕГ</div>
+        <div class="btn round big" id="btnJump">▲</div>
+      </div>
+    </div>
+    <div id="overlay">
+      <h1 id="ovTitle">ПРЫГ-СКОК</h1>
+      <p id="ovText">Добеги до флага, собирай монеты,<br>прыгай на жуков.</p>
+      <button id="ovBtn">Играть</button>
+      <p class="hint" id="ovHint">Клавиатура: ← → прыжок Z/пробел, бег X/Shift</p>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
