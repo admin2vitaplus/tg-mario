@@ -118,3 +118,13 @@ html, body {
   color: #fff;
   font: bold 18px "Courier New", monospace;
 }
+
+/* Narrow phones: four buttons must fit in one row */
+@media (max-width: 420px) {
+  #controls { padding-left: 12px; padding-right: 12px; }
+  #dpad, #actions { gap: 8px; }
+  .btn { width: 54px; height: 54px; font-size: 22px; }
+  .btn.big { width: 66px; height: 66px; }
+  .btn.round { font-size: 10px; }
+  .btn.round.big { font-size: 24px; }
+}

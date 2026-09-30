@@ -65,13 +65,14 @@ const SFX = {
   sprout: () => tone(200, 800, 0.4, 'triangle', 0.15),
   power: () => notes([523, 659, 784, 1047], 0.07, 0.1),
   hurt: () => tone(600, 150, 0.35),
+  fire: () => tone(900, 300, 0.08, 'square', 0.06),
   life: () => notes([659, 784, 1319, 1047, 1175, 1568], 0.08, 0.1),
   die: () => notes([660, 550, 440, 330, 220], 0.13, 0.15),
   win: () => notes([523, 659, 784, 1047, 784, 1047], 0.12, 0.15),
 };
 
 // ---------- Input ----------
-const touch = { left: false, right: false, jump: false, run: false };
+const touch = { left: false, right: false, jump: false, run: false, firePressed: false };
 
 function bindControls() {
   const dpad = document.getElementById('dpad');
@@ -113,6 +114,17 @@ function bindControls() {
   });
   for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
     jump.addEventListener(name, () => { touch.jump = false; jump.classList.remove('on'); });
+  }
+
+  const fireBtn = document.getElementById('btnFire');
+  fireBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    audio();
+    touch.firePressed = true;
+    fireBtn.classList.add('on');
+  });
+  for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
+    fireBtn.addEventListener(name, () => fireBtn.classList.remove('on'));
   }
 
   // Holding two thumbs on a phone is awkward, so run is a toggle on touch.
@@ -160,7 +172,7 @@ const PAL = {
   K: '#222222', W: '#ffffff', C: '#1fa2a8', S: '#f8b878', R: '#d82800',
   J: '#f8d020', P: '#2848a8', B: '#6b3a10',
   E: '#b83010', O: '#f08030', Y: '#f8d878',
-  G: '#107010', L: '#58d858', N: '#30b030', V: '#c02070', D: '#801050',
+  G: '#107010', L: '#58d858', N: '#30b030', F: '#e04020', V: '#c02070', D: '#801050',
   Q: '#f8c030', U: '#c07000',
 };
 
@@ -297,6 +309,13 @@ function makeTextures(scene) {
   pix(scene, 'hb0', [...HEAD, ...BIG_BODY, ...BIG_LEGS]);
   pix(scene, 'hb1', [...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]);
   pix(scene, 'hb2', [...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]);
+
+  // Fire outfit: white cap, red jacket.
+  const fire = (rows) => rows.map((r) => r.replace(/J/g, 'F').replace(/C/g, 'W'));
+  pix(scene, 'hf0', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS]));
+  pix(scene, 'hf1', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]));
+  pix(scene, 'hf2', fire([...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]));
+  pix(scene, 'fireball', ['..FF..', '.FJJF.', 'FJWWJF', 'FJWWJF', '.FJJF.', '..FF..']);
 
   pix(scene, 'bug0', [...BUG_TOP, '..KK..KK..KK..KK', '.KK..KK..KK..KK.']);
   pix(scene, 'bug1', [...BUG_TOP, '.KK..KK..KK..KK.', '..KK..KK..KK..KK']);
@@ -532,6 +551,7 @@ class Play extends Phaser.Scene {
     this.s = Object.assign({ lives: 3, score: 0, coins: 0 }, data || {});
     this.s.timeLeft = 300;
     this.big = false;
+    this.fire = false;
     this.dead = false;
     this.won = false;
     this.invUntil = 0;
@@ -599,12 +619,19 @@ class Play extends Phaser.Scene {
     }
 
     this.items = this.physics.add.group();
+    this.fireballs = this.physics.add.group();
 
     this.layerCollider = this.physics.add.collider(this.player, this.layer, (p, tile) => {
       if (p.body.blocked.up && tile.pixelY + TILE <= p.body.top + 2) this.headHits.push(tile);
     });
     this.physics.add.collider(this.enemies, this.layer);
     this.physics.add.collider(this.items, this.layer);
+    this.physics.add.collider(this.fireballs, this.layer);
+    this.physics.add.overlap(this.fireballs, this.enemies, (f, e) => {
+      if (e.getData('state') === 'dead') return;
+      f.destroy();
+      this.flipEnemy(e);
+    });
     this.physics.add.overlap(this.player, this.enemies, (p, e) => this.touchEnemy(e));
     this.physics.add.overlap(this.player, this.coinItems, (p, c) => { c.destroy(); this.gainCoin(); });
     this.physics.add.overlap(this.player, this.items, (p, it) => {
@@ -620,7 +647,7 @@ class Play extends Phaser.Scene {
     this.physics.add.overlap(this.player, pole, () => this.win(lvl.poleX));
 
     const kb = this.input.keyboard;
-    this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,Z,X,SPACE,SHIFT');
+    this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,Z,X,C,SPACE,SHIFT');
 
     this.time.addEvent({
       delay: 400,
@@ -648,8 +675,15 @@ class Play extends Phaser.Scene {
 
   setBig(big) {
     this.big = big;
-    this.player.setTexture(big ? 'hb0' : 'hs0');
+    if (!big) this.fire = false;
+    this.player.setTexture(this.heroTex() + '0');
     this.applyBody();
+  }
+
+  // Texture prefix for the hero's current form.
+  heroTex() {
+    if (this.fire) return 'hf';
+    return this.big ? 'hb' : 'hs';
   }
 
   addScore(n) {
@@ -676,13 +710,14 @@ class Play extends Phaser.Scene {
 
     this.updateEnemies(time, cam);
     this.updateItems();
+    this.updateFireballs();
 
     if (this.dead) return;
 
     if (this.won) {
       if (this.autoWalk) {
         b.setVelocityX(60);
-        p.setTexture((this.big ? 'hb' : 'hs') + (Math.floor(time / 110) % 2));
+        p.setTexture(this.heroTex() + (Math.floor(time / 110) % 2));
       }
       return;
     }
@@ -694,6 +729,11 @@ class Play extends Phaser.Scene {
     const right = k.RIGHT.isDown || k.D.isDown || touch.right;
     const jump = k.UP.isDown || k.W.isDown || k.Z.isDown || k.SPACE.isDown || touch.jump;
     const run = k.X.isDown || k.SHIFT.isDown || touch.run;
+    // Latched presses, so a quick tap between two frames still fires.
+    const JD = Phaser.Input.Keyboard.JustDown;
+    const firePressed = JD(k.X) | JD(k.C) | touch.firePressed;
+    touch.firePressed = false;
+    if (firePressed && this.fire) this.shoot();
     const onGround = b.blocked.down;
     const dt = delta / 1000;
 
@@ -744,7 +784,7 @@ class Play extends Phaser.Scene {
     }
 
     // Sprite frame.
-    const pre = this.big ? 'hb' : 'hs';
+    const pre = this.heroTex();
     let frame = pre + '0';
     if (!onGround) frame = pre + '2';
     else if (Math.abs(b.velocity.x) > 5) frame = pre + (Math.floor(time / (run ? 70 : 110)) % 2);
@@ -902,6 +942,36 @@ class Play extends Phaser.Scene {
     SFX.power();
     haptic('medium');
     if (!this.big) this.setBig(true);
+    else if (!this.fire) {
+      this.fire = true;
+      this.player.setTexture(this.heroTex() + '0');
+    }
+  }
+
+  shoot() {
+    const live = this.fireballs.getChildren().filter((f) => f.active).length;
+    if (live >= 2) return;
+    const p = this.player;
+    const dir = p.flipX ? -1 : 1;
+    const f = this.fireballs.create(p.x + dir * 8, p.y - 16, 'fireball').setDepth(DEPTH.ITEM);
+    f.body.setSize(6, 6);
+    f.body.setVelocity(dir * 200, 80);
+    f.setData('dir', dir);
+    SFX.fire();
+  }
+
+  updateFireballs() {
+    const cam = this.cameras.main;
+    for (const f of this.fireballs.getChildren().slice()) {
+      const b = f.body;
+      if (b.blocked.left || b.blocked.right || f.x < cam.scrollX - 16 || f.x > cam.scrollX + VIEW_W + 16 || f.y > VIEW_H) {
+        f.destroy();
+        continue;
+      }
+      if (b.blocked.down) b.setVelocityY(-160);
+      b.setVelocityX(f.getData('dir') * 200);
+      f.angle += 20;
+    }
   }
 
   hurt() {
@@ -924,7 +994,7 @@ class Play extends Phaser.Scene {
     const p = this.player;
     this.layerCollider.active = false;
     p.setAlpha(1);
-    p.setTexture(this.big ? 'hb2' : 'hs2');
+    p.setTexture(this.heroTex() + '2');
     p.body.setGravityY(0);
     p.body.setVelocity(0, fell ? 0 : -350);
     this.time.delayedCall(2500, () => {
@@ -959,7 +1029,7 @@ class Play extends Phaser.Scene {
     b.setGravityY(0);
     b.allowGravity = false;
     p.x = poleTileX * TILE + 4;
-    p.setTexture(this.big ? 'hb2' : 'hs2');
+    p.setTexture(this.heroTex() + '2');
     const bottom = 12 * TILE;
     const dur = Math.max(200, (bottom - p.y) * 8);
     this.tweens.add({ targets: this.flag, y: bottom - 8, duration: dur });
