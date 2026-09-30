@@ -624,7 +624,8 @@ function drawScenery(scene) {
 // Chars: # ground, B brick, ? bonus (coin), M bonus (berry), L bonus (extra life), C brick with coins,
 // H hard block, [ ] pipe lip, { } pipe body, o coin, e enemy, | pole, T pole top,
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
-// ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body.
+// ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
+// h hidden block with an extra life, k hidden block with a coin (invisible until hit from below).
 const TILE_OF = {
   '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'L': T.BONUS, 'H': T.HARD, 'r': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
@@ -685,52 +686,54 @@ function grid(W) {
   return L;
 }
 
+// 1-1 follows the classic rhythm: first blocks and a berry, four pipes of growing height
+// (the last one leads down to a coin room), a hidden extra life, brick rows high up,
+// block clusters, two pairs of staircases (the second over a pit) and a big staircase to the flag.
 function levelField() {
   const L = grid(230);
-  const { row, fill, pipe, column, stairsUp, stairsDown } = L;
+  const { row, fill, pipe, column, stairsUp, stairsDown, put } = L;
   L.area(0, 212, 'tiles', '#6b8cff', 'field');
   L.area(214, 230, 'tilesCave', '#000000');
   L.floor('#', 0, 211);
-  L.gap(62, 63);
-  L.gap(90, 92);
-  L.gap(158, 159);
+  L.gap(69, 70);
+  L.gap(86, 88);
+  L.gap(153, 154);
 
-  row(12, 9, '?');
-  row(17, 9, 'BMB?B');
-  row(19, 5, '?');
-  row(26, 7, 'ooo');
-  pipe(31, 2);
-  pipe(41, 3);
-  row(52, 9, 'B??B');
-  row(52, 6, ' oo ');
-  pipe(56, 4);
-  row(60, 8, 'oooooo');
-  row(66, 9, 'B?B');
-  row(68, 5, 'BBB?BBBB');
-  row(80, 9, 'M');
-  row(84, 9, 'C');
-  stairsUp(86, 4);
-  row(89, 4, 'oooo');
-  stairsDown(93, 4);
-  row(106, 9, '?B?B?');
-  row(108, 5, 'M');
-  pipe(116, 2);
-  pipe(126, 3);
-  row(127, 6, 'L');
-  row(132, 9, 'BBBBBBBB');
-  row(132, 8, 'oooooooo');
-  stairsUp(152, 5);
-  column(157, 5);
-  stairsDown(160, 5);
-  row(166, 9, 'B?B');
-  pipe(176, 2);
-  stairsUp(182, 8);
-  column(190, 8);
-  L.flagpole(199);
+  row(16, 9, '?');
+  row(20, 9, 'BMB?B');
+  row(22, 5, '?');
+  pipe(28, 2);
+  pipe(38, 3);
+  pipe(46, 4);
+  pipe(57, 4);
+  put(64, 8, 'h');
+  row(77, 9, 'BMB');
+  row(80, 5, 'BBBBBBBB');
+  row(91, 5, 'BBB?');
+  row(94, 9, 'C');
+  row(100, 9, 'BB');
+  row(106, 9, '?  ?  ?');
+  row(109, 5, 'M');
+  row(118, 9, 'B');
+  row(121, 5, 'BBB');
+  row(128, 5, 'B??B');
+  row(129, 9, 'BB');
+  stairsUp(134, 4);
+  stairsDown(140, 4);
+  stairsUp(148, 4);
+  column(152, 4);
+  stairsDown(155, 4);
+  pipe(163, 2);
+  row(168, 9, 'BB?B');
+  pipe(179, 2);
+  stairsUp(181, 8);
+  column(189, 8);
+  L.flagpole(198);
 
-  L.enemies([24, 36, 47, 49, 70, 72, 100, 102, 104, 120, 122, 136, 138, 142, 144, 170, 172]);
+  L.enemies([22, 40, 51, 53, 97, 99, 107, 114, 116, 124, 126, 128, 130, 174, 176]);
+  L.enemies([81, 83], 4);
 
-  // Bonus room under the 4-tall pipe; the side pipe there leads back up through the pipe near the end.
+  // Coin room under the last tall pipe; its side pipe leads back up through the pipe near the end.
   L.floor('#', 214, 229);
   fill(214, 214, 2, 12, 'B');
   fill(214, 229, 1, 1, 'B');
@@ -739,10 +742,10 @@ function levelField() {
   row(217, 8, 'ooooooo');
   row(218, 6, 'ooooo');
   L.sidePipe(226, 11, 2);
-  L.pipes.push({ type: 'down', x: 56, y: 9, to: { area: 1, x: 216, y: 3 } });
-  L.pipes.push({ type: 'side', x: 226, y: 11, to: { area: 0, pipeX: 176, pipeY: 11 } });
+  L.pipes.push({ type: 'down', x: 57, y: 9, to: { area: 1, x: 216, y: 3 } });
+  L.pipes.push({ type: 'side', x: 226, y: 11, to: { area: 0, pipeX: 163, pipeY: 11 } });
 
-  return L.done({ goal: 'pole', goalX: 199 });
+  return L.done({ goal: 'pole', goalX: 198 });
 }
 
 // Underground: brick ceiling, low passages, lots of coins, lifts over a pit,
@@ -761,13 +764,10 @@ function levelCave() {
 
   row(10, 9, 'M?????');
   row(18, 11, 'oo');
-  column(22, 1);
-  column(24, 2);
-  column(26, 3);
-  column(28, 4);
-  column(30, 4);
+  stairsUp(27, 4);
+  column(31, 4);
   column(32, 3);
-  row(28, 7, 'oooo');
+  row(28, 6, 'oooo');
   fill(38, 43, 5, 6, 'B');
   row(38, 8, 'oooooo');
   row(39, 6, 'C');
@@ -1037,6 +1037,7 @@ class Play extends Phaser.Scene {
     this.lvl = lvl;
     this.W = lvl.W;
     this.contents = new Map();
+    this.hidden = new Set();
     const coinSpots = [];
     const enemySpots = [];
     const ballSpots = [];
@@ -1046,7 +1047,9 @@ class Play extends Phaser.Scene {
         const ch = lvl.grid[y][x];
         if (ch === '?') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
         if (ch === 'M') this.contents.set(x + ',' + y, { kind: 'berry', left: 1 });
-        if (ch === 'L') this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
+        if (ch === 'L' || ch === 'h') this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
+        if (ch === 'k') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
+        if (ch === 'h' || ch === 'k') this.hidden.add(x + ',' + y);
         if (ch === 'C') this.contents.set(x + ',' + y, { kind: 'coin', left: 8 });
         if (ch === 'o') coinSpots.push([x, y]);
         if (ch === 'e') enemySpots.push([x, y]);
@@ -1626,6 +1629,8 @@ class Play extends Phaser.Scene {
     const g = b.velocity.y < 0 && jump ? holdG : fallG;
     b.setGravityY(g - WORLD_GRAVITY);
 
+    this.checkHidden(b);
+
     // Blocks hit by the head: take the one closest to the hero's center.
     if (this.headHits.length) {
       let best = null;
@@ -1681,6 +1686,23 @@ class Play extends Phaser.Scene {
       if (it.body.blocked.left) it.body.setVelocityX(50);
       else if (it.body.blocked.right) it.body.setVelocityX(-50);
       if (it.y > VIEW_H + 32) it.destroy();
+    }
+  }
+
+  // Hidden blocks only appear when the hero jumps into them from below.
+  checkHidden(b) {
+    if (!this.hidden.size || b.velocity.y >= 0) return;
+    const ty = Math.floor((b.top - 1) / TILE);
+    for (let tx = Math.floor(b.left / TILE); tx <= Math.floor((b.right - 1) / TILE); tx++) {
+      const key = tx + ',' + ty;
+      if (!this.hidden.has(key) || b.top < (ty + 1) * TILE - 6) continue;
+      this.hidden.delete(key);
+      const tile = this.layerAt(tx).putTileAt(T.BONUS, tx, ty);
+      this.player.y += (ty + 1) * TILE - b.top;
+      b.setVelocityY(0);
+      this.headHits.length = 0;
+      this.hitBlock(tile);
+      return;
     }
   }
 
