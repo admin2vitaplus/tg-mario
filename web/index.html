@@ -32,6 +32,11 @@
         <div class="btn round ab" id="btnA">A</div>
       </div>
     </div>
+    <div id="menu">
+      <h1>СБОРНИК ИГР</h1>
+      <ol id="menuList"></ol>
+      <p class="hint">Выберите игру</p>
+    </div>
     <div id="overlay">
       <h1 id="ovTitle">ПРЫГ-СКОК</h1>
       <p id="ovText">Добеги до флага, собирай монеты,<br>прыгай на жуков.</p>
@@ -42,6 +47,7 @@
     </div>
   </div>
   <!-- The engine loads after the markup so the start screen shows right away. -->
+  <script src="menu.js"></script>
   <script src="lib/phaser.min.js"></script>
   <script src="game.js"></script>
 </body>
