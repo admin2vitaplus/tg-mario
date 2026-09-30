@@ -1,0 +1,176 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: "Courier New", monospace;
+  overflow: hidden;
+  touch-action: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#hud {
+  display: flex;
+  justify-content: space-around;
+  padding: 6px 4px;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.3;
+}
+
+#game {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#screen {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #f8d020;
+  text-shadow: 2px 2px 0 #000;
+  pointer-events: none;
+}
+
+#banner.over { color: #e83820; animation: rise 2s ease-out both; }
+@keyframes rise { from { top: 100%; } to { top: 50%; } }
+.hidden { display: none !important; }
+
+#controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 160px;
+  padding: 0 16px env(safe-area-inset-bottom);
+}
+
+#dpad, #actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  font-size: 26px;
+  font-weight: bold;
+}
+
+.btn.round { border-radius: 50%; }
+.btn.ab { background: rgba(216, 40, 0, 0.6); font-size: 24px; }
+.btn.turbo { font-size: 10px; line-height: 1.2; text-align: center; }
+.btn.on { background: rgba(255, 255, 255, 0.45); }
+.btn.ab.on { background: rgba(255, 90, 50, 0.9); }
+
+#dpad {
+  display: grid;
+  grid-template-areas: ". up ." "left . right" ". down .";
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 46px);
+  gap: 0;
+}
+#dpad .btn { width: 46px; height: 46px; border-radius: 8px; font-size: 20px; }
+#dpad .up { grid-area: up; }
+#dpad .down { grid-area: down; }
+#dpad .left { grid-area: left; }
+#dpad .right { grid-area: right; }
+
+#actions { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
+
+@media (orientation: landscape) and (max-height: 500px) {
+  #controls {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: auto;
+    padding: 12px 24px;
+    pointer-events: none;
+  }
+  #controls > div { pointer-events: auto; }
+  .btn { opacity: 0.6; }
+}
+
+/* Mouse and keyboard: no on-screen buttons */
+@media (hover: hover) and (pointer: fine) {
+  #controls { display: none; }
+}
+/* Two players share one keyboard, so that mode is only offered on desktop */
+@media not all and (hover: hover) and (pointer: fine) {
+  .desk { display: none; }
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.85);
+}
+
+#overlay.hidden { display: none; }
+#overlay h1 { margin: 0 0 12px; font-size: 30px; color: #f8d020; letter-spacing: 2px; }
+#overlay p { margin: 0 0 20px; font-size: 15px; line-height: 1.5; }
+#overlay .hint { margin-top: 20px; font-size: 12px; opacity: 0.6; }
+
+#menu { display: flex; flex-direction: column; gap: 10px; }
+
+#overlay button {
+  padding: 12px 28px;
+  border: 0;
+  border-radius: 10px;
+  background: #3a8a3a;
+  color: #fff;
+  font: bold 17px "Courier New", monospace;
+}
+#overlay button:disabled { background: #333; color: #888; }
+
+#back { margin-top: 8px; color: #8ab; font-size: 14px; text-decoration: none; }
+
+@media (max-width: 420px) {
+  #controls { padding-left: 12px; padding-right: 12px; }
+  #dpad, #actions { gap: 8px; }
+  .btn { width: 56px; height: 56px; font-size: 22px; }
+  #dpad { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px); }
+  #dpad .btn { width: 42px; height: 42px; font-size: 18px; }
+  .btn.turbo { font-size: 9px; }
+}
