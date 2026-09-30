@@ -165,16 +165,16 @@ const PAL = {
   Q: '#f8c030', U: '#c07000',
 };
 
-function pix(scene, key, rows) {
+function pix(scene, key, rows, scale = 1) {
   const w = Math.max(...rows.map((r) => r.length));
-  const c = scene.textures.createCanvas(key, w, rows.length);
+  const c = scene.textures.createCanvas(key, w * scale, rows.length * scale);
   const ctx = c.getContext();
   rows.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
       const col = PAL[row[x]];
       if (!col) continue;
       ctx.fillStyle = col;
-      ctx.fillRect(x, y, 1, 1);
+      ctx.fillRect(x * scale, y * scale, scale, scale);
     }
   });
   c.refresh();
@@ -346,46 +346,61 @@ function makeTextures(scene) {
     '...R......R...',
   ]);
   pix(scene, 'spark', ['..OO..', '.OJJO.', 'OJWWJO', 'OJWWJO', '.OJJO.', '..OO..']);
-  pix(scene, 'chest', [
-    '................',
-    '...UUUUUUUUUU...',
-    '..UQQQQQQQQQQU..',
-    '.UQQUUUUUUUUQQU.',
-    '.UQUBBBBBBBBUQU.',
-    '.UQUBBBBBBBBUQU.',
-    '.UUUUUUUUUUUUUU.',
-    '.UQQQQQWWQQQQQU.',
-    '.UBBBBBQQBBBBBU.',
-    '.UBBBBBKKBBBBBU.',
-    '.UBBBBBBBBBBBBU.',
-    '.UBBBBBBBBBBBBU.',
-    '.UQQQQQQQQQQQQU.',
-    '.UUUUUUUUUUUUUU.',
+  // Castle boss: a big horned beetle, drawn at double size.
+  const BOSS = [
+    '....W......W....',
+    '...WW......WW...',
+    '...GGGGGGGGGG...',
+    '..GGLLGGGGLLGG..',
+    '.GGLLLLGGLLLLGG.',
+    '.GGGGGGGGGGGGGG.',
+    '.GWWKGGGGGGWWKG.',
+    '.GWKKGGGGGGWKKG.',
+    '.GGGGGGGGGGGGGG.',
+    '..GRRRRRRRRRRG..',
+    '..GRWRWRWRWRWG..',
+    '...GGGGGGGGGG...',
+    '..YYYYYYYYYYYY..',
+    '.YYYYYYYYYYYYYY.',
+  ];
+  pix(scene, 'boss0', [...BOSS, '.KKK..KKKK..KKK.', 'KKK....KK....KKK'], 2);
+  pix(scene, 'boss1', [...BOSS, '..KKK.KKKK.KKK..', '.KKK...KK...KKK.'], 2);
+  pix(scene, 'bossFire', [
+    '....OOOOJJ......',
+    '..OOJJJJWWJJ....',
+    'RROOJJWWWWWWJJ..',
+    '..OOJJJJWWJJ....',
+    '....OOOOJJ......',
   ]);
-  pix(scene, 'chestOpen', [
-    '.UUUUUUUUUUUUUU.',
-    '.UQUBBBBBBBBUQU.',
-    '.UQQUUUUUUUUQQU.',
-    '..UQQQQQQQQQQU..',
-    '.UUQWQJQWQJQWQUU',
-    '.UJQJWJQJWJQJQJU',
-    '.UUUUUUUUUUUUUU.',
-    '.UQQQQQQQQQQQQU.',
-    '.UBBBBBQQBBBBBU.',
-    '.UBBBBBKKBBBBBU.',
-    '.UBBBBBBBBBBBBU.',
-    '.UBBBBBBBBBBBBU.',
-    '.UQQQQQQQQQQQQU.',
-    '.UUUUUUUUUUUUUU.',
+  pix(scene, 'lever', [
+    '..........RR....',
+    '.........RRRR...',
+    '.........RRRR...',
+    '..........RR....',
+    '.........KK.....',
+    '........KK......',
+    '.......KK.......',
+    '......KK........',
+    '.....KK.........',
+    '....KK..........',
+    '...UUUUUUUU.....',
+    '..UQQQQQQQQU....',
+    '..UUUUUUUUUU....',
   ]);
+  pix(scene, 'arrow', ['.WWWWW.', '.WWWWW.', 'WWWWWWW', '.WWWWW.', '..WWW..', '...W...']);
 
   for (const [key, colors] of Object.entries(TILESETS)) drawTiles(scene, key, colors);
   drawScenery(scene);
 }
 
 // Tileset: one row of 16x16 tiles, index = tile id.
-const T = { GROUND: 0, BRICK: 1, BONUS: 2, USED: 3, HARD: 4, PIPE_TL: 5, PIPE_TR: 6, PIPE_L: 7, PIPE_R: 8, POLE: 9, POLE_TOP: 10, LAVA_TOP: 11, LAVA: 12 };
-const SOLID_MAX = 8;
+const T = {
+  GROUND: 0, BRICK: 1, BONUS: 2, USED: 3, HARD: 4, PIPE_TL: 5, PIPE_TR: 6, PIPE_L: 7, PIPE_R: 8, POLE: 9, POLE_TOP: 10,
+  LAVA_TOP: 11, LAVA: 12, TREE_L: 13, TREE_M: 14, TREE_R: 15, TRUNK: 16, BRIDGE: 17,
+  SIDE_LIP_T: 18, SIDE_LIP_B: 19, SIDE_T: 20, SIDE_B: 21,
+};
+const SOLID = [0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 17, 18, 19, 20, 21];
+const TILE_COUNT = 22;
 
 // Ground, brick and hard block colors per theme; the rest of the tiles are shared.
 const TILESETS = {
@@ -407,7 +422,7 @@ const TILESETS = {
 };
 
 function drawTiles(scene, key, colors) {
-  const count = 13;
+  const count = TILE_COUNT;
   const { g, b, h } = colors;
   const c = scene.textures.createCanvas(key, TILE * count, TILE);
   const ctx = c.getContext();
@@ -484,6 +499,44 @@ function drawTiles(scene, key, colors) {
   r(12, 3, 5, 2, 1, '#f08030');
   r(12, 11, 11, 2, 1, '#f08030');
 
+  // treetop caps (left, middle, right) and the trunk under them
+  for (const i of [13, 14, 15]) {
+    r(i, 0, 0, 16, 16, '#0a300a');
+    r(i, 0, 1, 16, 15, '#30a030');
+    r(i, 0, 1, 16, 2, '#80e060');
+    r(i, 3, 7, 2, 2, '#107010');
+    r(i, 10, 10, 2, 2, '#107010');
+  }
+  ctx.clearRect(13 * TILE, 0, 3, 3);
+  ctx.clearRect(15 * TILE + 13, 0, 3, 3);
+  r(13, 0, 3, 1, 13, '#0a300a');
+  r(15, 15, 3, 1, 13, '#0a300a');
+  r(16, 2, 0, 12, 16, '#b07830');
+  r(16, 2, 0, 1, 16, '#603808');
+  r(16, 13, 0, 1, 16, '#603808');
+  for (const [x, y] of [[5, 2], [9, 7], [6, 12]]) r(16, x, y, 1, 3, '#603808');
+
+  // castle bridge
+  r(17, 0, 0, 16, 5, '#e0a070');
+  r(17, 0, 0, 16, 1, '#fff0c0');
+  for (const x of [0, 4, 8, 12]) r(17, x, 0, 1, 5, '#6b2a08');
+  r(17, 0, 5, 16, 1, '#6b2a08');
+  for (const x of [2, 10]) r(17, x, 6, 2, 4, '#8a8a8a');
+
+  // side pipe: mouth (top/bottom) and body (top/bottom), opening to the left
+  r(18, 0, 0, 16, 16, '#0a300a');
+  r(18, 1, 1, 14, 15, '#30a030');
+  r(18, 1, 4, 14, 3, '#a0f080');
+  r(19, 0, 0, 16, 16, '#0a300a');
+  r(19, 1, 0, 14, 15, '#30a030');
+  r(19, 1, 9, 14, 3, '#107010');
+  r(20, 0, 2, 16, 14, '#30a030');
+  r(20, 0, 2, 16, 1, '#0a300a');
+  r(20, 0, 5, 16, 3, '#a0f080');
+  r(21, 0, 0, 16, 13, '#30a030');
+  r(21, 0, 13, 16, 1, '#0a300a');
+  r(21, 0, 8, 16, 3, '#107010');
+
   c.refresh();
   for (let i = 0; i < count; i++) c.add(i, 0, i * TILE, 0, TILE, TILE);
 }
@@ -528,13 +581,18 @@ function drawScenery(scene) {
 // ---------- Levels ----------
 // Chars: # ground, B brick, ? bonus (coin), M bonus (berry), C brick with coins,
 // H hard block, [ ] pipe lip, { } pipe body, o coin, e enemy, | pole, T pole top,
-// ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block.
+// ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
+// ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body.
 const TILE_OF = {
   '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'H': T.HARD, 'r': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
   '~': T.LAVA_TOP, '=': T.LAVA, 'f': T.LAVA_TOP,
+  '(': T.TREE_L, '-': T.TREE_M, ')': T.TREE_R, 'i': T.TRUNK, '_': T.BRIDGE,
+  'q': T.SIDE_LIP_T, 'w': T.SIDE_LIP_B, 'z': T.SIDE_T, 'x': T.SIDE_B,
 };
 
+// A level is one wide grid split into areas (the main course, a bonus room, an exit
+// outside). Each area has its own colors and camera limits; pipes move the hero between them.
 function grid(W) {
   const H = 15;
   const g = Array.from({ length: H }, () => Array(W).fill('.'));
@@ -543,18 +601,35 @@ function grid(W) {
   const fill = (x0, x1, y0, y1, ch) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(x, y, ch); };
   const L = {
     g, W, H, put, row, fill,
+    areas: [],
+    pipes: [],
+    lifts: [],
     pipe(x, h) {
       const top = 13 - h;
       put(x, top, '['); put(x + 1, top, ']');
       for (let y = top + 1; y < 13; y++) { put(x, y, '{'); put(x + 1, y, '}'); }
     },
+    // Pipe lying on its side with the mouth at (x, y..y+1), turning up into the ceiling.
+    sidePipe(x, y, top) {
+      put(x, y, 'q'); put(x, y + 1, 'w');
+      put(x + 1, y, 'z'); put(x + 1, y + 1, 'x');
+      for (let yy = top; yy <= y + 1; yy++) { put(x + 2, yy, '{'); put(x + 3, yy, '}'); }
+    },
     column(x, h) { for (let y = 13 - h; y < 13; y++) put(x, y, 'H'); },
     stairsUp(x, n) { for (let i = 0; i < n; i++) L.column(x + i, i + 1); },
     stairsDown(x, n) { for (let i = 0; i < n; i++) L.column(x + i, n - i); },
-    floor(ch = '#') { fill(0, W - 1, 13, 14, ch); },
+    floor(ch = '#', x0 = 0, x1 = W - 1) { fill(x0, x1, 13, 14, ch); },
     gap(a, b, lava) {
       fill(a, b, 13, 14, '.');
       if (lava) { fill(a, b, 13, 13, '~'); fill(a, b, 14, 14, '='); }
+    },
+    tree(x, w, top) {
+      put(x, top, '(');
+      for (let i = 1; i < w - 1; i++) put(x + i, top, '-');
+      put(x + w - 1, top, ')');
+      const t0 = x + Math.floor((w - 1) / 2);
+      const t1 = w >= 6 ? t0 + 1 : t0;
+      fill(t0, t1, top + 1, 14, 'i');
     },
     enemies(xs, y = 12) { for (const x of xs) put(x, y, 'e'); },
     flagpole(x) {
@@ -562,14 +637,18 @@ function grid(W) {
       for (let y = 4; y < 12; y++) put(x, y, '|');
       put(x, 12, 'H');
     },
+    area(x0, x1, tiles, sky, scenery = 'none') { L.areas.push({ x0, x1, tiles, sky, scenery }); },
+    done(extra) { return Object.assign({ grid: g, W, H, areas: L.areas, pipes: L.pipes, lifts: L.lifts }, extra); },
   };
   return L;
 }
 
 function levelField() {
-  const L = grid(212);
-  const { row, pipe, column, stairsUp, stairsDown } = L;
-  L.floor();
+  const L = grid(230);
+  const { row, fill, pipe, column, stairsUp, stairsDown } = L;
+  L.area(0, 212, 'tiles', '#6b8cff', 'field');
+  L.area(214, 230, 'tilesCave', '#000000');
+  L.floor('#', 0, 211);
   L.gap(62, 63);
   L.gap(90, 92);
   L.gap(158, 159);
@@ -607,16 +686,32 @@ function levelField() {
   L.flagpole(199);
 
   L.enemies([24, 36, 47, 49, 70, 72, 100, 102, 104, 120, 122, 136, 138, 142, 144, 170, 172]);
-  return { grid: L.g, W: L.W, H: L.H, goal: 'pole', goalX: 199 };
+
+  // Bonus room under the 4-tall pipe; the side pipe there leads back up through the pipe near the end.
+  L.floor('#', 214, 229);
+  fill(214, 214, 2, 12, 'B');
+  fill(214, 229, 1, 1, 'B');
+  fill(217, 223, 10, 12, 'B');
+  row(217, 9, 'ooooooo');
+  row(217, 8, 'ooooooo');
+  row(218, 6, 'ooooo');
+  L.sidePipe(226, 11, 2);
+  L.pipes.push({ type: 'down', x: 56, y: 9, to: { area: 1, x: 216, y: 3 } });
+  L.pipes.push({ type: 'side', x: 226, y: 11, to: { area: 0, pipeX: 176, pipeY: 11 } });
+
+  return L.done({ goal: 'pole', goalX: 199 });
 }
 
-// Underground: brick ceiling, low passages, lots of coins, pipes to jump over.
+// Underground: brick ceiling, low passages, lots of coins, lifts over a pit,
+// then a side pipe up to the surface where the flag is.
 function levelCave() {
-  const L = grid(180);
+  const L = grid(212);
   const { row, fill, pipe, column, stairsUp } = L;
-  L.floor();
+  L.area(0, 178, 'tilesCave', '#000000');
+  L.area(180, 212, 'tiles', '#6b8cff', 'field');
+  L.floor('#', 0, 177);
   fill(0, 0, 1, 12, 'B');
-  fill(6, 150, 1, 1, 'B');
+  fill(6, 175, 1, 1, 'B');
   L.gap(46, 48);
   L.gap(98, 100);
   L.gap(122, 123);
@@ -660,18 +755,82 @@ function levelCave() {
   stairsUp(136, 6);
   fill(142, 145, 7, 12, 'H');
   row(142, 6, 'oooo');
-  L.flagpole(160);
 
-  L.enemies([16, 20, 35, 37, 58, 60, 62, 76, 84, 86, 96, 112, 114, 120, 131, 133]);
-  return { grid: L.g, W: L.W, H: L.H, goal: 'pole', goalX: 160 };
+  // Pit with two lifts going up and down.
+  L.gap(146, 157);
+  L.lifts.push({ x: 148, y: 8, w: 3, axis: 'y', dist: 4, period: 4, phase: 0 });
+  L.lifts.push({ x: 153, y: 8, w: 3, axis: 'y', dist: 4, period: 4, phase: 0.5 });
+  row(160, 9, 'BB?BB');
+  row(160, 8, 'ooooo');
+  L.sidePipe(170, 11, 2);
+  fill(174, 177, 1, 12, 'H');
+  L.pipes.push({ type: 'side', x: 170, y: 11, to: { area: 1, pipeX: 182, pipeY: 11 } });
+
+  // Outside: exit pipe, stairs and the flag.
+  L.floor('#', 180, 211);
+  pipe(182, 2);
+  stairsUp(188, 8);
+  column(196, 8);
+  L.flagpole(204);
+
+  L.enemies([16, 20, 35, 37, 58, 60, 62, 76, 84, 86, 96, 112, 114, 120, 131, 133, 163, 166]);
+  return L.done({ goal: 'pole', goalX: 204 });
 }
 
-// Castle: stone floor, lava pits with jumping lava balls, rotating fire bars, a chest at the end.
+// Treetops: platforms high above a bottomless drop, with lifts between them.
+function levelTrees() {
+  const L = grid(180);
+  const { row, tree } = L;
+  L.area(0, 180, 'tiles', '#6b8cff', 'sky');
+  L.floor('#', 0, 15);
+  tree(17, 4, 11);
+  tree(23, 6, 8);
+  row(24, 5, 'oooo');
+  tree(31, 3, 10);
+  tree(36, 5, 7);
+  tree(44, 7, 9);
+  row(46, 5, '?M?');
+  L.lifts.push({ x: 53, y: 9, w: 3, axis: 'x', dist: 5, period: 4, phase: 0 });
+  tree(61, 5, 7);
+  row(62, 4, 'ooo');
+  tree(69, 4, 10);
+  tree(76, 8, 7);
+  row(77, 4, 'oooooo');
+  L.lifts.push({ x: 87, y: 6, w: 3, axis: 'y', dist: 5, period: 3.5, phase: 0.25 });
+  tree(92, 4, 8);
+  row(93, 6, 'oo');
+  tree(99, 6, 11);
+  row(100, 8, '?  ?');
+  L.lifts.push({ x: 107, y: 9, w: 3, axis: 'x', dist: 4, period: 3.5, phase: 0 });
+  tree(115, 5, 7);
+  row(116, 4, 'ooo');
+  tree(122, 3, 9);
+  tree(128, 6, 7);
+  row(129, 4, 'oooo');
+  L.lifts.push({ x: 136, y: 5, w: 3, axis: 'y', dist: 5, period: 3.5, phase: 0.75 });
+  tree(141, 5, 9);
+  L.floor('#', 148, 179);
+  L.stairsUp(152, 4);
+  L.flagpole(166);
+
+  L.enemies([25], 7);
+  L.enemies([38], 6);
+  L.enemies([46, 48], 8);
+  L.enemies([79, 81], 6);
+  L.enemies([101], 10);
+  L.enemies([130], 6);
+  L.enemies([158, 161]);
+  return L.done({ goal: 'pole', goalX: 166 });
+}
+
+// Castle: lava pits with jumping lava balls, rotating fire bars, and a bridge
+// guarded by a big beetle. Pulling the lever at the far end drops the bridge.
 function levelCastle() {
-  const L = grid(170);
+  const L = grid(200);
   const { row, fill, column, put } = L;
+  L.area(0, 200, 'tilesCastle', '#000000');
   L.floor();
-  fill(0, 169, 0, 2, 'H');
+  fill(0, 145, 0, 2, 'H');
   fill(0, 5, 8, 12, 'H');
   fill(6, 15, 9, 12, 'H');
   L.gap(16, 19, true);
@@ -706,19 +865,32 @@ function levelCastle() {
   put(121, 13, 'f');
   put(126, 13, 'f');
   put(131, 13, 'f');
-  fill(133, 169, 3, 4, 'H');
+  fill(133, 145, 3, 4, 'H');
   fill(133, 135, 10, 12, 'H');
   put(134, 10, 'r');
 
+  // Boss room: a bridge over lava, the lever behind it.
+  fill(146, 199, 0, 3, 'H');
+  fill(146, 149, 9, 12, 'H');
+  L.gap(150, 165, true);
+  fill(150, 165, 9, 9, '_');
+  fill(166, 172, 9, 14, 'H');
+  fill(173, 199, 4, 12, 'H');
+
   L.enemies([12, 24], 8);
   L.enemies([40, 42, 56, 64, 80, 84, 110, 112, 140, 144]);
-  return { grid: L.g, W: L.W, H: L.H, goal: 'chest', goalX: 160, start: [3, 8] };
+  return L.done({
+    goal: 'lever', goalX: 167, start: [3, 8],
+    bridge: { x0: 150, x1: 165, y: 9 },
+    boss: { x: 161, min: 153, max: 164 },
+  });
 }
 
 const LEVELS = [
-  { name: 'ПОЛЕ', build: levelField, tiles: 'tiles', sky: '#6b8cff', scenery: 'field', time: 300 },
-  { name: 'ПОДЗЕМЕЛЬЕ', build: levelCave, tiles: 'tilesCave', sky: '#000000', scenery: 'none', time: 300 },
-  { name: 'ЗАМОК', build: levelCastle, tiles: 'tilesCastle', sky: '#000000', scenery: 'none', time: 300 },
+  { name: 'ПОЛЕ', build: levelField, time: 400 },
+  { name: 'ПОДЗЕМЕЛЬЕ', build: levelCave, time: 400 },
+  { name: 'ВЕРХУШКИ ДЕРЕВЬЕВ', build: levelTrees, time: 300 },
+  { name: 'ЗАМОК', build: levelCastle, time: 300 },
 ];
 
 // ---------- Game scene ----------
@@ -745,18 +917,16 @@ class Play extends Phaser.Scene {
   create() {
     if (!this.textures.exists('tiles')) makeTextures(this);
     const cam = this.cameras.main;
-    cam.setBackgroundColor(this.def.sky);
 
     const lvl = this.def.build();
+    this.lvl = lvl;
     this.W = lvl.W;
     this.contents = new Map();
-    const data = [];
     const coinSpots = [];
     const enemySpots = [];
     const ballSpots = [];
     const barSpots = [];
     for (let y = 0; y < lvl.H; y++) {
-      const line = [];
       for (let x = 0; x < lvl.W; x++) {
         const ch = lvl.grid[y][x];
         if (ch === '?') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
@@ -766,43 +936,68 @@ class Play extends Phaser.Scene {
         if (ch === 'e') enemySpots.push([x, y]);
         if (ch === 'f') ballSpots.push([x, y]);
         if (ch === 'r') barSpots.push([x, y]);
-        line.push(ch in TILE_OF ? TILE_OF[ch] : -1);
       }
-      data.push(line);
     }
 
-    // Scenery behind the level, with parallax.
-    if (this.def.scenery === 'field') {
-      for (let x = 0; x < lvl.W * TILE; x += 190) {
-        this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5);
+    // Scenery behind each area, with parallax; only the current area's is shown.
+    this.scenery = lvl.areas.map((ar) => {
+      const box = [];
+      // With scroll factor f an image at X shows at X - f * scrollX, so cover the area's scroll range.
+      const span = (f) => [Math.floor(f * ar.x0 * TILE), f * (ar.x1 * TILE - VIEW_W) + VIEW_W];
+      if (ar.scenery !== 'none') {
+        const [a, b] = span(0.5);
+        for (let x = a; x < b; x += 190) {
+          box.push(this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5).setDepth(-2));
+        }
       }
-      for (let x = 0; x < lvl.W * TILE; x += 300) {
-        this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8);
+      if (ar.scenery === 'field') {
+        const [a, b] = span(0.8);
+        for (let x = a; x < b; x += 300) {
+          box.push(this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8).setDepth(-2));
+        }
       }
-    }
+      return box;
+    });
 
     // Lava balls sit behind the tiles so they rise out of the lava.
     this.hazards = [];
     for (const [x] of ballSpots) this.addLavaBall(x);
 
-    this.map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
-    const tiles = this.map.addTilesetImage(this.def.tiles, this.def.tiles, TILE, TILE, 0, 0);
-    this.layer = this.map.createLayer(0, tiles, 0, 0);
-    this.layer.setCollisionBetween(0, SOLID_MAX);
+    // One tile layer per area, so every area can have its own colors.
+    this.map = this.make.tilemap({ tileWidth: TILE, tileHeight: TILE, width: lvl.W, height: lvl.H });
+    this.layers = lvl.areas.map((ar, i) => {
+      const ts = this.map.addTilesetImage(ar.tiles + i, ar.tiles, TILE, TILE, 0, 0);
+      const layer = this.map.createBlankLayer('area' + i, ts);
+      for (let y = 0; y < lvl.H; y++) {
+        for (let x = ar.x0; x < Math.min(ar.x1, lvl.W); x++) {
+          const ch = lvl.grid[y][x];
+          if (ch in TILE_OF) layer.putTileAt(TILE_OF[ch], x, y);
+        }
+      }
+      layer.setCollision(SOLID);
+      layer.setData('tiles', ar.tiles);
+      return layer;
+    });
 
     this.bars = [];
     barSpots.forEach(([x, y], i) => this.addFireBar(x, y, i % 2 ? -1 : 1));
 
-    // Goal: flag on a pole, or a chest in the castle.
+    this.lifts = this.physics.add.group({ allowGravity: false, immovable: true });
+    for (const def of lvl.lifts) this.addLift(def);
+
+    // Goal: flag on a pole, or the lever behind the castle bridge.
     const goalX = lvl.goalX * TILE + 8;
     if (lvl.goal === 'pole') this.flag = this.add.image(goalX - 8, 4 * TILE + 8, 'flag');
-    else this.chest = this.add.image(goalX, 13 * TILE, 'chest').setOrigin(0.5, 1);
+    else this.lever = this.add.image(goalX, lvl.bridge.y * TILE, 'lever').setOrigin(0.5, 1);
 
     // Hero.
     const [sx, sy] = lvl.start || [3, 13];
     this.player = this.physics.add.sprite(sx * TILE + 8, sy * TILE, this.big ? 'hb0' : 'hs0').setOrigin(0.5, 1);
     this.player.body.setMaxVelocity(300, 420);
     this.applyBody();
+    this.arrow = this.add.image(0, 0, 'arrow').setVisible(false);
+    this.pipeWait = 0;
+    this.inPipe = false;
 
     this.coinItems = this.physics.add.staticGroup();
     for (const [x, y] of coinSpots) this.coinItems.create(x * TILE + 8, y * TILE + 8, 'coin');
@@ -816,11 +1011,12 @@ class Play extends Phaser.Scene {
 
     this.items = this.physics.add.group();
 
-    this.layerCollider = this.physics.add.collider(this.player, this.layer, (p, tile) => {
+    this.layerCollider = this.physics.add.collider(this.player, this.layers, (p, tile) => {
       if (p.body.blocked.up && tile.pixelY + TILE <= p.body.top + 2) this.headHits.push(tile);
     });
-    this.physics.add.collider(this.enemies, this.layer);
-    this.physics.add.collider(this.items, this.layer);
+    this.liftCollider = this.physics.add.collider(this.player, this.lifts);
+    this.physics.add.collider(this.enemies, this.layers);
+    this.physics.add.collider(this.items, this.layers);
     this.physics.add.overlap(this.player, this.enemies, (p, e) => this.touchEnemy(e));
     this.physics.add.overlap(this.player, this.coinItems, (p, c) => { c.destroy(); this.gainCoin(); });
     this.physics.add.overlap(this.player, this.items, (p, it) => {
@@ -834,13 +1030,14 @@ class Play extends Phaser.Scene {
       this.physics.add.existing(pole, true);
       this.physics.add.overlap(this.player, pole, () => this.win(lvl.goalX));
     } else {
-      const zone = this.add.zone(goalX, 13 * TILE, 12, 14).setOrigin(0.5, 1);
+      const zone = this.add.zone(goalX, lvl.bridge.y * TILE, 12, 16).setOrigin(0.5, 1);
       this.physics.add.existing(zone, true);
-      this.physics.add.overlap(this.player, zone, () => this.openChest());
+      this.physics.add.overlap(this.player, zone, () => this.pullLever());
     }
+    if (lvl.boss) this.addBoss(lvl.boss);
 
     const kb = this.input.keyboard;
-    this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,Z,X,SPACE,SHIFT');
+    this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,S,Z,X,SPACE,SHIFT');
 
     this.time.addEvent({
       delay: 400,
@@ -853,11 +1050,243 @@ class Play extends Phaser.Scene {
       },
     });
 
+    this.setArea(0);
+    cam.scrollX = 0;
+
     // The physics world outlives scene restarts, so its paused flag does too.
     this.physics.pause();
     if (started) this.showIntro();
     hud(this.s);
     window.__scene = this;
+  }
+
+  setArea(i) {
+    this.area = i;
+    const ar = this.lvl.areas[i];
+    this.cameras.main.setBackgroundColor(ar.sky);
+    this.scenery.forEach((box, j) => box.forEach((img) => img.setVisible(i === j)));
+  }
+
+  layerAt(tx) {
+    const i = this.lvl.areas.findIndex((ar) => tx >= ar.x0 && tx < ar.x1);
+    return this.layers[Math.max(0, i)];
+  }
+
+  // ---------- Pipes between areas ----------
+  updatePipes(time, down, right, onGround) {
+    const p = this.player;
+    const b = p.body;
+    let over = null;
+    for (const pipe of this.lvl.pipes) {
+      if (pipe.type === 'down') {
+        const px = pipe.x * TILE;
+        if (onGround && Math.abs(b.bottom - pipe.y * TILE) < 2 && b.left >= px && b.right <= px + 2 * TILE) over = pipe;
+      } else if (onGround && right && Math.abs(b.bottom - (pipe.y + 2) * TILE) < 2 &&
+        b.right >= pipe.x * TILE - 1 && b.left < pipe.x * TILE) {
+        this.enterPipe(pipe);
+        return true;
+      }
+    }
+    // On a phone there is no "down" button: standing still on the pipe for a moment works too.
+    const still = Math.abs(b.velocity.x) < 5;
+    if (over && (down || still)) {
+      if (!this.pipeWait) this.pipeWait = time;
+      this.arrow.setPosition(over.x * TILE + TILE, over.y * TILE - 34 + Math.sin(time / 120) * 2).setVisible(true);
+      if (down || time - this.pipeWait > 700) {
+        this.arrow.setVisible(false);
+        this.enterPipe(over);
+        return true;
+      }
+    } else {
+      this.pipeWait = 0;
+      this.arrow.setVisible(over !== null && time % 600 < 400);
+      if (over) this.arrow.setPosition(over.x * TILE + TILE, over.y * TILE - 34);
+    }
+    return false;
+  }
+
+  enterPipe(pipe) {
+    const p = this.player;
+    const b = p.body;
+    this.inPipe = true;
+    this.pipeWait = 0;
+    SFX.hurt();
+    b.setVelocity(0, 0);
+    b.allowGravity = false;
+    b.enable = false;
+    p.setDepth(-1);
+    const tween = pipe.type === 'down'
+      ? { y: p.y + p.height, x: pipe.x * TILE + TILE }
+      : { x: p.x + 16 };
+    this.tweens.add({
+      targets: p,
+      ...tween,
+      duration: 700,
+      onComplete: () => this.time.delayedCall(300, () => this.leavePipe(pipe.to)),
+    });
+  }
+
+  leavePipe(to) {
+    const p = this.player;
+    const b = p.body;
+    const cam = this.cameras.main;
+    const ar = this.lvl.areas[to.area];
+    this.setArea(to.area);
+    const finish = () => {
+      p.setDepth(0);
+      b.enable = true;
+      b.allowGravity = true;
+      b.reset(p.x, p.y);
+      this.inPipe = false;
+    };
+    let x;
+    if (to.pipeX !== undefined) {
+      x = to.pipeX * TILE + TILE;
+      p.setPosition(x, to.pipeY * TILE + p.height);
+      this.tweens.add({ targets: p, y: to.pipeY * TILE, duration: 700, onComplete: finish });
+      SFX.hurt();
+    } else {
+      x = to.x * TILE + 8;
+      p.setPosition(x, to.y * TILE);
+      finish();
+    }
+    cam.scrollX = Phaser.Math.Clamp(x - VIEW_W * 0.42, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
+  }
+
+  // ---------- Lifts ----------
+  addLift(def) {
+    const key = 'lift' + def.w;
+    if (!this.textures.exists(key)) {
+      const c = this.textures.createCanvas(key, def.w * TILE, 8);
+      const ctx = c.getContext();
+      ctx.fillStyle = '#f8b878';
+      ctx.fillRect(0, 0, def.w * TILE, 8);
+      ctx.fillStyle = '#c05000';
+      for (let x = 0; x < def.w * TILE; x += 8) ctx.fillRect(x + 3, 2, 2, 4);
+      ctx.fillRect(0, 7, def.w * TILE, 1);
+      c.refresh();
+    }
+    const lift = this.lifts.create(def.x * TILE, def.y * TILE, key).setOrigin(0, 0);
+    lift.body.setSize(def.w * TILE, 8);
+    lift.body.checkCollision.down = false;
+    lift.body.checkCollision.left = false;
+    lift.body.checkCollision.right = false;
+    lift.body.setFriction(0, 0);
+    lift.setData('def', def);
+    lift.setData('home', [def.x * TILE, def.y * TILE]);
+    this.placeLift(lift, 0);
+  }
+
+  liftTarget(lift, t) {
+    const def = lift.getData('def');
+    const [hx, hy] = lift.getData('home');
+    const k = (1 - Math.cos((t / def.period + def.phase) * Math.PI * 2)) / 2;
+    const d = k * def.dist * TILE;
+    return def.axis === 'x' ? [hx + d, hy] : [hx, hy + d];
+  }
+
+  placeLift(lift, t) {
+    const [x, y] = this.liftTarget(lift, t);
+    lift.body.reset(x, y);
+  }
+
+  updateLifts(time, delta) {
+    const t = time / 1000;
+    const dt = delta / 1000;
+    const pb = this.player.body;
+    for (const lift of this.lifts.getChildren()) {
+      const [x, y] = this.liftTarget(lift, t + dt);
+      const lb = lift.body;
+      const riding = pb.enable && pb.right > lb.left && pb.left < lb.right && Math.abs(pb.bottom - lb.top) < 3;
+      const dx = x - lb.x;
+      const dy = y - lb.y;
+      if (dt > 0) lb.setVelocity(dx / dt, dy / dt);
+      if (riding && !this.dead) {
+        this.player.x += dx;
+        if (dy > 0) this.player.y += dy;
+      }
+    }
+  }
+
+  // ---------- Castle boss ----------
+  addBoss(def) {
+    const boss = this.physics.add.sprite(def.x * TILE, 9 * TILE, 'boss0').setOrigin(0.5, 1);
+    boss.body.setSize(26, 26).setOffset(3, 6);
+    boss.setData('def', def);
+    this.boss = boss;
+    this.bossDir = -1;
+    this.bossNext = 0;
+    this.bossFires = [];
+    this.physics.add.collider(boss, this.layers);
+    this.physics.add.overlap(this.player, boss, () => {
+      if (!this.won && boss.body.enable) this.hurt();
+    });
+  }
+
+  updateBoss(time, delta) {
+    const boss = this.boss;
+    if (!boss || !boss.active) return;
+    const cam = this.cameras.main;
+    if (boss.y > VIEW_H + 48) { boss.destroy(); return; }
+    if (this.won) return;
+    if (boss.x > cam.scrollX + VIEW_W + 16) { boss.body.setVelocityX(0); return; }
+    const def = boss.getData('def');
+    const b = boss.body;
+    if (boss.x < def.min * TILE) this.bossDir = 1;
+    if (boss.x > def.max * TILE) this.bossDir = -1;
+    b.setVelocityX(this.bossDir * 25);
+    boss.setTexture('boss' + (Math.floor(time / 250) % 2));
+    if (time > this.bossNext) {
+      this.bossNext = time + 1800 + Math.random() * 1200;
+      if (Math.random() < 0.5 && b.blocked.down) b.setVelocityY(-260);
+      else this.bossFire(boss);
+    }
+    for (const f of this.bossFires) f.x -= 75 * delta / 1000;
+    const gone = this.bossFires.filter((f) => f.x < cam.scrollX - 32);
+    for (const f of gone) {
+      f.destroy();
+      this.hazards.splice(this.hazards.indexOf(f), 1);
+    }
+    this.bossFires = this.bossFires.filter((f) => f.active);
+  }
+
+  bossFire(boss) {
+    // Aim at the hero's height, but only in steps of a tile like the console.
+    const py = Phaser.Math.Clamp(this.player.body.center.y, 5 * TILE, 8 * TILE + 8);
+    const f = this.add.image(boss.x - 14, Math.round(py / 8) * 8, 'bossFire');
+    this.bossFires.push(f);
+    this.hazards.push(f);
+    tone(120, 60, 0.4, 'sawtooth', 0.12);
+  }
+
+  pullLever() {
+    if (this.won || this.dead) return;
+    this.won = true;
+    const b = this.player.body;
+    b.setVelocity(0, 0);
+    this.lever.setFlipX(true);
+    if (this.boss && this.boss.active) this.boss.body.setVelocityX(0);
+    SFX.bump();
+    haptic('success');
+    for (const f of this.bossFires) f.destroy();
+    this.bossFires = [];
+    const { x0, x1, y } = this.lvl.bridge;
+    const layer = this.layerAt(x0);
+    for (let x = x1; x >= x0; x--) {
+      this.time.delayedCall((x1 - x) * 70, () => { layer.removeTileAt(x, y); SFX.brick(); });
+    }
+    this.time.delayedCall((x1 - x0 + 1) * 70 + 200, () => {
+      if (this.boss && this.boss.active) {
+        this.boss.body.checkCollision.none = true;
+        this.boss.setFlipY(true);
+      }
+      SFX.die();
+    });
+    this.time.delayedCall((x1 - x0 + 1) * 70 + 2200, () => {
+      this.addScore(5000);
+      SFX.win();
+      this.finishLevel();
+    });
   }
 
   // Black title card before each level, like on the console.
@@ -967,11 +1396,13 @@ class Play extends Phaser.Scene {
     const cam = this.cameras.main;
 
     if (this.intro) return;
+    this.updateLifts(time, delta);
     this.updateEnemies(time, cam);
     this.updateItems();
+    this.updateBoss(time, delta);
     this.updateHazards(delta);
 
-    if (this.dead) return;
+    if (this.dead || this.inPipe) return;
 
     if (this.won) {
       if (this.autoWalk) {
@@ -982,7 +1413,7 @@ class Play extends Phaser.Scene {
     }
 
     if (p.y > VIEW_H + 24) { this.die(true); return; }
-    const under = this.map.getTileAtWorldXY(p.x, b.bottom - 4);
+    const under = this.layerAt(Math.floor(p.x / TILE)).getTileAtWorldXY(p.x, b.bottom - 4);
     if (under && under.index === T.LAVA_TOP && b.bottom > under.pixelY + 6) { this.die(true); return; }
 
     const k = this.keys;
@@ -990,7 +1421,9 @@ class Play extends Phaser.Scene {
     const right = k.RIGHT.isDown || k.D.isDown || touch.right;
     const jump = k.UP.isDown || k.W.isDown || k.Z.isDown || k.SPACE.isDown || touch.jump;
     const run = k.X.isDown || k.SHIFT.isDown || touch.run;
-    const onGround = b.blocked.down;
+    const down = k.DOWN.isDown || k.S.isDown;
+    const onGround = b.blocked.down || b.touching.down;
+    if (this.updatePipes(time, down, right && !left, onGround)) return;
     const dt = delta / 1000;
 
     // Horizontal movement with inertia.
@@ -1032,7 +1465,8 @@ class Play extends Phaser.Scene {
     }
 
     // The camera only moves right, like on the console.
-    const want = Phaser.Math.Clamp(p.x - VIEW_W * 0.42, 0, this.W * TILE - VIEW_W);
+    const ar = this.lvl.areas[this.area];
+    const want = Phaser.Math.Clamp(p.x - VIEW_W * 0.42, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
     if (want > cam.scrollX) cam.scrollX = want;
     if (p.x - 6 < cam.scrollX) {
       p.x = cam.scrollX + 6;
@@ -1051,7 +1485,7 @@ class Play extends Phaser.Scene {
   updateEnemies(time, cam) {
     for (const e of this.enemies.getChildren().slice()) {
       const st = e.getData('state');
-      if (st === 'idle' && e.x < cam.scrollX + VIEW_W + 24) {
+      if (st === 'idle' && e.x < cam.scrollX + VIEW_W + 24 && e.x > cam.scrollX - 24) {
         e.setData('state', 'walk');
         e.body.setVelocityX(-30);
       } else if (st === 'walk') {
@@ -1086,7 +1520,7 @@ class Play extends Phaser.Scene {
       if (content.left <= 0) {
         this.contents.delete(key);
         idx = T.USED;
-        this.map.putTileAt(idx, tx, ty);
+        tile.tilemapLayer.putTileAt(idx, tx, ty);
       }
       this.bounceTile(tx, ty, idx);
     } else if (tile.index === T.BRICK) {
@@ -1099,10 +1533,11 @@ class Play extends Phaser.Scene {
   }
 
   bounceTile(tx, ty, idx) {
-    const tile = this.map.getTileAt(tx, ty);
+    const layer = this.layerAt(tx);
+    const tile = layer.getTileAt(tx, ty);
     if (!tile) return;
     tile.setVisible(false);
-    const img = this.add.image(tx * TILE + 8, ty * TILE + 8, 'tiles', idx);
+    const img = this.add.image(tx * TILE + 8, ty * TILE + 8, layer.getData('tiles'), idx);
     this.tweens.add({
       targets: img,
       y: img.y - 6,
@@ -1113,7 +1548,7 @@ class Play extends Phaser.Scene {
   }
 
   breakBrick(tx, ty) {
-    this.map.removeTileAt(tx, ty);
+    this.layerAt(tx).removeTileAt(tx, ty);
     SFX.brick();
     haptic('medium');
     this.addScore(50);
@@ -1269,32 +1704,13 @@ class Play extends Phaser.Scene {
     });
   }
 
-  openChest() {
-    if (this.won || this.dead) return;
-    this.won = true;
-    const b = this.player.body;
-    b.setVelocity(0, 0);
-    b.setGravityY(0);
-    this.chest.setTexture('chestOpen');
-    this.addScore(5000);
-    SFX.win();
-    haptic('success');
-    for (let i = 0; i < 5; i++) {
-      this.time.delayedCall(i * 150, () => {
-        const c = this.add.image(this.chest.x + (i - 2) * 6, this.chest.y - 12, 'coin');
-        this.tweens.add({ targets: c, y: c.y - 40, alpha: 0, duration: 600, onComplete: () => c.destroy() });
-      });
-    }
-    this.time.delayedCall(1800, () => this.finishLevel());
-  }
-
   finishLevel() {
     this.addScore(this.s.timeLeft * 50);
     const next = this.s.level + 1;
     if (next < LEVELS.length) {
       this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, big: this.big });
     } else {
-      this.gameOver('ВСЕ МИРЫ ПРОЙДЕНЫ!');
+      this.gameOver('МИР 1 ПРОЙДЕН!');
     }
   }
 }
