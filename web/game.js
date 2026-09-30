@@ -72,34 +72,44 @@ const SFX = {
 };
 
 // ---------- Input ----------
-const touch = { left: false, right: false, a: false, b: false, turboA: false, turboB: false, bPressed: false };
+const touch = { up: false, down: false, left: false, right: false, a: false, b: false, turboA: false, turboB: false, bPressed: false };
 const TURBO_MS = 67; // about 7.5 presses per second, like a turbo button
 
 function bindControls() {
+  // Cross d-pad: the direction comes from where the thumb is relative to the
+  // center, so sliding the thumb switches direction and diagonals press two.
   const dpad = document.getElementById('dpad');
-  const [btnL, btnR] = dpad.children;
+  const btn = {};
+  for (const dir of ['up', 'down', 'left', 'right']) btn[dir] = dpad.querySelector('.' + dir);
   const pointers = new Map();
   const refresh = () => {
     const r = dpad.getBoundingClientRect();
-    touch.left = false;
-    touch.right = false;
-    for (const x of pointers.values()) {
-      if (x < r.left + r.width / 2) touch.left = true;
-      else touch.right = true;
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const dead = r.width * 0.12;
+    const on = { up: false, down: false, left: false, right: false };
+    for (const [x, y] of pointers.values()) {
+      const dx = x - cx;
+      const dy = y - cy;
+      if (Math.hypot(dx, dy) < dead) continue;
+      if (Math.abs(dx) > Math.abs(dy) * 0.5) on[dx < 0 ? 'left' : 'right'] = true;
+      if (Math.abs(dy) > Math.abs(dx) * 0.5) on[dy < 0 ? 'up' : 'down'] = true;
     }
-    btnL.classList.toggle('on', touch.left);
-    btnR.classList.toggle('on', touch.right);
+    for (const dir in on) {
+      touch[dir] = on[dir];
+      btn[dir].classList.toggle('on', on[dir]);
+    }
   };
   dpad.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     audio();
-    dpad.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, e.clientX);
+    try { dpad.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
     refresh();
   });
   dpad.addEventListener('pointermove', (e) => {
     if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, e.clientX);
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
     refresh();
   });
   for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
@@ -257,6 +267,18 @@ const BIG_LEGS_WALK = [
   '.BBBB......BBBB.',
 ];
 
+const CROUCH = [
+  ...Array(9).fill('................'),
+  ...HEAD,
+  '..SSJJJJJJJJSS..',
+  '..SSJJJJJJJJSS..',
+  '...PPPPPPPPPP...',
+  '..PPPPPPPPPPPP..',
+  '..PPPP....PPPP..',
+  '.BBBBB....BBBBB.',
+  '.BBBBB....BBBBB.',
+];
+
 const BUG_TOP = [
   '................',
   '................',
@@ -300,12 +322,14 @@ function makeTextures(scene) {
   pix(scene, 'hb0', [...HEAD, ...BIG_BODY, ...BIG_LEGS]);
   pix(scene, 'hb1', [...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]);
   pix(scene, 'hb2', [...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]);
+  pix(scene, 'hbc', CROUCH);
 
   // Fire outfit: white cap, red jacket.
   const fire = (rows) => rows.map((r) => r.replace(/J/g, 'F').replace(/C/g, 'W'));
   pix(scene, 'hf0', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS]));
   pix(scene, 'hf1', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]));
   pix(scene, 'hf2', fire([...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]));
+  pix(scene, 'hfc', fire(CROUCH));
   pix(scene, 'fireball', ['..FF..', '.FJJF.', 'FJWWJF', 'FJWWJF', '.FJJF.', '..FF..']);
 
   pix(scene, 'bug0', [...BUG_TOP, '..KK..KK..KK..KK', '.KK..KK..KK..KK.']);
@@ -921,8 +945,8 @@ class Play extends Phaser.Scene {
     this.def = LEVELS[this.s.level];
     this.s.timeLeft = this.def.time;
     this.big = !!this.s.big;
-    this.fire = !!this.s.fire;
     delete this.s.big;
+    this.fire = this.big && !!this.s.fire;
     delete this.s.fire;
     this.intro = false;
     this.dead = false;
@@ -1089,6 +1113,11 @@ class Play extends Phaser.Scene {
     window.__scene = this;
   }
 
+  holdingA() {
+    const k = this.keys;
+    return k.Z.isDown || k.SPACE.isDown || touch.a;
+  }
+
   setArea(i) {
     this.area = i;
     const ar = this.lvl.areas[i];
@@ -1116,9 +1145,7 @@ class Play extends Phaser.Scene {
         return true;
       }
     }
-    // On a phone there is no "down" button: standing still on the pipe for a moment works too.
-    const still = Math.abs(b.velocity.x) < 5;
-    if (over && (down || still)) {
+    if (over && down) {
       if (!this.pipeWait) this.pipeWait = time;
       this.arrow.setPosition(over.x * TILE + TILE, over.y * TILE - 34 + Math.sin(time / 120) * 2).setVisible(true);
       if (down || time - this.pipeWait > 700) {
@@ -1405,19 +1432,16 @@ class Play extends Phaser.Scene {
     }
   }
 
-  holdingA() {
-    const k = this.keys;
-    return k.UP.isDown || k.Z.isDown || k.SPACE.isDown || touch.a;
-  }
-
   applyBody() {
     const b = this.player.body;
-    if (this.big) { b.setSize(12, 22, false); b.setOffset(2, 2); }
+    if (this.big && this.crouch) { b.setSize(12, 14, false); b.setOffset(2, 10); }
+    else if (this.big) { b.setSize(12, 22, false); b.setOffset(2, 2); }
     else { b.setSize(10, 14, false); b.setOffset(3, 2); }
   }
 
   setBig(big) {
     this.big = big;
+    this.crouch = false;
     if (!big) this.fire = false;
     this.player.setTexture(this.heroTex() + '0');
     this.applyBody();
@@ -1455,9 +1479,9 @@ class Play extends Phaser.Scene {
     this.updateLifts(time, delta);
     this.updateEnemies(time, cam);
     this.updateItems();
+    this.updateFireballs();
     this.updateBoss(time, delta);
     this.updateHazards(delta);
-    this.updateFireballs();
 
     if (this.dead || this.inPipe) return;
 
@@ -1487,15 +1511,24 @@ class Play extends Phaser.Scene {
     touch.bPressed = false;
     this.prevTurboB = turboB;
     if (firePressed && this.fire) this.shoot();
-    const down = k.DOWN.isDown;
+    const up = k.UP.isDown || touch.up;
+    const down = k.DOWN.isDown || touch.down;
     const onGround = b.blocked.down || b.touching.down;
     if (this.updatePipes(time, down, right && !left, onGround)) return;
     const dt = delta / 1000;
 
+    // Big hero crouches on the ground while down is held and slides to a stop.
+    const crouch = this.big && down && (onGround || this.crouch);
+    if (crouch !== !!this.crouch) {
+      this.crouch = crouch;
+      this.applyBody();
+    }
+
     // Horizontal movement with inertia.
     const maxV = run ? 150 : 90;
     let target = 0;
-    if (left && !right) target = -maxV;
+    if (this.crouch) target = 0;
+    else if (left && !right) target = -maxV;
     else if (right && !left) target = maxV;
     let acc;
     if (!onGround) acc = 260;
@@ -1542,7 +1575,8 @@ class Play extends Phaser.Scene {
     // Sprite frame.
     const pre = this.heroTex();
     let frame = pre + '0';
-    if (!onGround) frame = pre + '2';
+    if (this.crouch) frame = pre + 'c';
+    else if (!onGround) frame = pre + '2';
     else if (Math.abs(b.velocity.x) > 5) frame = pre + (Math.floor(time / (run ? 70 : 110)) % 2);
     if (p.texture.key !== frame) p.setTexture(frame);
     p.setAlpha(time < this.invUntil && Math.floor(time / 60) % 2 ? 0.3 : 1);
