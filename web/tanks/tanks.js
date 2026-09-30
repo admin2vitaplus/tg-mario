@@ -633,12 +633,15 @@ function connect(onOpen) {
   try { ws = new WebSocket(API.replace(/^http/, 'ws') + '/ws/tanks'); } catch (e) { onlineMenu('Не удалось подключиться к серверу.'); return; }
   net.ws = ws;
   let opened = false;
-  ws.onopen = () => { opened = true; onOpen(); };
+  // A tunnel that swallows the upgrade can leave the socket hanging forever.
+  const timer = setTimeout(() => { if (!opened && net.ws === ws) ws.close(); }, 10000);
+  ws.onopen = () => { opened = true; clearTimeout(timer); onOpen(); };
   ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } onNet(m); };
   ws.onclose = () => {
     if (net.ws !== ws) return;
     net.ws = null;
-    lostLink(opened ? 'Связь с сервером прервалась.' : NO_SERVER.down);
+    clearTimeout(timer);
+    lostLink(opened ? 'Связь с сервером прервалась.<br>' + REOPEN : serverAlive ? NO_SERVER.ws : NO_SERVER.down);
   };
 }
 
@@ -683,14 +686,18 @@ function onNet(m) {
   }
 }
 
+// The bot's tunnel address changes on every restart, so buttons in old
+// messages lead to a dead server; the menu button always has the fresh one.
+const REOPEN = 'Закройте игру и откройте её заново кнопкой «Играть» внизу чата с ботом @' + BOT_NAME
+  + ' (не из старых сообщений: адрес сервера меняется при перезапуске бота).';
 const NO_SERVER = {
-  none: 'Игра не получила адрес сервера, поэтому онлайн недоступен.<br>'
-    + 'Закройте игру и откройте её заново кнопкой «Играть» в боте @' + BOT_NAME + '.<br>'
-    + 'Если сообщение не пропало, у сервера бота нет https-адреса: не запущен туннель и не задан PUBLIC_API_URL.',
-  http: 'Адрес сервера игры начинается не с https://, а Telegram пускает только https.<br>'
-    + 'Нужен туннель или домен с https (PUBLIC_API_URL в настройках бота).',
-  down: 'Сервер игры не отвечает. Проверьте, что бот запущен, и попробуйте ещё раз.',
+  none: 'Игра не знает адрес сервера, поэтому онлайн недоступен.<br>' + REOPEN,
+  http: 'Адрес сервера игры не https, а Telegram пускает только https.<br>' + REOPEN,
+  down: 'Сервер игры не отвечает: похоже, адрес устарел.<br>' + REOPEN,
+  ws: 'Сервер отвечает, но онлайн-соединение не открылось. Попробуйте ещё раз;'
+    + ' если не выходит, возможно, сеть блокирует WebSocket (попробуйте Wi-Fi или мобильный интернет).',
 };
+let serverAlive = false;
 
 function onlineMenu(text) {
   running = false;
@@ -710,7 +717,9 @@ function checkServer() {
   const timer = setTimeout(() => ctl && ctl.abort(), 6000);
   // no-cors: only whether the server answers matters, not what it says.
   fetch(API + '/api/health', { mode: 'no-cors', signal: ctl ? ctl.signal : undefined })
+    .then(() => { serverAlive = true; })
     .catch(() => {
+      serverAlive = false;
       if (mode !== 'local' || $('online').classList.contains('hidden') || net.ws) return;
       $('ovText').innerHTML = NO_SERVER.down;
     })
