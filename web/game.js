@@ -76,6 +76,9 @@ const SFX = {
 
 // ---------- Input ----------
 const touch = { up: false, down: false, left: false, right: false, a: false, b: false, turboA: false, turboB: false, bPressed: false };
+const WORLD_GRAVITY = 1100;
+// [gravity while A is held and rising, gravity otherwise] for slow, medium and fast take-offs.
+const JUMP_GRAVITY = [[450, 1575], [422, 1350], [562, 2025]];
 const TURBO_MS = 67; // about 7.5 presses per second, like a turbo button
 
 function bindControls() {
@@ -180,13 +183,25 @@ const PAL = {
   Q: '#f8c030', U: '#c07000',
 };
 
-function pix(scene, key, rows, scale = 1) {
+function drawRows(ctx, rows, scale, pal) {
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      const col = pal[row[x]];
+      if (!col) continue;
+      ctx.fillStyle = col;
+      ctx.fillRect(x * scale, y * scale, scale, scale);
+    }
+  });
+}
+
+function pix(scene, key, rows, scale = 1, pal = PAL) {
   const w = Math.max(...rows.map((r) => r.length));
+  if (scene.textures.exists(key)) scene.textures.remove(key);
   const c = scene.textures.createCanvas(key, w * scale, rows.length * scale);
   const ctx = c.getContext();
   rows.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
-      const col = PAL[row[x]];
+      const col = pal[row[x]];
       if (!col) continue;
       ctx.fillStyle = col;
       ctx.fillRect(x * scale, y * scale, scale, scale);
@@ -319,20 +334,7 @@ const BERRY = [
 ];
 
 function makeTextures(scene) {
-  pix(scene, 'hs0', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS]);
-  pix(scene, 'hs1', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS_WALK]);
-  pix(scene, 'hs2', [...HEAD, ...SMALL_BODY_JUMP, ...SMALL_LEGS_WALK]);
-  pix(scene, 'hb0', [...HEAD, ...BIG_BODY, ...BIG_LEGS]);
-  pix(scene, 'hb1', [...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]);
-  pix(scene, 'hb2', [...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]);
-  pix(scene, 'hbc', CROUCH);
-
-  // Fire outfit: white cap, red jacket.
-  const fire = (rows) => rows.map((r) => r.replace(/J/g, 'F').replace(/C/g, 'W'));
-  pix(scene, 'hf0', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS]));
-  pix(scene, 'hf1', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]));
-  pix(scene, 'hf2', fire([...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]));
-  pix(scene, 'hfc', fire(CROUCH));
+  makeHeroTextures(scene);
   pix(scene, 'fireball', ['..FF..', '.FJJF.', 'FJWWJF', 'FJWWJF', '.FJJF.', '..FF..']);
 
   pix(scene, 'bug0', [...BUG_TOP, '..KK..KK..KK..KK', '.KK..KK..KK..KK.']);
@@ -625,7 +627,8 @@ function drawScenery(scene) {
 // Chars: # ground, B brick, ? bonus (coin), M bonus (berry), L bonus (extra life), C brick with coins,
 // H hard block, [ ] pipe lip, { } pipe body, o coin, e enemy, | pole, T pole top,
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
-// ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body.
+// ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
+// h hidden block with an extra life, k hidden block with a coin (invisible until hit from below).
 const TILE_OF = {
   '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'L': T.BONUS, 'H': T.HARD, 'r': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
@@ -686,52 +689,54 @@ function grid(W) {
   return L;
 }
 
+// 1-1 follows the classic rhythm: first blocks and a berry, four pipes of growing height
+// (the last one leads down to a coin room), a hidden extra life, brick rows high up,
+// block clusters, two pairs of staircases (the second over a pit) and a big staircase to the flag.
 function levelField() {
   const L = grid(230);
-  const { row, fill, pipe, column, stairsUp, stairsDown } = L;
+  const { row, fill, pipe, column, stairsUp, stairsDown, put } = L;
   L.area(0, 212, 'tiles', '#6b8cff', 'field');
   L.area(214, 230, 'tilesCave', '#000000');
   L.floor('#', 0, 211);
-  L.gap(62, 63);
-  L.gap(90, 92);
-  L.gap(158, 159);
+  L.gap(69, 70);
+  L.gap(86, 88);
+  L.gap(153, 154);
 
-  row(12, 9, '?');
-  row(17, 9, 'BMB?B');
-  row(19, 5, '?');
-  row(26, 7, 'ooo');
-  pipe(31, 2);
-  pipe(41, 3);
-  row(52, 9, 'B??B');
-  row(52, 6, ' oo ');
-  pipe(56, 4);
-  row(60, 8, 'oooooo');
-  row(66, 9, 'B?B');
-  row(68, 5, 'BBB?BBBB');
-  row(80, 9, 'M');
-  row(84, 9, 'C');
-  stairsUp(86, 4);
-  row(89, 4, 'oooo');
-  stairsDown(93, 4);
-  row(106, 9, '?B?B?');
-  row(108, 5, 'M');
-  pipe(116, 2);
-  pipe(126, 3);
-  row(127, 6, 'L');
-  row(132, 9, 'BBBBBBBB');
-  row(132, 8, 'oooooooo');
-  stairsUp(152, 5);
-  column(157, 5);
-  stairsDown(160, 5);
-  row(166, 9, 'B?B');
-  pipe(176, 2);
-  stairsUp(182, 8);
-  column(190, 8);
-  L.flagpole(199);
+  row(16, 9, '?');
+  row(20, 9, 'BMB?B');
+  row(22, 5, '?');
+  pipe(28, 2);
+  pipe(38, 3);
+  pipe(46, 4);
+  pipe(57, 4);
+  put(64, 8, 'h');
+  row(77, 9, 'BMB');
+  row(80, 5, 'BBBBBBBB');
+  row(91, 5, 'BBB?');
+  row(94, 9, 'C');
+  row(100, 9, 'BB');
+  row(106, 9, '?  ?  ?');
+  row(109, 5, 'M');
+  row(118, 9, 'B');
+  row(121, 5, 'BBB');
+  row(128, 5, 'B??B');
+  row(129, 9, 'BB');
+  stairsUp(134, 4);
+  stairsDown(140, 4);
+  stairsUp(148, 4);
+  column(152, 4);
+  stairsDown(155, 4);
+  pipe(163, 2);
+  row(168, 9, 'BB?B');
+  pipe(179, 2);
+  stairsUp(181, 8);
+  column(189, 8);
+  L.flagpole(198);
 
-  L.enemies([24, 36, 47, 49, 70, 72, 100, 102, 104, 120, 122, 136, 138, 142, 144, 170, 172]);
+  L.enemies([22, 40, 51, 53, 97, 99, 107, 114, 116, 124, 126, 128, 130, 174, 176]);
+  L.enemies([81, 83], 4);
 
-  // Bonus room under the 4-tall pipe; the side pipe there leads back up through the pipe near the end.
+  // Coin room under the last tall pipe; its side pipe leads back up through the pipe near the end.
   L.floor('#', 214, 229);
   fill(214, 214, 2, 12, 'B');
   fill(214, 229, 1, 1, 'B');
@@ -740,10 +745,10 @@ function levelField() {
   row(217, 8, 'ooooooo');
   row(218, 6, 'ooooo');
   L.sidePipe(226, 11, 2);
-  L.pipes.push({ type: 'down', x: 56, y: 9, to: { area: 1, x: 216, y: 3 } });
-  L.pipes.push({ type: 'side', x: 226, y: 11, to: { area: 0, pipeX: 176, pipeY: 11 } });
+  L.pipes.push({ type: 'down', x: 57, y: 9, to: { area: 1, x: 216, y: 3 } });
+  L.pipes.push({ type: 'side', x: 226, y: 11, to: { area: 0, pipeX: 163, pipeY: 11 } });
 
-  return L.done({ goal: 'pole', goalX: 199 });
+  return L.done({ goal: 'pole', goalX: 198 });
 }
 
 // Underground: brick ceiling, low passages, lots of coins, lifts over a pit,
@@ -762,13 +767,10 @@ function levelCave() {
 
   row(10, 9, 'M?????');
   row(18, 11, 'oo');
-  column(22, 1);
-  column(24, 2);
-  column(26, 3);
-  column(28, 4);
-  column(30, 4);
+  stairsUp(27, 4);
+  column(31, 4);
   column(32, 3);
-  row(28, 7, 'oooo');
+  row(28, 6, 'oooo');
   fill(38, 43, 5, 6, 'B');
   row(38, 8, 'oooooo');
   row(39, 6, 'C');
@@ -937,6 +939,76 @@ const LEVELS = [
   { name: 'ЗАМОК', build: levelCastle, time: 300 },
 ];
 
+// ---------- Skins ----------
+// Each skin recolors the hero: C cap, J jacket, P overalls, B boots, S skin, K hair.
+const SKINS = [
+  { id: 'classic', name: 'Классика', pal: {} },
+  { id: 'forest', name: 'Лесник', pal: { C: '#2a7a2a', J: '#a86c30', P: '#4a4a20', B: '#3a2008' } },
+  { id: 'space', name: 'Космонавт', pal: { C: '#e8e8f0', J: '#b8bcc8', P: '#3050c8', B: '#606070', K: '#e8e8f0' } },
+  { id: 'ninja', name: 'Ниндзя', pal: { C: '#303040', J: '#404050', P: '#202028', B: '#101010', K: '#d82800' } },
+  { id: 'pirate', name: 'Пират', pal: { C: '#d82800', J: '#f0f0f0', P: '#202020', B: '#6b3a10', S: '#e0a070' } },
+  { id: 'pink', name: 'Зефирка', pal: { C: '#f878b8', J: '#f8b8d8', P: '#8040c0', B: '#c03080', K: '#8a4a20' } },
+];
+const SKIN_KEY = 'prygskok_skin';
+
+function loadSkin() {
+  try {
+    const id = localStorage.getItem(SKIN_KEY);
+    return SKINS.find((sk) => sk.id === id) || SKINS[0];
+  } catch (e) { return SKINS[0]; }
+}
+
+let skin = loadSkin();
+
+function skinPal(sk) { return Object.assign({}, PAL, sk.pal); }
+
+// Fire form keeps the skin's face but wears a white cap and red jacket.
+const fire = (rows) => rows.map((r) => r.replace(/J/g, 'F').replace(/C/g, 'W'));
+
+function makeHeroTextures(scene) {
+  const pal = skinPal(skin);
+  const hp = (key, rows) => pix(scene, key, rows, 1, pal);
+  hp('hs0', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS]);
+  hp('hs1', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS_WALK]);
+  hp('hs2', [...HEAD, ...SMALL_BODY_JUMP, ...SMALL_LEGS_WALK]);
+  hp('hb0', [...HEAD, ...BIG_BODY, ...BIG_LEGS]);
+  hp('hb1', [...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]);
+  hp('hb2', [...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]);
+  hp('hbc', CROUCH);
+  hp('hf0', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS]));
+  hp('hf1', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]));
+  hp('hf2', fire([...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]));
+  hp('hfc', fire(CROUCH));
+}
+
+// Skin picker on the title and game-over screens.
+function buildSkinPicker() {
+  const box = document.getElementById('skins');
+  box.innerHTML = '';
+  for (const sk of SKINS) {
+    const item = document.createElement('button');
+    item.className = 'skin' + (sk.id === skin.id ? ' on' : '');
+    const cv = document.createElement('canvas');
+    cv.width = 48;
+    cv.height = 48;
+    drawRows(cv.getContext('2d'), [...HEAD, ...SMALL_BODY, ...SMALL_LEGS], 3, skinPal(sk));
+    const label = document.createElement('span');
+    label.textContent = sk.name;
+    item.append(cv, label);
+    item.addEventListener('click', () => {
+      skin = sk;
+      try { localStorage.setItem(SKIN_KEY, sk.id); } catch (e) { /* ignore */ }
+      for (const el of box.children) el.classList.toggle('on', el === item);
+      const scene = window.__scene;
+      if (scene && scene.player) {
+        makeHeroTextures(scene);
+        scene.player.setTexture(scene.heroTex() + '0');
+      }
+    });
+    box.append(item);
+  }
+}
+
 // ---------- Game scene ----------
 let started = false;
 
@@ -968,6 +1040,7 @@ class Play extends Phaser.Scene {
     this.lvl = lvl;
     this.W = lvl.W;
     this.contents = new Map();
+    this.hidden = new Set();
     const coinSpots = [];
     const enemySpots = [];
     const ballSpots = [];
@@ -977,7 +1050,9 @@ class Play extends Phaser.Scene {
         const ch = lvl.grid[y][x];
         if (ch === '?') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
         if (ch === 'M') this.contents.set(x + ',' + y, { kind: 'berry', left: 1 });
-        if (ch === 'L') this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
+        if (ch === 'L' || ch === 'h') this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
+        if (ch === 'k') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
+        if (ch === 'h' || ch === 'k') this.hidden.add(x + ',' + y);
         if (ch === 'C') this.contents.set(x + ',' + y, { kind: 'coin', left: 8 });
         if (ch === 'o') coinSpots.push([x, y]);
         if (ch === 'e') enemySpots.push([x, y]);
@@ -1040,7 +1115,7 @@ class Play extends Phaser.Scene {
     // Hero.
     const [sx, sy] = lvl.start || [3, 13];
     this.player = this.physics.add.sprite(sx * TILE + 8, sy * TILE, this.heroTex() + '0').setOrigin(0.5, 1).setDepth(DEPTH.HERO);
-    this.player.body.setMaxVelocity(300, 420);
+    this.player.body.setMaxVelocity(300, 270);
     this.applyBody();
     this.arrow = this.add.image(0, 0, 'arrow').setVisible(false).setDepth(DEPTH.HERO);
     this.pipeWait = 0;
@@ -1535,23 +1610,31 @@ class Play extends Phaser.Scene {
     if (this.crouch) target = 0;
     else if (left && !right) target = -maxV;
     else if (right && !left) target = maxV;
+    // Rates follow the NES game (per-frame values x 60 x 60): slow build-up,
+    // a long slide on release and a sharper skid when reversing.
     let acc;
-    if (!onGround) acc = 260;
-    else if (target === 0) acc = 500;
-    else if (b.velocity.x !== 0 && Math.sign(target) !== Math.sign(b.velocity.x)) acc = 800;
-    else acc = 350;
+    if (target === 0) acc = onGround ? 183 : 0;
+    else if (b.velocity.x !== 0 && Math.sign(target) !== Math.sign(b.velocity.x)) acc = 366;
+    else acc = run ? 200 : 134;
     const vx = b.velocity.x;
     b.setVelocityX(vx < target ? Math.min(vx + acc * dt, target) : Math.max(vx - acc * dt, target));
     if (target !== 0) p.setFlipX(target < 0);
 
     // Jump: higher when running, shorter when the button is released early.
+    // Jump strength and gravity depend on the speed at take-off, as on the NES:
+    // low gravity while A is held on the way up, heavy gravity otherwise.
     if (jump && !this.prevJump && onGround) {
-      b.setVelocityY(Math.abs(b.velocity.x) > 120 ? -330 : -300);
+      const speed = Math.abs(b.velocity.x);
+      this.jumpKind = speed < 60 ? 0 : speed < 139 ? 1 : 2;
+      b.setVelocityY(this.jumpKind === 2 ? -300 : -240);
       SFX.jump();
     }
     this.prevJump = jump;
-    if (b.velocity.y < 0) b.setGravityY(jump ? -500 : 300);
-    else b.setGravityY(0);
+    const [holdG, fallG] = JUMP_GRAVITY[this.jumpKind || 0];
+    const g = b.velocity.y < 0 && jump ? holdG : fallG;
+    b.setGravityY(g - WORLD_GRAVITY);
+
+    this.checkHidden(b);
 
     // Blocks hit by the head: take the one closest to the hero's center.
     if (this.headHits.length) {
@@ -1608,6 +1691,23 @@ class Play extends Phaser.Scene {
       if (it.body.blocked.left) it.body.setVelocityX(50);
       else if (it.body.blocked.right) it.body.setVelocityX(-50);
       if (it.y > VIEW_H + 32) it.destroy();
+    }
+  }
+
+  // Hidden blocks only appear when the hero jumps into them from below.
+  checkHidden(b) {
+    if (!this.hidden.size || b.velocity.y >= 0) return;
+    const ty = Math.floor((b.top - 1) / TILE);
+    for (let tx = Math.floor(b.left / TILE); tx <= Math.floor((b.right - 1) / TILE); tx++) {
+      const key = tx + ',' + ty;
+      if (!this.hidden.has(key) || b.top < (ty + 1) * TILE - 6) continue;
+      this.hidden.delete(key);
+      const tile = this.layerAt(tx).putTileAt(T.BONUS, tx, ty);
+      this.player.y += (ty + 1) * TILE - b.top;
+      b.setVelocityY(0);
+      this.headHits.length = 0;
+      this.hitBlock(tile);
+      return;
     }
   }
 
@@ -1716,8 +1816,8 @@ class Play extends Phaser.Scene {
       e.setTexture('bugFlat');
       e.body.enable = false;
       this.time.delayedCall(500, () => e.destroy());
-      const jumpHeld = this.holdingA() || touch.turboA || this.keys.A.isDown;
-      b.setVelocityY(jumpHeld ? -320 : -220);
+      b.setVelocityY(-240);
+      this.jumpKind = 0;
       this.addScore(100);
       SFX.stomp();
       haptic('light');
@@ -1869,6 +1969,8 @@ class Play extends Phaser.Scene {
 // ---------- Boot ----------
 bindControls();
 
+buildSkinPicker();
+
 $('ovBtn').addEventListener('click', () => {
   audio();
   $('overlay').classList.add('hidden');
@@ -1892,7 +1994,7 @@ const game = new Phaser.Game({
   backgroundColor: '#000000',
   pixelArt: true,
   roundPixels: true,
-  physics: { default: 'arcade', arcade: { gravity: { y: 1100 }, tileBias: 20 } },
+  physics: { default: 'arcade', arcade: { gravity: { y: WORLD_GRAVITY }, tileBias: 20 } },
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: [Play],
 });
