@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>Танкодром</title>
+  <link rel="stylesheet" href="tanks.css">
+  <script src="../lib/telegram-web-app.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="hud">
+      <div>СЧЁТ<br><span id="score">000000</span></div>
+      <div>ЖИЗНИ<br><span id="lives">3</span></div>
+      <div>ВРАГИ<br><span id="foes">20</span></div>
+      <div>УРОВЕНЬ<br><span id="stage">1</span></div>
+    </div>
+    <div id="game">
+      <canvas id="screen" width="256" height="224"></canvas>
+      <div id="banner" class="hidden"></div>
+    </div>
+    <div id="controls">
+      <div id="dpad">
+        <div class="btn up">▲</div>
+        <div class="btn left">◀</div>
+        <div class="btn right">▶</div>
+        <div class="btn down">▼</div>
+      </div>
+      <div id="actions">
+        <div class="btn round turbo" id="btnTB">ТУРБО<br>B</div>
+        <div class="btn round turbo" id="btnTA">ТУРБО<br>A</div>
+        <div class="btn round ab" id="btnB">B</div>
+        <div class="btn round ab" id="btnA">A</div>
+      </div>
+    </div>
+    <div id="overlay">
+      <h1 id="ovTitle">ТАНКОДРОМ</h1>
+      <p id="ovText">Защити штаб от вражеских танков.<br>Кирпич пробивается, сталь держит.</p>
+      <div id="menu">
+        <button data-players="1">1 игрок</button>
+        <button data-players="2" class="desk">2 игрока за одной клавиатурой</button>
+        <button disabled>Онлайн вдвоём (скоро)</button>
+      </div>
+      <button id="ovBtn" class="hidden">Дальше</button>
+      <p class="hint" id="ovHint">Крестовина — ехать, A и B — огонь, ТУРБО — очередь.<br>Клавиатура: стрелки или WASD, огонь — пробел/Z, турбо — C.<br>Вдвоём: 1-й WASD + пробел (турбо G), 2-й стрелки + Enter (турбо K).</p>
+      <a id="back" href="../">← к выбору игр</a>
+    </div>
+  </div>
+  <script src="sim.js"></script>
+  <script src="tanks.js"></script>
+</body>
+</html>
