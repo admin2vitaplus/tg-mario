@@ -39,8 +39,15 @@ if (!apiUrl && process.env.TUNNEL !== "off") {
     apiUrl = await startTunnel(port, process.env.CLOUDFLARED || "cloudflared");
     console.log(`Туннель: ${apiUrl}`);
   } catch (err) {
-    console.warn(`Туннель не запущен (${err.message}). Игра будет работать, но без сохранения очков.`);
+    console.warn(`Туннель не запущен: ${err.message}.`);
   }
+}
+if (!apiUrl) {
+  console.error(
+    "\n!!! У сервера нет публичного https-адреса.\n" +
+      "!!! Рекорды, достижения и сетевые «Танки» работать НЕ будут.\n" +
+      "!!! Установите cloudflared (см. bot/README.md) или впишите PUBLIC_API_URL в .env и перезапустите бота.\n",
+  );
 }
 
 // Адрес сервера передаётся игре в ссылке, поэтому при смене туннеля ничего не надо перенастраивать.

@@ -36,14 +36,18 @@ Node.js + [grammY](https://grammy.dev). Один процесс делает д�
 
 Бот и сервер работают, пока запущен процесс. Для работы 24/7 нужен компьютер, который не выключается:
 
-- **VPS** (от ~200 ₽/мес): те же шаги, что выше, а запуск через pm2, чтобы бот поднимался сам:
+- **Чистый VPS на Ubuntu/Debian** (от ~200 ₽/мес): скрипт ставит Node.js и cloudflared
+  (оба с проверкой контрольных сумм), код и службу systemd в песочнице с лимитом памяти.
+  Перед установкой он прогоняет тесты бота. Токен спросит при первом запуске:
   ```sh
-  git clone https://github.com/admin2vitaplus/tg-mario && cd tg-mario/bot
-  npm install && cp .env.example .env && nano .env
-  npx pm2 start npm --name prygskok -- start
-  npx pm2 save
+  curl -fsSLo install.sh https://raw.githubusercontent.com/admin2vitaplus/tg-mario/main/bot/deploy/install.sh
+  less install.sh        # прочитайте, что он делает
+  sudo bash install.sh
   ```
-  Если у сервера есть свой домен с https, впишите его в `PUBLIC_API_URL`, тогда туннель не нужен.
+  Если на сервере бот уже запущен по-другому, скрипт откажется ставить второй: два бота
+  с одним токеном мешают друг другу. Повторный запуск обновляет эту же установку.
+  Логи: `journalctl -u prygskok-bot -f`, база: `/opt/tg-mario/data/scores.db`.
+  Свой домен с https вместо туннеля: `sudo PUBLIC_API_URL=https://ваш.домен bash install.sh`.
 - **Railway / Render / Fly.io**: корень сервиса — папка `bot`, команда запуска `npm start`,
   переменные `BOT_TOKEN` и `TUNNEL=off` задаются в настройках сервиса, а `PUBLIC_API_URL` —
   адрес, который выдаст платформа. Для базы нужен постоянный диск (volume), иначе очки
