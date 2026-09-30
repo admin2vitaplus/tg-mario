@@ -147,3 +147,29 @@ html, body {
   #dpad .btn { width: 42px; height: 42px; font-size: 18px; }
   .btn.turbo { font-size: 9px; }
 }
+
+/* Skin picker */
+#overlay .skins-title { margin: 0 0 8px; font-size: 13px; opacity: 0.8; }
+#skins {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 360px;
+  margin-bottom: 20px;
+}
+#overlay .skin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 72px;
+  padding: 6px 4px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: bold 11px "Courier New", monospace;
+}
+#overlay .skin.on { border-color: #f8d020; background: rgba(248, 208, 32, 0.15); }
+#overlay .skin canvas { width: 48px; height: 48px; image-rendering: pixelated; }
