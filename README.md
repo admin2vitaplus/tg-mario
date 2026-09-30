@@ -30,7 +30,7 @@ python3 -m http.server 8000
 ## Подключение к Telegram
 
 1. В настройках репозитория: Settings → Pages → Source: **GitHub Actions**.
-2. После пуша в `main` игра будет доступна по адресу `https://admin2vitaplus.github.io/sklad/`.
+2. После пуша в `main` игра будет доступна по адресу `https://admin2vitaplus.github.io/tg-mario/`.
 3. В @BotFather: `/mybots` → ваш бот → Bot Settings → Menu Button → укажите этот адрес.
    Либо `/newapp`, чтобы у игры была своя ссылка `t.me/<бот>/<имя>`.
 
