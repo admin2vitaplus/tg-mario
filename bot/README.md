@@ -7,7 +7,7 @@
 
 1. Node.js 20.12 или новее.
 2. `cp .env.example .env` и впишите в `.env` токен от @BotFather (`BOT_TOKEN`).
-   `WEBAPP_URL` — адрес игры, по умолчанию `https://admin2vitaplus.github.io/sklad/`.
+   `WEBAPP_URL` — адрес игры, по умолчанию `https://admin2vitaplus.github.io/tg-mario/`.
 3. `npm install`
 4. `npm start`
 
@@ -20,7 +20,7 @@
 
 - **Любой VPS** (самый простой и надёжный вариант, от ~200 ₽/мес):
   ```sh
-  git clone https://github.com/admin2vitaplus/sklad && cd sklad/bot
+  git clone https://github.com/admin2vitaplus/tg-mario && cd tg-mario/bot
   npm install && cp .env.example .env && nano .env
   npx pm2 start index.js --name prygskok --node-args="--env-file=.env"
   npx pm2 save

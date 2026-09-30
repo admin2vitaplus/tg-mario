@@ -6,7 +6,7 @@ if (!token) {
   process.exit(1);
 }
 
-const gameUrl = process.env.WEBAPP_URL || "https://admin2vitaplus.github.io/sklad/";
+const gameUrl = process.env.WEBAPP_URL || "https://admin2vitaplus.github.io/tg-mario/";
 
 const bot = new Bot(token);
 
