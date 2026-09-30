@@ -164,6 +164,26 @@ html, body {
 }
 #overlay button:disabled { background: #333; color: #888; }
 
+#online, #onlineStart { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+#online.hidden { display: none; }
+.join { display: flex; gap: 8px; }
+.join input {
+  width: 110px;
+  padding: 10px;
+  border: 2px solid #3a8a3a;
+  border-radius: 10px;
+  background: #111;
+  color: #fff;
+  font: bold 20px "Courier New", monospace;
+  text-align: center;
+  letter-spacing: 4px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.join button { flex: 1; }
+#overlay button.ghost { background: #333; }
+#overlay b.code { font-size: 28px; color: #f8d020; letter-spacing: 4px; }
+
 #back { margin-top: 8px; color: #8ab; font-size: 14px; text-decoration: none; }
 
 @media (max-width: 420px) {

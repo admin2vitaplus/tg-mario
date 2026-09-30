@@ -149,8 +149,12 @@ function onKey(e, down) {
     if (!btn.classList.contains('hidden')) btn.click();
   }
 }
-window.addEventListener('keydown', (e) => { audio(); onKey(e, true); });
-window.addEventListener('keyup', (e) => onKey(e, false));
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  audio();
+  onKey(e, true);
+});
+window.addEventListener('keyup', (e) => { if (e.target.tagName !== 'INPUT') onKey(e, false); });
 window.addEventListener('blur', clearPads);
 
 function bindTouch() {
@@ -540,12 +544,16 @@ function saveBest(score) {
   return best;
 }
 
+// The overlay shows either the main menu, the online panel or one button.
 let overlayAction = null;
-function showOverlay(title, html, button, action) {
+function showOverlay(title, html, button, action, panel) {
+  panel = panel || (button ? 'button' : 'menu');
   $('ovTitle').textContent = title;
   $('ovText').innerHTML = html;
-  $('menu').classList.toggle('hidden', !!button);
-  $('ovHint').classList.toggle('hidden', !!button);
+  $('menu').classList.toggle('hidden', panel !== 'menu');
+  $('ovHint').classList.toggle('hidden', panel !== 'menu');
+  $('back').classList.toggle('hidden', panel !== 'menu');
+  $('online').classList.toggle('hidden', panel !== 'online');
   const btn = $('ovBtn');
   btn.classList.toggle('hidden', !button);
   btn.textContent = button || '';
@@ -555,6 +563,9 @@ function showOverlay(title, html, button, action) {
 
 function showMenu() {
   running = false;
+  mode = 'local';
+  view = null;
+  netClose();
   showOverlay('ТАНКОДРОМ', 'Защити штаб от вражеских танков.<br>Кирпич пробивается, сталь держит.<br>Рекорд: ' + loadBest(), null, null);
 }
 
@@ -577,12 +588,222 @@ function killsTable(s) {
   }).join('<br>');
 }
 
+// ---------- Online: two phones, one room ----------
+// The host runs the game and sends the world 30 times a second; the guest
+// only sends its buttons and draws what arrives.
+const API_KEY = 'prygskok_api';
+function apiBase() {
+  let url = new URLSearchParams(location.search).get('api');
+  try {
+    if (url) localStorage.setItem(API_KEY, url);
+    else url = localStorage.getItem(API_KEY);
+  } catch (e) { /* ignore */ }
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.hostname === 'localhost' || u.hostname === '127.0.0.1' ? u.origin : '';
+  } catch (e) {
+    return '';
+  }
+}
+const API = apiBase();
+
+let mode = 'local'; // local | host | guest
+let view = null;    // what the guest draws
+const net = { ws: null, code: '', remote: { dir: -1, fire: false }, lastDir: -1, cellsKey: '', events: [] };
+
+function netSend(msg) {
+  if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(msg));
+}
+
+function netClose() {
+  const ws = net.ws;
+  net.ws = null;
+  net.code = '';
+  if (ws) { ws.onclose = null; try { ws.close(); } catch (e) { /* ignore */ } }
+}
+
+function connect(onOpen) {
+  netClose();
+  let ws;
+  try { ws = new WebSocket(API.replace(/^http/, 'ws') + '/ws/tanks'); } catch (e) { onlineMenu('Не удалось подключиться к серверу.'); return; }
+  net.ws = ws;
+  ws.onopen = onOpen;
+  ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } onNet(m); };
+  ws.onclose = () => {
+    if (net.ws !== ws) return;
+    net.ws = null;
+    lostLink('Связь с сервером прервалась.');
+  };
+}
+
+function lostLink(text) {
+  const inGame = mode !== 'local';
+  running = false;
+  mode = 'local';
+  netClose();
+  if (inGame) showOverlay('СВЯЗЬ ПОТЕРЯНА', text, 'В меню', showMenu);
+  else onlineMenu(text);
+}
+
+function onNet(m) {
+  if (m.t === 'room') {
+    net.code = m.code;
+    showOverlay('КОМНАТА', 'Код комнаты: <b class="code">' + m.code + '</b><br>Отправьте код другу и ждите, пока он войдёт.', null, null, 'online');
+    $('onlineStart').classList.add('hidden');
+    $('btnInvite').classList.remove('hidden');
+  } else if (m.t === 'peer') {
+    haptic('success');
+    mode = 'host';
+    begin(2);
+  } else if (m.t === 'joined') {
+    mode = 'guest';
+    keyMap = KEYS_1P;
+    clearPads();
+    view = null;
+    guestShown = 'wait';
+    net.lastDir = -1;
+    showOverlay('КОМНАТА ' + m.code, 'Вы в игре! Ждём начала…', null, null, 'online');
+    $('onlineStart').classList.add('hidden');
+  } else if (m.t === 'error') {
+    netClose();
+    onlineMenu(m.msg);
+  } else if (m.t === 'left') {
+    lostLink('Друг вышел из игры.');
+  } else if (m.t === 'i' && mode === 'host') {
+    net.remote.dir = m.d;
+    if (m.f) net.remote.fire = true;
+  } else if (m.t === 's' && mode === 'guest') {
+    applySnapshot(m);
+  }
+}
+
+function onlineMenu(text) {
+  running = false;
+  mode = 'local';
+  const html = API
+    ? (text ? text + '<br>' : '') + 'Создайте комнату и отправьте код другу<br>или введите код, который прислал друг.'
+    : 'Онлайн работает, когда игра открыта через бота в Telegram.';
+  showOverlay('ОНЛАЙН ВДВОЁМ', html, null, null, 'online');
+  $('onlineStart').classList.toggle('hidden', !API);
+  $('btnInvite').classList.add('hidden');
+}
+
+$('btnOnline').addEventListener('click', () => { audio(); onlineMenu(); });
+$('btnCancel').addEventListener('click', () => { audio(); showMenu(); });
+$('btnCreate').addEventListener('click', () => {
+  audio();
+  showOverlay('ОНЛАЙН ВДВОЁМ', 'Создаём комнату…', null, null, 'online');
+  $('onlineStart').classList.add('hidden');
+  connect(() => netSend({ t: 'create' }));
+});
+function joinRoom(code) {
+  code = String(code || '').replace(/\D/g, '');
+  if (code.length !== 4) { onlineMenu('Код — это 4 цифры.'); return; }
+  showOverlay('ОНЛАЙН ВДВОЁМ', 'Входим в комнату ' + code + '…', null, null, 'online');
+  $('onlineStart').classList.add('hidden');
+  connect(() => netSend({ t: 'join', code }));
+}
+$('btnJoin').addEventListener('click', () => { audio(); joinRoom($('code').value); });
+$('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($('code').value); });
+$('btnInvite').addEventListener('click', () => {
+  const link = location.origin + location.pathname + '?room=' + net.code + '&api=' + encodeURIComponent(API);
+  const text = 'Сыграем в «Танкодром» вдвоём? Код комнаты: ' + net.code;
+  try {
+    if (tg && tg.openTelegramLink) {
+      tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(text));
+      return;
+    }
+  } catch (e) { /* fall through */ }
+  if (navigator.share) navigator.share({ text, url: link }).catch(() => {});
+  else if (navigator.clipboard) navigator.clipboard.writeText(text + '\n' + link).then(() => { $('btnInvite').textContent = 'Ссылка скопирована'; });
+});
+
+const packTank = (t) => [t.x, t.y, t.dir, t.side === 'p' ? 1 : 0, t.type, t.pi, t.hp, t.anim, t.shield, t.stun, t.flash ? 1 : 0];
+const unpackTank = (a) => ({
+  x: a[0], y: a[1], dir: a[2], side: a[3] ? 'p' : 'e', type: a[4], pi: a[5], hp: a[6], anim: a[7], shield: a[8], stun: a[9], flash: !!a[10],
+});
+
+function sendSnapshot(s) {
+  const key = String.fromCharCode.apply(null, s.cells);
+  const m = {
+    t: 's', f: s.frame, ph: s.phase, pt: s.phaseT, st: s.stage, mn: s.mapName, ba: s.baseAlive ? 1 : 0,
+    q: s.queue.length, fr: s.freeze, sh: s.shovel,
+    pl: s.players.map((p) => [p.lives, p.level, p.score, p.kills, p.tank ? packTank(p.tank) : 0]),
+    en: s.enemies.map(packTank),
+    bu: s.bullets.map((b) => [b.x, b.y]),
+    bo: s.booms.map((b) => [b.x, b.y, b.big ? 1 : 0, b.t]),
+    sp: s.spawns.map((x) => [x.x, x.y, x.t]),
+    bn: s.bonus ? [s.bonus.x, s.bonus.y, s.bonus.type, s.bonus.t] : 0,
+    ev: net.events,
+  };
+  if (key !== net.cellsKey || s.frame % 120 === 0) { m.c = btoa(key); net.cellsKey = key; }
+  netSend(m);
+  net.events = [];
+}
+
+function applySnapshot(m) {
+  if (!view) view = { cells: new Uint8Array(N * N) };
+  const v = view;
+  Object.assign(v, {
+    frame: m.f, phase: m.ph, phaseT: m.pt, stage: m.st, mapName: m.mn, baseAlive: !!m.ba,
+    queue: { length: m.q }, freeze: m.fr, shovel: m.sh,
+    players: m.pl.map((a) => ({ lives: a[0], level: a[1], score: a[2], kills: a[3], tank: a[4] ? unpackTank(a[4]) : null })),
+    enemies: m.en.map(unpackTank),
+    bullets: m.bu.map(([x, y]) => ({ x, y })),
+    booms: m.bo.map(([x, y, big, t]) => ({ x, y, big: !!big, t })),
+    spawns: m.sp.map(([x, y, t]) => ({ x, y, t })),
+    bonus: m.bn ? { x: m.bn[0], y: m.bn[1], type: m.bn[2], t: m.bn[3] } : null,
+  });
+  if (m.c) {
+    const raw = atob(m.c);
+    for (let i = 0; i < raw.length; i++) v.cells[i] = raw.charCodeAt(i);
+  }
+  for (const ev of m.ev) if (SFX[ev]) SFX[ev]();
+  state = v;
+  guestScreens(v);
+}
+
+// The guest follows the host between stages.
+let guestShown = '';
+function guestScreens(v) {
+  const done = v.phase === 'clearDone' || v.phase === 'overDone' ? v.phase : '';
+  if (done === guestShown) return;
+  guestShown = done;
+  if (!done) {
+    $('overlay').classList.add('hidden');
+    running = true;
+    return;
+  }
+  const score = v.players.reduce((a, p) => a + p.score, 0);
+  const title = done === 'clearDone' ? 'УРОВЕНЬ ' + (v.stage + 1) + ' ПРОЙДЕН' : 'ИГРА ОКОНЧЕНА';
+  const body = done === 'clearDone' ? 'Подбито:<br>' + killsTable(v) : (v.baseAlive ? 'Все танки подбиты.' : 'Штаб разрушен.');
+  showOverlay(title, body + '<br><br>Счёт: ' + score + '<br>Ждём, когда друг продолжит…', 'Выйти', showMenu);
+}
+
+function guestTick() {
+  const inp = readPad(pads[0]);
+  if (inp.dir !== net.lastDir || inp.fire) {
+    net.lastDir = inp.dir;
+    netSend({ t: 'i', d: inp.dir, f: inp.fire ? 1 : 0 });
+  }
+}
+
+function remotePad() {
+  const r = net.remote;
+  const out = { dir: r.dir, fire: r.fire };
+  r.fire = false;
+  return out;
+}
+
 // ---------- Game flow ----------
 let state = null;
 let running = false;
 
 function begin(players) {
-  keyMap = players === 2 ? KEYS_2P : KEYS_1P;
+  keyMap = players === 2 && mode === 'local' ? KEYS_2P : KEYS_1P;
+  net.remote = { dir: -1, fire: false };
+  net.cellsKey = '';
+  net.events = [];
   clearPads();
   state = S.newGame(players, (Date.now() & 0x7fffffff) || 1);
   lastHud = '';
@@ -608,6 +829,8 @@ function afterStep(s) {
     const why = s.baseAlive ? 'Все танки подбиты.' : 'Штаб разрушен.';
     showOverlay('ИГРА ОКОНЧЕНА', why + '<br>Уровень: ' + (s.stage + 1) + '<br>Счёт: ' + score + '<br>Рекорд: ' + best, 'Ещё раз', () => begin(s.players.length));
   }
+  // The guest sees the result screen too, so send the final frame.
+  if (mode === 'host' && !running) sendSnapshot(s);
 }
 
 let last = 0, acc = 0;
@@ -615,14 +838,21 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = last ? now - last : 0;
   last = now;
-  if (state && running && !document.hidden) {
+  if (mode === 'guest') {
+    if (running) {
+      acc += Math.min(dt, 100);
+      while (acc >= STEP) { acc -= STEP; guestTick(); }
+    }
+  } else if (state && running && (!document.hidden || mode === 'host')) {
     acc += Math.min(dt, 100);
     while (acc >= STEP && running) {
       acc -= STEP;
-      S.step(state, [readPad(pads[0]), readPad(pads[1])]);
+      S.step(state, [readPad(pads[0]), mode === 'host' ? remotePad() : readPad(pads[1])]);
       for (const ev of state.events) if (SFX[ev]) SFX[ev]();
+      if (mode === 'host') net.events.push(...state.events);
       state.events.length = 0;
       afterStep(state);
+      if (mode === 'host' && running && state.frame % 2 === 0) sendSnapshot(state);
     }
   } else acc = 0;
   if (state) {
@@ -639,5 +869,10 @@ state.phase = 'play';
 render(state);
 state = null;
 showMenu();
+const invited = new URLSearchParams(location.search).get('room');
+if (invited && API) {
+  $('code').value = invited;
+  joinRoom(invited);
+}
 requestAnimationFrame(frame);
 })();

@@ -39,7 +39,18 @@
       <div id="menu">
         <button data-players="1">1 игрок</button>
         <button data-players="2" class="desk">2 игрока за одной клавиатурой</button>
-        <button disabled>Онлайн вдвоём (скоро)</button>
+        <button id="btnOnline">Онлайн вдвоём</button>
+      </div>
+      <div id="online" class="hidden">
+        <div id="onlineStart">
+          <button id="btnCreate">Создать комнату</button>
+          <div class="join">
+            <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="код" autocomplete="off">
+            <button id="btnJoin">Войти</button>
+          </div>
+        </div>
+        <button id="btnInvite" class="hidden">Позвать друга в Telegram</button>
+        <button id="btnCancel" class="ghost">Назад</button>
       </div>
       <button id="ovBtn" class="hidden">Дальше</button>
       <p class="hint" id="ovHint">Крестовина — ехать, A и B — огонь, ТУРБО — очередь.<br>Клавиатура: стрелки или WASD, огонь — пробел/Z, турбо — C.<br>Вдвоём: 1-й WASD + пробел (турбо G), 2-й стрелки + Enter (турбо K).</p>
