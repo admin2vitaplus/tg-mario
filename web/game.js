@@ -160,7 +160,7 @@ const PAL = {
   K: '#222222', W: '#ffffff', C: '#1fa2a8', S: '#f8b878', R: '#d82800',
   J: '#f8d020', P: '#2848a8', B: '#6b3a10',
   E: '#b83010', O: '#f08030', Y: '#f8d878',
-  G: '#107010', L: '#58d858', V: '#c02070', D: '#801050',
+  G: '#107010', L: '#58d858', N: '#30b030', V: '#c02070', D: '#801050',
   Q: '#f8c030', U: '#c07000',
 };
 
@@ -271,6 +271,25 @@ const BUG_TOP = [
   '...YYYYYYYYYY...',
 ];
 
+const BERRY = [
+    '.......G........',
+    '......GGG.......',
+    '....LLGGGLL.....',
+    '.....VVVVVV.....',
+    '...VVVVVVVVVV...',
+    '..VVWVVVVVVVVV..',
+    '..VWWVVVVVVVVV..',
+    '.VVVVVVVVVVVVVV.',
+    '.VVVVVVVVVVVVVV.',
+    '.VVVVVVVVVVVVDV.',
+    '.VVVVVVVVVVVDDV.',
+    '..VVVVVVVVVDDV..',
+    '..VVVVVVVVVVVV..',
+    '...VVVVVVVVVV...',
+    '.....VVVVVV.....',
+    '................',
+];
+
 function makeTextures(scene) {
   pix(scene, 'hs0', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS]);
   pix(scene, 'hs1', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS_WALK]);
@@ -308,24 +327,10 @@ function makeTextures(scene) {
     '......UUUU......',
   ]);
 
-  pix(scene, 'berry', [
-    '.......G........',
-    '......GGG.......',
-    '....LLGGGLL.....',
-    '.....VVVVVV.....',
-    '...VVVVVVVVVV...',
-    '..VVWVVVVVVVVV..',
-    '..VWWVVVVVVVVV..',
-    '.VVVVVVVVVVVVVV.',
-    '.VVVVVVVVVVVVVV.',
-    '.VVVVVVVVVVVVDV.',
-    '.VVVVVVVVVVVDDV.',
-    '..VVVVVVVVVDDV..',
-    '..VVVVVVVVVVVV..',
-    '...VVVVVVVVVV...',
-    '.....VVVVVV.....',
-    '................',
-  ]);
+  pix(scene, 'berry', BERRY);
+
+  // Green berry gives an extra life: same shape, other colors.
+  pix(scene, 'berry1', BERRY.map((r) => r.replace(/V/g, 'N').replace(/D/g, 'G')));
 
   pix(scene, 'debris', ['.UUU.', 'UOOOU', 'UOOOU', '.UUU.']);
 
@@ -336,6 +341,8 @@ function makeTextures(scene) {
 // Tileset: one row of 16x16 tiles, index = tile id.
 const T = { GROUND: 0, BRICK: 1, BONUS: 2, USED: 3, HARD: 4, PIPE_TL: 5, PIPE_TR: 6, PIPE_L: 7, PIPE_R: 8, POLE: 9, POLE_TOP: 10 };
 const SOLID_MAX = 8;
+// Draw order: scenery, items rising out of blocks, tiles, items, enemies, hero.
+const DEPTH = { SCENERY: -10, SPROUT: -5, TILES: 0, ITEM: 5, ENEMY: 6, HERO: 10 };
 
 function drawTiles(scene) {
   const count = 11;
@@ -448,10 +455,10 @@ function drawScenery(scene) {
 }
 
 // ---------- Level ----------
-// Chars: # ground, B brick, ? bonus (coin), M bonus (berry), C brick with coins,
+// Chars: # ground, B brick, ? bonus (coin), M bonus (berry), L bonus (extra life), C brick with coins,
 // H hard block, [ ] pipe lip, { } pipe body, o coin, e enemy, | pole, T pole top.
 const TILE_OF = {
-  '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'H': T.HARD,
+  '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'L': T.BONUS, 'H': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
 };
 
@@ -496,6 +503,7 @@ function buildLevel() {
   row(108, 5, 'M');
   pipe(116, 2);
   pipe(126, 3);
+  row(127, 6, 'L');
   row(132, 9, 'BBBBBBBB');
   row(132, 8, 'oooooooo');
   stairsUp(152, 5);
@@ -549,6 +557,7 @@ class Play extends Phaser.Scene {
         const ch = lvl.grid[y][x];
         if (ch === '?') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
         if (ch === 'M') this.contents.set(x + ',' + y, { kind: 'berry', left: 1 });
+        if (ch === 'L') this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
         if (ch === 'C') this.contents.set(x + ',' + y, { kind: 'coin', left: 8 });
         if (ch === 'o') coinSpots.push([x, y]);
         if (ch === 'e') enemySpots.push([x, y]);
@@ -559,15 +568,15 @@ class Play extends Phaser.Scene {
 
     // Scenery behind the level, with parallax.
     for (let x = 0; x < lvl.W * TILE; x += 190) {
-      this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5);
+      this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5).setDepth(DEPTH.SCENERY);
     }
     for (let x = 0; x < lvl.W * TILE; x += 300) {
-      this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8);
+      this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8).setDepth(DEPTH.SCENERY);
     }
 
     this.map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
     const tiles = this.map.addTilesetImage('tiles', 'tiles', TILE, TILE, 0, 0);
-    this.layer = this.map.createLayer(0, tiles, 0, 0);
+    this.layer = this.map.createLayer(0, tiles, 0, 0).setDepth(DEPTH.TILES);
     this.layer.setCollisionBetween(0, SOLID_MAX);
 
     // Flag on the pole.
@@ -575,7 +584,7 @@ class Play extends Phaser.Scene {
     this.flag = this.add.image(poleX - 8, 4 * TILE + 8, 'flag');
 
     // Hero.
-    this.player = this.physics.add.sprite(3 * TILE + 8, 13 * TILE, 'hs0').setOrigin(0.5, 1);
+    this.player = this.physics.add.sprite(3 * TILE + 8, 13 * TILE, 'hs0').setOrigin(0.5, 1).setDepth(DEPTH.HERO);
     this.player.body.setMaxVelocity(300, 420);
     this.applyBody();
 
@@ -584,7 +593,7 @@ class Play extends Phaser.Scene {
 
     this.enemies = this.physics.add.group();
     for (const [x, y] of enemySpots) {
-      const e = this.enemies.create(x * TILE + 8, y * TILE + 8, 'bug0');
+      const e = this.enemies.create(x * TILE + 8, y * TILE + 8, 'bug0').setDepth(DEPTH.ENEMY);
       e.body.setSize(14, 14).setOffset(1, 2);
       e.setData('state', 'idle');
     }
@@ -600,8 +609,10 @@ class Play extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.coinItems, (p, c) => { c.destroy(); this.gainCoin(); });
     this.physics.add.overlap(this.player, this.items, (p, it) => {
       if (!it.body.enable) return;
+      const kind = it.getData('kind');
       it.destroy();
-      this.grow();
+      if (kind === 'life') this.extraLife();
+      else this.grow();
     });
 
     const pole = this.add.zone(poleX, 3 * TILE, 4, 9 * TILE).setOrigin(0.5, 0);
@@ -652,8 +663,7 @@ class Play extends Phaser.Scene {
     SFX.coin();
     if (this.s.coins >= 100) {
       this.s.coins -= 100;
-      this.s.lives++;
-      SFX.life();
+      this.extraLife();
     }
     hud(this.s);
   }
@@ -775,7 +785,7 @@ class Play extends Phaser.Scene {
     if (content) {
       content.left--;
       if (content.kind === 'coin') this.popCoin(tx, ty);
-      else this.spawnBerry(tx, ty);
+      else this.spawnBerry(tx, ty, content.kind);
       let idx = tile.index;
       if (content.left <= 0) {
         this.contents.delete(key);
@@ -824,17 +834,18 @@ class Play extends Phaser.Scene {
     this.gainCoin();
   }
 
-  spawnBerry(tx, ty) {
+  spawnBerry(tx, ty, kind) {
     SFX.sprout();
-    const it = this.items.create(tx * TILE + 8, ty * TILE + 8, 'berry');
-    it.setDepth(-1);
+    const it = this.items.create(tx * TILE + 8, ty * TILE + 8, kind === 'life' ? 'berry1' : 'berry');
+    it.setData('kind', kind);
+    it.setDepth(DEPTH.SPROUT);
     it.body.enable = false;
     this.tweens.add({
       targets: it,
       y: ty * TILE - 8,
       duration: 500,
       onComplete: () => {
-        it.setDepth(0);
+        it.setDepth(DEPTH.ITEM);
         it.body.enable = true;
         it.body.reset(it.x, it.y);
         it.body.setVelocityX(50);
@@ -877,6 +888,13 @@ class Play extends Phaser.Scene {
     } else {
       this.hurt();
     }
+  }
+
+  extraLife() {
+    this.s.lives++;
+    hud(this.s);
+    SFX.life();
+    haptic('success');
   }
 
   grow() {
