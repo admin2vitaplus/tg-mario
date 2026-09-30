@@ -5,12 +5,14 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node --env-file-if-exists=.env index.js"
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test"
   },
   "engines": {
-    "node": ">=20.12"
+    "node": ">=22.13"
   },
   "dependencies": {
-    "grammy": "^1.30.0"
+    "grammy": "^1.30.0",
+    "ws": "^8.18.0"
   }
 }

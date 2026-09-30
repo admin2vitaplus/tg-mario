@@ -21,6 +21,9 @@ if (tg) {
   } catch (e) { /* not inside Telegram */ }
 }
 
+// Server scores and achievements (api.js). The stub keeps the game working without it.
+const api = window.GameAPI || { track() {}, levelDone() {}, runDone() { return Promise.resolve(null); }, newRun() {} };
+
 function haptic(kind) {
   try {
     if (!tg || !tg.HapticFeedback) return;
@@ -1362,6 +1365,7 @@ class Play extends Phaser.Scene {
       boss.setTintFill(0xffffff);
       this.time.delayedCall(80, () => boss.clearTint());
       if (boss.getData('hp') <= 0) {
+        api.track('bossFire');
         this.addScore(5000);
         boss.setFlipY(true);
         boss.body.checkCollision.none = true;
@@ -1535,6 +1539,7 @@ class Play extends Phaser.Scene {
 
   gainCoin() {
     this.s.coins++;
+    api.track('coin');
     this.s.score += 200;
     SFX.coin();
     if (this.s.coins >= 100) {
@@ -1880,6 +1885,7 @@ class Play extends Phaser.Scene {
   die(fell) {
     if (this.dead) return;
     this.dead = true;
+    api.track('death');
     SFX.die();
     haptic('error');
     const p = this.player;
@@ -1898,11 +1904,17 @@ class Play extends Phaser.Scene {
     });
   }
 
-  gameOver(title) {
+  gameOver(title, completed) {
     const best = saveBest(this.s.score);
     this.physics.pause();
+    const levels = completed ? LEVELS.length : this.s.level;
     showOverlay(title, `Счёт: ${this.s.score}<br>Рекорд: ${best}`, 'Играть снова', () => {
       this.scene.restart({});
+    });
+    api.runDone(this.s.score, levels, !!completed).then((r) => {
+      if (!r) return;
+      const place = r.rank ? `<br>Место в таблице: ${r.rank}` : '';
+      $('ovText').innerHTML = `Счёт: ${this.s.score}<br>${r.newRecord ? 'Новый рекорд!' : `Рекорд: ${r.best}`}${place}`;
     });
   }
 
@@ -1943,12 +1955,13 @@ class Play extends Phaser.Scene {
   }
 
   finishLevel() {
+    api.levelDone(this.s.level, this.s.score, this.s.timeLeft);
     this.addScore(this.s.timeLeft * 50);
     const next = this.s.level + 1;
     if (next < LEVELS.length) {
       this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, big: this.big, fire: this.fire });
     } else {
-      this.gameOver('МИР 1 ПРОЙДЕН!');
+      this.gameOver('МИР 1 ПРОЙДЕН!', true);
     }
   }
 }
