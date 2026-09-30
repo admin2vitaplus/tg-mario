@@ -106,7 +106,14 @@ function esc(s) {
 function showTab(tab) {
   panel.querySelectorAll('.scTabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   bodyEl.innerHTML = '<p class="scNote">Загрузка…</p>';
-  const fail = () => { bodyEl.innerHTML = '<p class="scNote">Сервер рекордов сейчас недоступен.</p>'; };
+  if (!base) {
+    bodyEl.innerHTML = '<p class="scNote">Сервер рекордов не подключён.<br><br>' +
+      'Таблица работает, когда игра открыта кнопкой «Играть» из сообщения бота ' +
+      '(команда /start), а сам бот запущен. После первого такого запуска ' +
+      'адрес запомнится и рекорды будут видны отовсюду.</p>';
+    return;
+  }
+  const fail = () => { bodyEl.innerHTML = '<p class="scNote">Сервер рекордов сейчас недоступен: бот выключен или нет связи. Попробуйте позже.</p>'; };
   if (tab === 'top') {
     request('GET', '/top').then((list) => {
       if (!list.length) { bodyEl.innerHTML = '<p class="scNote">Рекордов пока нет. Будь первым!</p>'; return; }
@@ -140,8 +147,9 @@ function openScores() {
   showTab('top');
 }
 
-// Кнопка «Рекорды» на заставке и экране окончания игры.
-if (base) {
+// Кнопка «Рекорды» на заставке и экране окончания игры. Видна всегда:
+// без сервера экран рекордов объясняет, почему таблица пуста.
+{
   const btn = document.createElement('button');
   btn.id = 'ovScores';
   btn.textContent = '🏆 Рекорды и достижения';

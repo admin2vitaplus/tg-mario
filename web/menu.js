@@ -51,5 +51,8 @@ function onKey(e) {
 }
 
 document.addEventListener('keydown', onKey, true);
+document.getElementById('menuScores').addEventListener('click', () => {
+  if (window.GameAPI) window.GameAPI.openScores();
+});
 render();
 })();

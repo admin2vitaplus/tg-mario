@@ -199,3 +199,12 @@ html, body {
 #menu li.soon { opacity: 0.35; cursor: default; }
 #menu li.on::before { content: '►'; position: absolute; left: 10px; color: #f8d020; }
 #menu .hint { margin-top: 24px; font-size: 12px; opacity: 0.6; }
+#menuScores {
+  margin-top: 20px;
+  padding: 10px 24px;
+  border: 2px solid #f8d020;
+  border-radius: 8px;
+  background: transparent;
+  color: #f8d020;
+  font: bold 16px "Courier New", monospace;
+}
