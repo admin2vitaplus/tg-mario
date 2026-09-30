@@ -72,7 +72,8 @@ const SFX = {
 };
 
 // ---------- Input ----------
-const touch = { left: false, right: false, jump: false, run: false, firePressed: false };
+const touch = { left: false, right: false, a: false, b: false, turboA: false, turboB: false, bPressed: false };
+const TURBO_MS = 67; // about 7.5 presses per second, like a turbo button
 
 function bindControls() {
   const dpad = document.getElementById('dpad');
@@ -105,36 +106,25 @@ function bindControls() {
     dpad.addEventListener(name, (e) => { pointers.delete(e.pointerId); refresh(); });
   }
 
-  const jump = document.getElementById('btnJump');
-  jump.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    audio();
-    touch.jump = true;
-    jump.classList.add('on');
-  });
-  for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
-    jump.addEventListener(name, () => { touch.jump = false; jump.classList.remove('on'); });
-  }
-
-  const fireBtn = document.getElementById('btnFire');
-  fireBtn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    audio();
-    touch.firePressed = true;
-    fireBtn.classList.add('on');
-  });
-  for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
-    fireBtn.addEventListener(name, () => fireBtn.classList.remove('on'));
-  }
-
-  // Holding two thumbs on a phone is awkward, so run is a toggle on touch.
-  const run = document.getElementById('btnRun');
-  run.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    audio();
-    touch.run = !touch.run;
-    run.classList.toggle('on', touch.run);
-  });
+  // Dendy pad: A jumps, B runs while held and fires on each press.
+  // Turbo buttons act as A/B pressed and released many times a second.
+  const hold = (id, key, onPress) => {
+    const el = document.getElementById(id);
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      audio();
+      touch[key] = true;
+      if (onPress) onPress();
+      el.classList.add('on');
+    });
+    for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
+      el.addEventListener(name, () => { touch[key] = false; el.classList.remove('on'); });
+    }
+  };
+  hold('btnA', 'a');
+  hold('btnB', 'b', () => { touch.bPressed = true; });
+  hold('btnTA', 'turboA');
+  hold('btnTB', 'turboB');
 }
 
 // ---------- HUD and overlay ----------
@@ -647,7 +637,7 @@ class Play extends Phaser.Scene {
     this.physics.add.overlap(this.player, pole, () => this.win(lvl.poleX));
 
     const kb = this.input.keyboard;
-    this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,Z,X,C,SPACE,SHIFT');
+    this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,Z,X,A,S,SPACE,SHIFT');
 
     this.time.addEvent({
       delay: 400,
@@ -665,6 +655,11 @@ class Play extends Phaser.Scene {
     else this.physics.pause();
     hud(this.s);
     window.__scene = this;
+  }
+
+  holdingA() {
+    const k = this.keys;
+    return k.UP.isDown || k.Z.isDown || k.SPACE.isDown || touch.a;
   }
 
   applyBody() {
@@ -725,14 +720,18 @@ class Play extends Phaser.Scene {
     if (p.y > VIEW_H + 24) { this.die(true); return; }
 
     const k = this.keys;
-    const left = k.LEFT.isDown || k.A.isDown || touch.left;
-    const right = k.RIGHT.isDown || k.D.isDown || touch.right;
-    const jump = k.UP.isDown || k.W.isDown || k.Z.isDown || k.SPACE.isDown || touch.jump;
-    const run = k.X.isDown || k.SHIFT.isDown || touch.run;
+    const turboOn = Math.floor(time / TURBO_MS) % 2 === 0;
+    const turboA = (touch.turboA || k.A.isDown) && turboOn;
+    const turboB = (touch.turboB || k.S.isDown) && turboOn;
+    const left = k.LEFT.isDown || touch.left;
+    const right = k.RIGHT.isDown || touch.right;
+    const jump = this.holdingA() || turboA;
+    const run = k.X.isDown || k.SHIFT.isDown || touch.b || touch.turboB || k.S.isDown;
     // Latched presses, so a quick tap between two frames still fires.
     const JD = Phaser.Input.Keyboard.JustDown;
-    const firePressed = JD(k.X) | JD(k.C) | touch.firePressed;
-    touch.firePressed = false;
+    const firePressed = JD(k.X) || JD(k.SHIFT) || touch.bPressed || (turboB && !this.prevTurboB);
+    touch.bPressed = false;
+    this.prevTurboB = turboB;
     if (firePressed && this.fire) this.shoot();
     const onGround = b.blocked.down;
     const dt = delta / 1000;
@@ -920,7 +919,7 @@ class Play extends Phaser.Scene {
       e.setTexture('bugFlat');
       e.body.enable = false;
       this.time.delayedCall(500, () => e.destroy());
-      const jumpHeld = this.keys.Z.isDown || this.keys.SPACE.isDown || this.keys.UP.isDown || this.keys.W.isDown || touch.jump;
+      const jumpHeld = this.holdingA() || touch.turboA || this.keys.A.isDown;
       b.setVelocityY(jumpHeld ? -320 : -220);
       this.addScore(100);
       SFX.stomp();

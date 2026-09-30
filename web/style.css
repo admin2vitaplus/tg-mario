@@ -47,7 +47,7 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 150px;
+  height: 160px;
   padding: 0 16px env(safe-area-inset-bottom);
 }
 
@@ -69,8 +69,13 @@ html, body {
   font-weight: bold;
 }
 
-.btn.round { border-radius: 50%; font-size: 13px; }
-.btn.big { width: 80px; height: 80px; font-size: 28px; }
+.btn.round { border-radius: 50%; }
+.btn.ab { background: rgba(216, 40, 0, 0.6); font-size: 24px; }
+.btn.turbo { font-size: 10px; line-height: 1.2; text-align: center; }
+.btn.ab.on { background: rgba(255, 90, 50, 0.9); }
+
+/* Dendy-style 2x2 block: turbo buttons above, B and A below */
+#actions { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
 .btn.on { background: rgba(255, 255, 255, 0.45); }
 
 /* Phone in landscape: buttons float over the game */
@@ -123,8 +128,6 @@ html, body {
 @media (max-width: 420px) {
   #controls { padding-left: 12px; padding-right: 12px; }
   #dpad, #actions { gap: 8px; }
-  .btn { width: 54px; height: 54px; font-size: 22px; }
-  .btn.big { width: 66px; height: 66px; }
-  .btn.round { font-size: 10px; }
-  .btn.round.big { font-size: 24px; }
+  .btn { width: 56px; height: 56px; font-size: 22px; }
+  .btn.turbo { font-size: 9px; }
 }
