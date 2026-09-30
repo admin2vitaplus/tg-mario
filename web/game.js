@@ -65,13 +65,15 @@ const SFX = {
   sprout: () => tone(200, 800, 0.4, 'triangle', 0.15),
   power: () => notes([523, 659, 784, 1047], 0.07, 0.1),
   hurt: () => tone(600, 150, 0.35),
+  fire: () => tone(900, 300, 0.08, 'square', 0.06),
   life: () => notes([659, 784, 1319, 1047, 1175, 1568], 0.08, 0.1),
   die: () => notes([660, 550, 440, 330, 220], 0.13, 0.15),
   win: () => notes([523, 659, 784, 1047, 784, 1047], 0.12, 0.15),
 };
 
 // ---------- Input ----------
-const touch = { left: false, right: false, jump: false, run: false };
+const touch = { left: false, right: false, a: false, b: false, turboA: false, turboB: false, bPressed: false };
+const TURBO_MS = 67; // about 7.5 presses per second, like a turbo button
 
 function bindControls() {
   const dpad = document.getElementById('dpad');
@@ -104,25 +106,25 @@ function bindControls() {
     dpad.addEventListener(name, (e) => { pointers.delete(e.pointerId); refresh(); });
   }
 
-  const jump = document.getElementById('btnJump');
-  jump.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    audio();
-    touch.jump = true;
-    jump.classList.add('on');
-  });
-  for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
-    jump.addEventListener(name, () => { touch.jump = false; jump.classList.remove('on'); });
-  }
-
-  // Holding two thumbs on a phone is awkward, so run is a toggle on touch.
-  const run = document.getElementById('btnRun');
-  run.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    audio();
-    touch.run = !touch.run;
-    run.classList.toggle('on', touch.run);
-  });
+  // Dendy pad: A jumps, B runs while held and fires on each press.
+  // Turbo buttons act as A/B pressed and released many times a second.
+  const hold = (id, key, onPress) => {
+    const el = document.getElementById(id);
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      audio();
+      touch[key] = true;
+      if (onPress) onPress();
+      el.classList.add('on');
+    });
+    for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
+      el.addEventListener(name, () => { touch[key] = false; el.classList.remove('on'); });
+    }
+  };
+  hold('btnA', 'a');
+  hold('btnB', 'b', () => { touch.bPressed = true; });
+  hold('btnTA', 'turboA');
+  hold('btnTB', 'turboB');
 }
 
 // ---------- HUD and overlay ----------
@@ -161,7 +163,7 @@ const PAL = {
   K: '#222222', W: '#ffffff', C: '#1fa2a8', S: '#f8b878', R: '#d82800',
   J: '#f8d020', P: '#2848a8', B: '#6b3a10',
   E: '#b83010', O: '#f08030', Y: '#f8d878',
-  G: '#107010', L: '#58d858', V: '#c02070', D: '#801050',
+  G: '#107010', L: '#58d858', N: '#30b030', F: '#e04020', V: '#c02070', D: '#801050',
   Q: '#f8c030', U: '#c07000',
 };
 
@@ -272,6 +274,25 @@ const BUG_TOP = [
   '...YYYYYYYYYY...',
 ];
 
+const BERRY = [
+    '.......G........',
+    '......GGG.......',
+    '....LLGGGLL.....',
+    '.....VVVVVV.....',
+    '...VVVVVVVVVV...',
+    '..VVWVVVVVVVVV..',
+    '..VWWVVVVVVVVV..',
+    '.VVVVVVVVVVVVVV.',
+    '.VVVVVVVVVVVVVV.',
+    '.VVVVVVVVVVVVDV.',
+    '.VVVVVVVVVVVDDV.',
+    '..VVVVVVVVVDDV..',
+    '..VVVVVVVVVVVV..',
+    '...VVVVVVVVVV...',
+    '.....VVVVVV.....',
+    '................',
+];
+
 function makeTextures(scene) {
   pix(scene, 'hs0', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS]);
   pix(scene, 'hs1', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS_WALK]);
@@ -279,6 +300,13 @@ function makeTextures(scene) {
   pix(scene, 'hb0', [...HEAD, ...BIG_BODY, ...BIG_LEGS]);
   pix(scene, 'hb1', [...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]);
   pix(scene, 'hb2', [...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]);
+
+  // Fire outfit: white cap, red jacket.
+  const fire = (rows) => rows.map((r) => r.replace(/J/g, 'F').replace(/C/g, 'W'));
+  pix(scene, 'hf0', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS]));
+  pix(scene, 'hf1', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]));
+  pix(scene, 'hf2', fire([...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]));
+  pix(scene, 'fireball', ['..FF..', '.FJJF.', 'FJWWJF', 'FJWWJF', '.FJJF.', '..FF..']);
 
   pix(scene, 'bug0', [...BUG_TOP, '..KK..KK..KK..KK', '.KK..KK..KK..KK.']);
   pix(scene, 'bug1', [...BUG_TOP, '.KK..KK..KK..KK.', '..KK..KK..KK..KK']);
@@ -309,24 +337,10 @@ function makeTextures(scene) {
     '......UUUU......',
   ]);
 
-  pix(scene, 'berry', [
-    '.......G........',
-    '......GGG.......',
-    '....LLGGGLL.....',
-    '.....VVVVVV.....',
-    '...VVVVVVVVVV...',
-    '..VVWVVVVVVVVV..',
-    '..VWWVVVVVVVVV..',
-    '.VVVVVVVVVVVVVV.',
-    '.VVVVVVVVVVVVVV.',
-    '.VVVVVVVVVVVVDV.',
-    '.VVVVVVVVVVVDDV.',
-    '..VVVVVVVVVDDV..',
-    '..VVVVVVVVVVVV..',
-    '...VVVVVVVVVV...',
-    '.....VVVVVV.....',
-    '................',
-  ]);
+  pix(scene, 'berry', BERRY);
+
+  // Green berry gives an extra life: same shape, other colors.
+  pix(scene, 'berry1', BERRY.map((r) => r.replace(/V/g, 'N').replace(/D/g, 'G')));
 
   pix(scene, 'debris', ['.UUU.', 'UOOOU', 'UOOOU', '.UUU.']);
 
@@ -401,6 +415,8 @@ const T = {
 };
 const SOLID = [0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 17, 18, 19, 20, 21];
 const TILE_COUNT = 22;
+// Draw order: scenery, items rising out of blocks, tiles, items, enemies, hero.
+const DEPTH = { SCENERY: -10, SPROUT: -5, TILES: 0, ITEM: 5, ENEMY: 6, HERO: 10 };
 
 // Ground, brick and hard block colors per theme; the rest of the tiles are shared.
 const TILESETS = {
@@ -579,12 +595,12 @@ function drawScenery(scene) {
 }
 
 // ---------- Levels ----------
-// Chars: # ground, B brick, ? bonus (coin), M bonus (berry), C brick with coins,
+// Chars: # ground, B brick, ? bonus (coin), M bonus (berry), L bonus (extra life), C brick with coins,
 // H hard block, [ ] pipe lip, { } pipe body, o coin, e enemy, | pole, T pole top,
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
 // ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body.
 const TILE_OF = {
-  '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'H': T.HARD, 'r': T.HARD,
+  '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'L': T.BONUS, 'H': T.HARD, 'r': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
   '~': T.LAVA_TOP, '=': T.LAVA, 'f': T.LAVA_TOP,
   '(': T.TREE_L, '-': T.TREE_M, ')': T.TREE_R, 'i': T.TRUNK, '_': T.BRIDGE,
@@ -674,6 +690,7 @@ function levelField() {
   row(108, 5, 'M');
   pipe(116, 2);
   pipe(126, 3);
+  row(127, 6, 'L');
   row(132, 9, 'BBBBBBBB');
   row(132, 8, 'oooooooo');
   stairsUp(152, 5);
@@ -904,7 +921,9 @@ class Play extends Phaser.Scene {
     this.def = LEVELS[this.s.level];
     this.s.timeLeft = this.def.time;
     this.big = !!this.s.big;
+    this.fire = !!this.s.fire;
     delete this.s.big;
+    delete this.s.fire;
     this.intro = false;
     this.dead = false;
     this.won = false;
@@ -931,6 +950,7 @@ class Play extends Phaser.Scene {
         const ch = lvl.grid[y][x];
         if (ch === '?') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
         if (ch === 'M') this.contents.set(x + ',' + y, { kind: 'berry', left: 1 });
+        if (ch === 'L') this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
         if (ch === 'C') this.contents.set(x + ',' + y, { kind: 'coin', left: 8 });
         if (ch === 'o') coinSpots.push([x, y]);
         if (ch === 'e') enemySpots.push([x, y]);
@@ -947,13 +967,13 @@ class Play extends Phaser.Scene {
       if (ar.scenery !== 'none') {
         const [a, b] = span(0.5);
         for (let x = a; x < b; x += 190) {
-          box.push(this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5).setDepth(-2));
+          box.push(this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5).setDepth(DEPTH.SCENERY));
         }
       }
       if (ar.scenery === 'field') {
         const [a, b] = span(0.8);
         for (let x = a; x < b; x += 300) {
-          box.push(this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8).setDepth(-2));
+          box.push(this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8).setDepth(DEPTH.SCENERY));
         }
       }
       return box;
@@ -992,10 +1012,10 @@ class Play extends Phaser.Scene {
 
     // Hero.
     const [sx, sy] = lvl.start || [3, 13];
-    this.player = this.physics.add.sprite(sx * TILE + 8, sy * TILE, this.big ? 'hb0' : 'hs0').setOrigin(0.5, 1);
+    this.player = this.physics.add.sprite(sx * TILE + 8, sy * TILE, this.heroTex() + '0').setOrigin(0.5, 1).setDepth(DEPTH.HERO);
     this.player.body.setMaxVelocity(300, 420);
     this.applyBody();
-    this.arrow = this.add.image(0, 0, 'arrow').setVisible(false);
+    this.arrow = this.add.image(0, 0, 'arrow').setVisible(false).setDepth(DEPTH.HERO);
     this.pipeWait = 0;
     this.inPipe = false;
 
@@ -1004,12 +1024,13 @@ class Play extends Phaser.Scene {
 
     this.enemies = this.physics.add.group();
     for (const [x, y] of enemySpots) {
-      const e = this.enemies.create(x * TILE + 8, y * TILE + 8, 'bug0');
+      const e = this.enemies.create(x * TILE + 8, y * TILE + 8, 'bug0').setDepth(DEPTH.ENEMY);
       e.body.setSize(14, 14).setOffset(1, 2);
       e.setData('state', 'idle');
     }
 
     this.items = this.physics.add.group();
+    this.fireballs = this.physics.add.group();
 
     this.layerCollider = this.physics.add.collider(this.player, this.layers, (p, tile) => {
       if (p.body.blocked.up && tile.pixelY + TILE <= p.body.top + 2) this.headHits.push(tile);
@@ -1017,12 +1038,20 @@ class Play extends Phaser.Scene {
     this.liftCollider = this.physics.add.collider(this.player, this.lifts);
     this.physics.add.collider(this.enemies, this.layers);
     this.physics.add.collider(this.items, this.layers);
+    this.physics.add.collider(this.fireballs, this.layers);
+    this.physics.add.overlap(this.fireballs, this.enemies, (f, e) => {
+      if (e.getData('state') === 'dead') return;
+      f.destroy();
+      this.flipEnemy(e);
+    });
     this.physics.add.overlap(this.player, this.enemies, (p, e) => this.touchEnemy(e));
     this.physics.add.overlap(this.player, this.coinItems, (p, c) => { c.destroy(); this.gainCoin(); });
     this.physics.add.overlap(this.player, this.items, (p, it) => {
       if (!it.body.enable) return;
+      const kind = it.getData('kind');
       it.destroy();
-      this.grow();
+      if (kind === 'life') this.extraLife();
+      else this.grow();
     });
 
     if (lvl.goal === 'pole') {
@@ -1037,7 +1066,7 @@ class Play extends Phaser.Scene {
     if (lvl.boss) this.addBoss(lvl.boss);
 
     const kb = this.input.keyboard;
-    this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,S,Z,X,SPACE,SHIFT');
+    this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,Z,X,A,S,SPACE,SHIFT');
 
     this.time.addEvent({
       delay: 400,
@@ -1114,7 +1143,7 @@ class Play extends Phaser.Scene {
     b.setVelocity(0, 0);
     b.allowGravity = false;
     b.enable = false;
-    p.setDepth(-1);
+    p.setDepth(DEPTH.SPROUT);
     const tween = pipe.type === 'down'
       ? { y: p.y + p.height, x: pipe.x * TILE + TILE }
       : { x: p.x + 16 };
@@ -1133,7 +1162,7 @@ class Play extends Phaser.Scene {
     const ar = this.lvl.areas[to.area];
     this.setArea(to.area);
     const finish = () => {
-      p.setDepth(0);
+      p.setDepth(DEPTH.HERO);
       b.enable = true;
       b.allowGravity = true;
       b.reset(p.x, p.y);
@@ -1210,8 +1239,9 @@ class Play extends Phaser.Scene {
 
   // ---------- Castle boss ----------
   addBoss(def) {
-    const boss = this.physics.add.sprite(def.x * TILE, 9 * TILE, 'boss0').setOrigin(0.5, 1);
+    const boss = this.physics.add.sprite(def.x * TILE, 9 * TILE, 'boss0').setOrigin(0.5, 1).setDepth(DEPTH.ENEMY);
     boss.body.setSize(26, 26).setOffset(3, 6);
+    boss.setData('hp', 5);
     boss.setData('def', def);
     this.boss = boss;
     this.bossDir = -1;
@@ -1219,7 +1249,22 @@ class Play extends Phaser.Scene {
     this.bossFires = [];
     this.physics.add.collider(boss, this.layers);
     this.physics.add.overlap(this.player, boss, () => {
-      if (!this.won && boss.body.enable) this.hurt();
+      if (!this.won && boss.getData('hp') > 0) this.hurt();
+    });
+    // Five fireballs defeat the beetle, like on the console.
+    this.physics.add.overlap(this.fireballs, boss, (a, b) => {
+      (a === boss ? b : a).destroy();
+      if (boss.getData('hp') <= 0) return;
+      boss.setData('hp', boss.getData('hp') - 1);
+      SFX.stomp();
+      boss.setTintFill(0xffffff);
+      this.time.delayedCall(80, () => boss.clearTint());
+      if (boss.getData('hp') <= 0) {
+        this.addScore(5000);
+        boss.setFlipY(true);
+        boss.body.checkCollision.none = true;
+        boss.body.setVelocity(0, -150);
+      }
     });
   }
 
@@ -1228,7 +1273,7 @@ class Play extends Phaser.Scene {
     if (!boss || !boss.active) return;
     const cam = this.cameras.main;
     if (boss.y > VIEW_H + 48) { boss.destroy(); return; }
-    if (this.won) return;
+    if (this.won || boss.getData('hp') <= 0) return;
     if (boss.x > cam.scrollX + VIEW_W + 16) { boss.body.setVelocityX(0); return; }
     const def = boss.getData('def');
     const b = boss.body;
@@ -1253,7 +1298,7 @@ class Play extends Phaser.Scene {
   bossFire(boss) {
     // Aim at the hero's height, but only in steps of a tile like the console.
     const py = Phaser.Math.Clamp(this.player.body.center.y, 5 * TILE, 8 * TILE + 8);
-    const f = this.add.image(boss.x - 14, Math.round(py / 8) * 8, 'bossFire');
+    const f = this.add.image(boss.x - 14, Math.round(py / 8) * 8, 'bossFire').setDepth(DEPTH.ITEM);
     this.bossFires.push(f);
     this.hazards.push(f);
     tone(120, 60, 0.4, 'sawtooth', 0.12);
@@ -1297,7 +1342,7 @@ class Play extends Phaser.Scene {
       this.add.rectangle(0, 0, VIEW_W, VIEW_H, 0x000000).setOrigin(0),
       this.add.text(VIEW_W / 2, 92, `МИР 1-${this.s.level + 1}`, { fontFamily: 'Courier New, monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0.5),
       this.add.text(VIEW_W / 2, 116, this.def.name, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#f8d020', resolution: 4 }).setOrigin(0.5),
-      this.add.image(VIEW_W / 2 - 14, 150, this.big ? 'hb0' : 'hs0').setOrigin(0.5, 1),
+      this.add.image(VIEW_W / 2 - 14, 150, this.heroTex() + '0').setOrigin(0.5, 1),
       this.add.text(VIEW_W / 2 + 2, 142, `× ${this.s.lives}`, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0, 0.5),
     ];
     for (const it of items) it.setScrollFactor(0).setDepth(100);
@@ -1310,7 +1355,7 @@ class Play extends Phaser.Scene {
 
   addLavaBall(tx) {
     const low = 15 * TILE + 8;
-    const b = this.add.image(tx * TILE + 8, low, 'lavaball');
+    const b = this.add.image(tx * TILE + 8, low, 'lavaball').setDepth(DEPTH.SPROUT);
     this.hazards.push(b);
     const jump = () => {
       b.setFlipY(false);
@@ -1333,7 +1378,7 @@ class Play extends Phaser.Scene {
     const cy = ty * TILE + 8;
     const sparks = [];
     for (let i = 0; i < 6; i++) {
-      const sp = this.add.image(cx, cy, 'spark');
+      const sp = this.add.image(cx, cy, 'spark').setDepth(DEPTH.ITEM);
       sp.setData('r', i * 7);
       sparks.push(sp);
       this.hazards.push(sp);
@@ -1360,6 +1405,11 @@ class Play extends Phaser.Scene {
     }
   }
 
+  holdingA() {
+    const k = this.keys;
+    return k.UP.isDown || k.Z.isDown || k.SPACE.isDown || touch.a;
+  }
+
   applyBody() {
     const b = this.player.body;
     if (this.big) { b.setSize(12, 22, false); b.setOffset(2, 2); }
@@ -1368,8 +1418,15 @@ class Play extends Phaser.Scene {
 
   setBig(big) {
     this.big = big;
-    this.player.setTexture(big ? 'hb0' : 'hs0');
+    if (!big) this.fire = false;
+    this.player.setTexture(this.heroTex() + '0');
     this.applyBody();
+  }
+
+  // Texture prefix for the hero's current form.
+  heroTex() {
+    if (this.fire) return 'hf';
+    return this.big ? 'hb' : 'hs';
   }
 
   addScore(n) {
@@ -1383,8 +1440,7 @@ class Play extends Phaser.Scene {
     SFX.coin();
     if (this.s.coins >= 100) {
       this.s.coins -= 100;
-      this.s.lives++;
-      SFX.life();
+      this.extraLife();
     }
     hud(this.s);
   }
@@ -1401,13 +1457,14 @@ class Play extends Phaser.Scene {
     this.updateItems();
     this.updateBoss(time, delta);
     this.updateHazards(delta);
+    this.updateFireballs();
 
     if (this.dead || this.inPipe) return;
 
     if (this.won) {
       if (this.autoWalk) {
         b.setVelocityX(60);
-        p.setTexture((this.big ? 'hb' : 'hs') + (Math.floor(time / 110) % 2));
+        p.setTexture(this.heroTex() + (Math.floor(time / 110) % 2));
       }
       return;
     }
@@ -1417,11 +1474,20 @@ class Play extends Phaser.Scene {
     if (under && under.index === T.LAVA_TOP && b.bottom > under.pixelY + 6) { this.die(true); return; }
 
     const k = this.keys;
-    const left = k.LEFT.isDown || k.A.isDown || touch.left;
-    const right = k.RIGHT.isDown || k.D.isDown || touch.right;
-    const jump = k.UP.isDown || k.W.isDown || k.Z.isDown || k.SPACE.isDown || touch.jump;
-    const run = k.X.isDown || k.SHIFT.isDown || touch.run;
-    const down = k.DOWN.isDown || k.S.isDown;
+    const turboOn = Math.floor(time / TURBO_MS) % 2 === 0;
+    const turboA = (touch.turboA || k.A.isDown) && turboOn;
+    const turboB = (touch.turboB || k.S.isDown) && turboOn;
+    const left = k.LEFT.isDown || touch.left;
+    const right = k.RIGHT.isDown || touch.right;
+    const jump = this.holdingA() || turboA;
+    const run = k.X.isDown || k.SHIFT.isDown || touch.b || touch.turboB || k.S.isDown;
+    // Latched presses, so a quick tap between two frames still fires.
+    const JD = Phaser.Input.Keyboard.JustDown;
+    const firePressed = JD(k.X) || JD(k.SHIFT) || touch.bPressed || (turboB && !this.prevTurboB);
+    touch.bPressed = false;
+    this.prevTurboB = turboB;
+    if (firePressed && this.fire) this.shoot();
+    const down = k.DOWN.isDown;
     const onGround = b.blocked.down || b.touching.down;
     if (this.updatePipes(time, down, right && !left, onGround)) return;
     const dt = delta / 1000;
@@ -1474,7 +1540,7 @@ class Play extends Phaser.Scene {
     }
 
     // Sprite frame.
-    const pre = this.big ? 'hb' : 'hs';
+    const pre = this.heroTex();
     let frame = pre + '0';
     if (!onGround) frame = pre + '2';
     else if (Math.abs(b.velocity.x) > 5) frame = pre + (Math.floor(time / (run ? 70 : 110)) % 2);
@@ -1515,7 +1581,7 @@ class Play extends Phaser.Scene {
     if (content) {
       content.left--;
       if (content.kind === 'coin') this.popCoin(tx, ty);
-      else this.spawnBerry(tx, ty);
+      else this.spawnBerry(tx, ty, content.kind);
       let idx = tile.index;
       if (content.left <= 0) {
         this.contents.delete(key);
@@ -1565,17 +1631,18 @@ class Play extends Phaser.Scene {
     this.gainCoin();
   }
 
-  spawnBerry(tx, ty) {
+  spawnBerry(tx, ty, kind) {
     SFX.sprout();
-    const it = this.items.create(tx * TILE + 8, ty * TILE + 8, 'berry');
-    it.setDepth(-1);
+    const it = this.items.create(tx * TILE + 8, ty * TILE + 8, kind === 'life' ? 'berry1' : 'berry');
+    it.setData('kind', kind);
+    it.setDepth(DEPTH.SPROUT);
     it.body.enable = false;
     this.tweens.add({
       targets: it,
       y: ty * TILE - 8,
       duration: 500,
       onComplete: () => {
-        it.setDepth(0);
+        it.setDepth(DEPTH.ITEM);
         it.body.enable = true;
         it.body.reset(it.x, it.y);
         it.body.setVelocityX(50);
@@ -1610,7 +1677,7 @@ class Play extends Phaser.Scene {
       e.setTexture('bugFlat');
       e.body.enable = false;
       this.time.delayedCall(500, () => e.destroy());
-      const jumpHeld = this.keys.Z.isDown || this.keys.SPACE.isDown || this.keys.UP.isDown || this.keys.W.isDown || touch.jump;
+      const jumpHeld = this.holdingA() || touch.turboA || this.keys.A.isDown;
       b.setVelocityY(jumpHeld ? -320 : -220);
       this.addScore(100);
       SFX.stomp();
@@ -1620,11 +1687,48 @@ class Play extends Phaser.Scene {
     }
   }
 
+  extraLife() {
+    this.s.lives++;
+    hud(this.s);
+    SFX.life();
+    haptic('success');
+  }
+
   grow() {
     this.addScore(1000);
     SFX.power();
     haptic('medium');
     if (!this.big) this.setBig(true);
+    else if (!this.fire) {
+      this.fire = true;
+      this.player.setTexture(this.heroTex() + '0');
+    }
+  }
+
+  shoot() {
+    const live = this.fireballs.getChildren().filter((f) => f.active).length;
+    if (live >= 2) return;
+    const p = this.player;
+    const dir = p.flipX ? -1 : 1;
+    const f = this.fireballs.create(p.x + dir * 8, p.y - 16, 'fireball').setDepth(DEPTH.ITEM);
+    f.body.setSize(6, 6);
+    f.body.setVelocity(dir * 200, 80);
+    f.setData('dir', dir);
+    SFX.fire();
+  }
+
+  updateFireballs() {
+    const cam = this.cameras.main;
+    for (const f of this.fireballs.getChildren().slice()) {
+      const b = f.body;
+      if (b.blocked.left || b.blocked.right || f.x < cam.scrollX - 16 || f.x > cam.scrollX + VIEW_W + 16 || f.y > VIEW_H) {
+        f.destroy();
+        continue;
+      }
+      if (b.blocked.down) b.setVelocityY(-160);
+      b.setVelocityX(f.getData('dir') * 200);
+      f.angle += 20;
+    }
   }
 
   hurt() {
@@ -1647,7 +1751,7 @@ class Play extends Phaser.Scene {
     const p = this.player;
     this.layerCollider.active = false;
     p.setAlpha(1);
-    p.setTexture(this.big ? 'hb2' : 'hs2');
+    p.setTexture(this.heroTex() + '2');
     p.body.setGravityY(0);
     p.body.setVelocity(0, fell ? 0 : -350);
     this.time.delayedCall(2500, () => {
@@ -1682,7 +1786,7 @@ class Play extends Phaser.Scene {
     b.setGravityY(0);
     b.allowGravity = false;
     p.x = poleTileX * TILE + 4;
-    p.setTexture(this.big ? 'hb2' : 'hs2');
+    p.setTexture(this.heroTex() + '2');
     const bottom = 12 * TILE;
     const dur = Math.max(200, (bottom - p.y) * 8);
     this.tweens.add({ targets: this.flag, y: bottom - 8, duration: dur });
@@ -1708,7 +1812,7 @@ class Play extends Phaser.Scene {
     this.addScore(this.s.timeLeft * 50);
     const next = this.s.level + 1;
     if (next < LEVELS.length) {
-      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, big: this.big });
+      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, big: this.big, fire: this.fire });
     } else {
       this.gameOver('МИР 1 ПРОЙДЕН!');
     }
