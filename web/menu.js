@@ -1,12 +1,14 @@
 // Cartridge-style game menu shown before anything else.
 // Each game is a separate module: the built-in one lives on this page,
 // later games get their own folder under games/<id>/ and an entry with `url`.
+// An entry without `id` is a placeholder and cannot be chosen.
 (() => {
 'use strict';
 
 const GAMES = [
   { id: 'pryg-skok', title: 'ПРЫГ-СКОК' },
-  { title: 'СКОРО' },
+  // When ready: { id: 'tanks', title: 'ТАНКИ', url: 'games/tanks/' }
+  { title: 'ТАНКИ — СКОРО' },
   { title: 'СКОРО' },
   { title: 'СКОРО' },
   { title: 'СКОРО' },
