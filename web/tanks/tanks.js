@@ -592,18 +592,22 @@ function killsTable(s) {
 // The host runs the game and sends the world 30 times a second; the guest
 // only sends its buttons and draws what arrives.
 const API_KEY = 'prygskok_api';
+// Why online may be unavailable: '' (fine), 'none' (the bot passed no server
+// address) or 'http' (the address is not https, which Telegram blocks).
+let apiProblem = '';
 function apiBase() {
   let url = new URLSearchParams(location.search).get('api');
   try {
     if (url) localStorage.setItem(API_KEY, url);
     else url = localStorage.getItem(API_KEY);
   } catch (e) { /* ignore */ }
+  if (!url) { apiProblem = 'none'; return ''; }
   try {
     const u = new URL(url);
-    return u.protocol === 'https:' || u.hostname === 'localhost' || u.hostname === '127.0.0.1' ? u.origin : '';
-  } catch (e) {
-    return '';
-  }
+    if (u.protocol === 'https:' || u.hostname === 'localhost' || u.hostname === '127.0.0.1') return u.origin;
+  } catch (e) { /* bad address */ }
+  apiProblem = 'http';
+  return '';
 }
 const API = apiBase();
 const BOT_NAME = 'agentmario_bot';
@@ -628,12 +632,13 @@ function connect(onOpen) {
   let ws;
   try { ws = new WebSocket(API.replace(/^http/, 'ws') + '/ws/tanks'); } catch (e) { onlineMenu('Не удалось подключиться к серверу.'); return; }
   net.ws = ws;
-  ws.onopen = onOpen;
+  let opened = false;
+  ws.onopen = () => { opened = true; onOpen(); };
   ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } onNet(m); };
   ws.onclose = () => {
     if (net.ws !== ws) return;
     net.ws = null;
-    lostLink('Связь с сервером прервалась.');
+    lostLink(opened ? 'Связь с сервером прервалась.' : NO_SERVER.down);
   };
 }
 
@@ -678,15 +683,38 @@ function onNet(m) {
   }
 }
 
+const NO_SERVER = {
+  none: 'Игра не получила адрес сервера, поэтому онлайн недоступен.<br>'
+    + 'Закройте игру и откройте её заново кнопкой «Играть» в боте @' + BOT_NAME + '.<br>'
+    + 'Если сообщение не пропало, у сервера бота нет https-адреса: не запущен туннель и не задан PUBLIC_API_URL.',
+  http: 'Адрес сервера игры начинается не с https://, а Telegram пускает только https.<br>'
+    + 'Нужен туннель или домен с https (PUBLIC_API_URL в настройках бота).',
+  down: 'Сервер игры не отвечает. Проверьте, что бот запущен, и попробуйте ещё раз.',
+};
+
 function onlineMenu(text) {
   running = false;
   mode = 'local';
   const html = API
     ? (text ? text + '<br>' : '') + 'Создайте комнату и отправьте код другу<br>или введите код, который прислал друг.'
-    : 'Онлайн работает, когда игра открыта через бота в Telegram.';
+    : NO_SERVER[apiProblem];
   showOverlay('ОНЛАЙН ВДВОЁМ', html, null, null, 'online');
   $('onlineStart').classList.toggle('hidden', !API);
   $('btnInvite').classList.add('hidden');
+  if (API && !text) checkServer();
+}
+
+// Ask the server whether it is alive, so a dead tunnel is reported up front.
+function checkServer() {
+  const ctl = window.AbortController ? new AbortController() : null;
+  const timer = setTimeout(() => ctl && ctl.abort(), 6000);
+  // no-cors: only whether the server answers matters, not what it says.
+  fetch(API + '/api/health', { mode: 'no-cors', signal: ctl ? ctl.signal : undefined })
+    .catch(() => {
+      if (mode !== 'local' || $('online').classList.contains('hidden') || net.ws) return;
+      $('ovText').innerHTML = NO_SERVER.down;
+    })
+    .finally(() => clearTimeout(timer));
 }
 
 $('btnOnline').addEventListener('click', () => { audio(); onlineMenu(); });
