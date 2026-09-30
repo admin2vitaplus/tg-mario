@@ -18,13 +18,13 @@
 
 Бот работает через long polling, поэтому ему не нужен домен и https, только постоянно запущенный процесс.
 
-- **Любой VPS** (самый простой и надёжный вариант, от ~200 ₽/мес):
+- **Любой VPS** (самый простой и надёжный вариант, от ~200 ₽/мес). На сервере с Ubuntu/Debian
+  выполните одну команду: скрипт поставит Node.js, скачает код, спросит токен и запустит бота
+  как службу systemd (сама перезапускается после сбоев и перезагрузки сервера):
   ```sh
-  git clone https://github.com/admin2vitaplus/tg-mario && cd tg-mario/bot
-  npm install && cp .env.example .env && nano .env
-  npx pm2 start index.js --name prygskok --node-args="--env-file=.env"
-  npx pm2 save
+  curl -fsSL https://raw.githubusercontent.com/admin2vitaplus/tg-mario/main/bot/deploy/install.sh | sudo bash
   ```
+  Повторный запуск той же команды обновляет бота. Логи: `journalctl -u prygskok-bot -f`.
 - **Railway / Render / Fly.io**: корень сервиса — папка `bot`, команда запуска `npm start`,
   переменные `BOT_TOKEN` и `WEBAPP_URL` задаются в настройках сервиса (не в файлах).
   На Render нужен тип сервиса Background Worker.
