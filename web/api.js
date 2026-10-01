@@ -199,5 +199,21 @@ function openScores() {
   ready.then((ok) => { if (base && !ok) btn.textContent = '⚠️ Рекорды: сервер переехал'; });
 }
 
+// ---------- Статистика (lib/events.js) ----------
+// «Открыли» — когда в меню картриджа выбран «Прыг-Скок», «начали» — каждая кнопка «Играть».
+// Конец игры сервер записывает сам по итогу игры.
+{
+  const stat = (type) => window.GameEvents && window.GameEvents.send(type, 'mario');
+  const menu = document.getElementById('menu');
+  if (menu) {
+    const watch = new MutationObserver(() => {
+      if (menu.classList.contains('hidden')) { watch.disconnect(); stat('game_open'); }
+    });
+    watch.observe(menu, { attributes: true, attributeFilter: ['class'] });
+  }
+  const play = document.getElementById('ovBtn');
+  if (play) play.addEventListener('click', () => stat('game_start'));
+}
+
 window.GameAPI = { enabled: !!base, ready, track, levelDone, runDone, newRun, openScores, reopenViaBot };
 })();
