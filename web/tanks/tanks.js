@@ -391,7 +391,6 @@ function circle(cx, cy, r, col) {
 // Every item carries a star price so items can later be unlocked with stars.
 // For now all prices are 0, so everything is open.
 const LOOK_KEY = 'tankodrom_look';
-const STARS_KEY = 'tankodrom_stars';
 
 const TANK_SKINS = [
   { id: 'gold', name: 'Золотой', stars: 0, col: { body: '#d8a818', light: '#f8e070', dark: '#6c4800' } },
@@ -469,26 +468,17 @@ const LOOK_CATS = [
   { key: 'ground', name: 'Фон', items: GROUNDS },
 ];
 
-function starsOwned() {
-  try { return Number(localStorage.getItem(STARS_KEY)) || 0; } catch (e) { return 0; }
-}
-const unlocked = (item) => item.stars <= starsOwned();
-const findItem = (cat, id) => cat.items.find((it) => it.id === id);
-
+// Saving, star prices and unlocking are handled by the shared panel in ../lib/looks.js.
+const LOOK_GROUPS = LOOK_CATS.map((c) => ({
+  id: c.key,
+  title: c.name,
+  items: c.items.map((it) => ({ id: it.id, name: it.name, stars: it.stars, draw: (g, size) => drawThumb(g, size, c.key, it.id) })),
+}));
 const look = {};
-function loadLook() {
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(LOOK_KEY) || '{}') || {}; } catch (e) { /* ignore */ }
-  for (const cat of LOOK_CATS) {
-    const it = findItem(cat, saved[cat.key]);
-    look[cat.key] = it && unlocked(it) ? it.id : cat.items[0].id;
-  }
-}
-function saveLook() {
-  try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) { /* ignore */ }
-}
-loadLook();
+if (window.Looks) Object.assign(look, window.Looks.load(LOOK_KEY, LOOK_GROUPS));
+for (const c of LOOK_CATS) if (!c.items.some((it) => it.id === look[c.key])) look[c.key] = c.items[0].id;
 
+const findItem = (cat, id) => cat.items.find((it) => it.id === id);
 const lookItem = (key) => findItem(LOOK_CATS.find((c) => c.key === key), look[key]);
 const tankSkin = (id) => TANK_SKINS.find((t) => t.id === id) || TANK_SKINS[0];
 const partnerSkin = (id) => (id === 'green' ? 'gold' : 'green');
@@ -549,7 +539,9 @@ function drawWeather(s, w, h) {
       g.fillStyle = 'rgba(4, 6, 22, 0.88)';
       g.fillRect(0, 0, w, h);
       g.globalCompositeOperation = 'destination-out';
+      const k = w < FIELD ? 0.3 : 1; // small pictures get small lights so the dark shows
       const light = (x, y, r) => {
+        r *= k;
         const gr = g.createRadialGradient(x, y, 0, x, y, r);
         gr.addColorStop(0, 'rgba(0,0,0,1)');
         gr.addColorStop(0.6, 'rgba(0,0,0,0.8)');
@@ -590,98 +582,57 @@ function drawWeather(s, w, h) {
   }
 }
 
-// Menu: one row per category, ◀ ▶ to flip through, a live preview above.
-const preview = document.getElementById('lookPreview');
-let lookOpen = false;
-
-function buildLookRows() {
-  const rows = $('lookRows');
-  rows.innerHTML = '';
-  for (const cat of LOOK_CATS) {
-    const row = document.createElement('div');
-    row.className = 'lrow';
-    const name = document.createElement('span');
-    name.className = 'lname';
-    name.textContent = cat.name;
-    const prev = document.createElement('button');
-    prev.className = 'arr';
-    prev.textContent = '◀';
-    const val = document.createElement('span');
-    val.className = 'lval';
-    const next = document.createElement('button');
-    next.className = 'arr';
-    next.textContent = '▶';
-    const show = () => {
-      const it = findItem(cat, look[cat.key]);
-      val.textContent = it.name;
-    };
-    const flip = (d) => {
-      audio();
-      const items = cat.items;
-      let i = items.findIndex((it) => it.id === look[cat.key]);
-      for (let n = 0; n < items.length; n++) {
-        i = (i + d + items.length) % items.length;
-        if (unlocked(items[i])) break; // locked items are skipped until stars unlock them
+// Small pictures for the «Внешний вид» panel: a scene is drawn at game
+// resolution and scaled up, using the same drawing code as the game itself.
+function drawThumb(g, size, key, id) {
+  const saved = look[key];
+  look[key] = id;
+  const px = key === 'walls' ? 16 : 24;
+  const tmp = document.createElement('canvas');
+  tmp.width = px;
+  tmp.height = px;
+  const main = ctx;
+  ctx = tmp.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  try {
+    if (key === 'walls') {
+      const w = wallTile();
+      for (const [x, y] of [[0, 0], [8, 0], [0, 8], [8, 8]]) ctx.drawImage(w, x, y);
+    } else {
+      ctx.drawImage(groundImage(), 0, 0);
+      const fake = { frame: 40, players: [], enemies: [], bullets: [], booms: [], spawns: [] };
+      if (key === 'enemies') {
+        fake.enemies.push({ x: 4, y: 4, dir: DOWN, side: 'e', type: 3, hp: 4, anim: 0, flash: false });
+      } else {
+        fake.players.push({ tank: { x: 4, y: 6, dir: UP, side: 'p', pi: 0, anim: 0, shield: 0, stun: 0 } });
       }
-      look[cat.key] = items[i].id;
-      saveLook();
-      show();
-      tone(660, 0, 0.04, 'square', 0.04);
-    };
-    prev.addEventListener('click', () => flip(-1));
-    next.addEventListener('click', () => flip(1));
-    show();
-    row.append(name, prev, val, next);
-    rows.append(row);
+      const was = skins[0];
+      if (key === 'tank') skins[0] = id;
+      for (const p of fake.players) drawTank(fake, p.tank);
+      for (const e of fake.enemies) drawTank(fake, e);
+      skins[0] = was;
+      if (key === 'weather' || key === 'ground') drawWeather(fake, px, px);
+    }
+  } finally {
+    ctx = main;
+    look[key] = saved;
   }
+  g.imageSmoothingEnabled = false;
+  g.drawImage(tmp, 0, 0, size, size);
 }
 
 function openLook() {
-  buildLookRows();
-  lookOpen = true;
-  showOverlay('ВНЕШНИЙ ВИД', '', null, null, 'look');
-}
-
-function drawPreview(t) {
-  const pctx = preview.getContext('2d');
-  pctx.imageSmoothingEnabled = false;
-  const pw = preview.width, ph = preview.height;
-  const main = ctx;
-  ctx = pctx;
-  const g = lookItem('ground');
-  ctx.fillStyle = g.frame;
-  ctx.fillRect(0, 0, pw, ph);
-  ctx.save();
-  ctx.translate(4, 4);
-  const w = pw - 8, h = ph - 8;
-  ctx.beginPath();
-  ctx.rect(0, 0, w, h);
-  ctx.clip();
-  ctx.drawImage(groundImage(), 0, 0);
-  const wall = wallTile();
-  for (let x = 0; x < w; x += 8) { ctx.drawImage(wall, x, 0); ctx.drawImage(wall, x, 8); }
-  for (let y = 16; y < h; y += 8) { ctx.drawImage(wall, 0, y); ctx.drawImage(wall, w - 8, y); }
-  ctx.drawImage(TILE[STEEL], 56, 32);
-  ctx.drawImage(TILE[STEEL], 64, 32);
-  const frame = Math.floor(t / 16.7);
-  const bob = Math.floor(frame / 8) % 2;
-  const fake = {
-    frame,
-    players: [{ tank: { x: 24, y: 36, dir: RIGHT, side: 'p', pi: 0, anim: frame, shield: 0, stun: 0 } }],
-    enemies: [
-      { x: 80, y: 20 + bob, dir: DOWN, side: 'e', type: 0, hp: 1, anim: frame, flash: false },
-      { x: 92, y: 40 - bob, dir: LEFT, side: 'e', type: 3, hp: 4, anim: frame, flash: false },
-    ],
-    bullets: [{ x: 44 + (frame % 30), y: 44 }],
-    booms: [],
-    spawns: [],
-  };
-  drawTank(fake, fake.players[0].tank);
-  for (const e of fake.enemies) drawTank(fake, e);
-  drawBullet(fake.bullets[0]);
-  drawWeather(fake, w, h);
-  ctx.restore();
-  ctx = main;
+  if (!window.Looks) return;
+  window.Looks.open({
+    key: LOOK_KEY,
+    title: 'ВНЕШНИЙ ВИД',
+    groups: LOOK_GROUPS,
+    onChange: (sel) => {
+      Object.assign(look, sel);
+      if (mode === 'local') skins = [look.tank, partnerSkin(look.tank)];
+    },
+    onClose: () => showMenu(),
+  });
 }
 
 // ---------- Drawing ----------
@@ -854,9 +805,7 @@ function showOverlay(title, html, button, action, panel) {
   $('ovHint').classList.toggle('hidden', panel !== 'menu');
   $('back').classList.toggle('hidden', panel !== 'menu');
   $('online').classList.toggle('hidden', panel !== 'online');
-  $('look').classList.toggle('hidden', panel !== 'look');
   $('ovText').classList.toggle('hidden', !html);
-  lookOpen = panel === 'look';
   const btn = $('ovBtn');
   btn.classList.toggle('hidden', !button);
   btn.textContent = button || '';
@@ -873,7 +822,6 @@ function showMenu() {
 }
 
 $('btnLook').addEventListener('click', () => { audio(); openLook(); });
-$('btnLookDone').addEventListener('click', () => { audio(); showMenu(); });
 
 $('ovBtn').addEventListener('click', () => {
   audio();
@@ -1218,7 +1166,6 @@ function frame(now) {
       if (mode === 'host' && running && state.frame % 2 === 0) sendSnapshot(state);
     }
   } else acc = 0;
-  if (lookOpen) drawPreview(now);
   if (state) {
     render(state);
     hud(state);
