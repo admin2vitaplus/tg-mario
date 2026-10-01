@@ -193,3 +193,44 @@ test('the offline cache lists only existing files and skips the server', () => {
   for (const f of core) if (f !== './') assert.ok(fs.existsSync(path.join(WEB, f)), f + ' is missing');
   assert.match(sw, /\(api\|ws\)/);
 });
+
+// ---------- Server address (lib/server.js) ----------
+
+// Runs lib/server.js with a fake network: `alive` lists the origins whose /api/health answers.
+function runServerJs({ search = '', stored = null, startParam = '', alive = [] }) {
+  const store = new Map(stored ? [['prygskok_api', stored]] : []);
+  const calls = [];
+  const fetch = (url) => {
+    calls.push(url);
+    const u = new URL(url);
+    if (!alive.includes(u.origin)) {
+      // A dead tunnel: Cloudflare's HTML error page.
+      return Promise.resolve({ ok: false, status: 530, json: () => Promise.reject(new Error('html')) });
+    }
+    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) });
+  };
+  const win = { Telegram: { WebApp: { initData: 'x', initDataUnsafe: { start_param: startParam } } } };
+  const ctx = {
+    window: win, location: { search }, URL, URLSearchParams, fetch, setTimeout: (f) => setTimeout(f, 0), clearTimeout,
+    localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) },
+  };
+  vm.runInNewContext(read(path.join(WEB, 'lib/server.js')), ctx);
+  return { server: win.Server, store, calls };
+}
+
+test('the address that answers wins and is remembered; a dead one is not used', async () => {
+  const good = 'https://good-one.trycloudflare.com';
+  const old = 'https://old-one.trycloudflare.com';
+  let r = runServerJs({ search: '?api=' + encodeURIComponent(old), stored: good, alive: [good] });
+  assert.equal(await r.server.ready, true);
+  assert.equal(r.server.base, good);
+  r = runServerJs({ stored: old, startParam: 'room_123456__good-one', alive: [good] });
+  assert.equal(await r.server.ready, true);
+  assert.equal(r.server.base, good);
+  assert.equal(r.store.get('prygskok_api'), good);
+  r = runServerJs({ stored: old, alive: [] });
+  assert.equal(await r.server.ready, false);
+  assert.equal(r.server.online, false);
+  await assert.rejects(r.server.request('GET', '/api/wallet/me'), (e) => e.offline === true);
+  assert.equal(r.store.get('prygskok_api'), old, 'a dead address does not replace the stored one');
+});

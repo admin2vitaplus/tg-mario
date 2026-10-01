@@ -20,7 +20,7 @@ if (tg) {
 
 // A t.me/<bot>?startapp=<label> link opens this menu with start_param, but
 // without ?api=: the label may carry the server's tunnel name after «__»
-// (room_123456__abc-def means the server abc-def.trycloudflare.com), and an invite
+// (room_123456__abc-def means the server abc-def.trycloudflare.com, see lib/server.js), and an invite
 // to a «Танкодром» room goes straight to that room.
 (() => {
   if (typeof URLSearchParams === 'undefined') return;
@@ -29,13 +29,17 @@ if (tg) {
   const m = /^(\w+?)(?:__([a-z0-9-]{1,63}))?$/.exec(start);
   if (!m) return;
   const params = new URLSearchParams(location.search);
-  if (m[2] && !params.get('api')) {
-    try { localStorage.setItem('prygskok_api', 'https://' + m[2] + '.trycloudflare.com'); } catch (e) { /* ignore */ }
-  }
   const room = /^(?:room|tanks)_(\d{4,8})$/.exec(m[1]);
   if (room && window.CARTRIDGE && window.CARTRIDGE.isEnabled('tanks')) {
     params.set('room', room[1]);
-    location.replace('tanks/?' + params + location.hash);
+    // lib/server.js checks the tunnel from the link against the remembered address;
+    // the room page gets the one that answered.
+    const server = window.Server;
+    const go = () => {
+      if (server && server.online) params.set('api', server.base);
+      location.replace('tanks/?' + params + location.hash);
+    };
+    if (server) server.ready.then(go); else go();
   }
 })();
 
@@ -81,8 +85,22 @@ function loadGame(g) {
 function choose() {
   const g = lines[cursor];
   if (!g.id || loading) return;
-  // Keep the launch parameters (?api=, ?bot=) for the game's own page.
-  if (g.url) { location.href = g.url + location.search; return; }
+  if (g.url) {
+    // Keep the launch parameters, with the server address that answered (lib/server.js).
+    const server = window.Server;
+    const go = () => {
+      const params = new URLSearchParams(location.search);
+      if (server && server.online) params.set('api', server.base);
+      const q = params.toString();
+      location.href = g.url + (q ? '?' + q : '');
+    };
+    if (server && server.online === null) {
+      loading = true;
+      hint.textContent = 'Загрузка…';
+      server.ready.then(go);
+    } else go();
+    return;
+  }
   loading = true;
   hint.textContent = 'Загрузка…';
   menu.classList.add('loading');
