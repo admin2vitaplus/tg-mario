@@ -885,7 +885,7 @@ function apiBase() {
   return '';
 }
 const API = apiBase();
-// Имя бота приходит в ссылке от бота (?bot=) и запоминается; запасное — текущее имя бота.
+// Имя бота приходит в ссылке от бота (?bot=) и запоминается; запасное — из настроек сборника.
 const BOT_NAME = (() => {
   let name = new URLSearchParams(location.search).get('bot');
   try {
@@ -893,44 +893,140 @@ const BOT_NAME = (() => {
     else name = localStorage.getItem('prygskok_bot');
   } catch (e) { /* ignore */ }
   name = (name || '').replace(/[^A-Za-z0-9_]/g, '');
-  return name || 'yellow_cartridge_bot';
+  return name || (window.CARTRIDGE && window.CARTRIDGE.bot) || 'yellow_cartridge_bot';
 })();
 
 let mode = 'local'; // local | host | guest
 let view = null;    // what the guest draws
-const net = { ws: null, code: '', remote: { dir: -1, fire: false }, lastDir: -1, cellsKey: '', events: [] };
+// code/token: our seat in the room, kept to come back after the link drops.
+// started: the game began (the host met the guest). rematch: who pressed «Реванш».
+const net = {
+  ws: null, code: '', token: '', started: false, remote: { dir: -1, fire: false }, lastDir: -1, cellsKey: '', events: [],
+  retry: null, ping: null, peerAway: false, resume: false, rematch: { me: false, peer: false },
+};
+const REJOIN_MS = 20000; // the server keeps a dropped player's seat this long
+const HOST_AWAY_MS = 120000; // and the host's seat this long before the guest arrives
 
 function netSend(msg) {
   if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(msg));
 }
 
+// Leaving on purpose: the server closes the room and tells the other player.
 function netClose() {
   const ws = net.ws;
   net.ws = null;
   net.code = '';
-  if (ws) { ws.onclose = null; try { ws.close(); } catch (e) { /* ignore */ } }
+  net.token = '';
+  net.started = false;
+  net.peerAway = false;
+  stopRetry();
+  clearInterval(net.ping);
+  if (ws) { ws.onclose = null; try { ws.close(1000); } catch (e) { /* ignore */ } }
 }
 
-function connect(onOpen) {
-  netClose();
+function connect(onOpen, onFail) {
   let ws;
-  try { ws = new WebSocket(API.replace(/^http/, 'ws') + '/ws/tanks'); } catch (e) { onlineMenu('Не удалось подключиться к серверу.'); return; }
+  // The signed Telegram data lets the server count connections per player.
+  const auth = tg && tg.initData ? '?auth=' + encodeURIComponent(tg.initData) : '';
+  try { ws = new WebSocket(API.replace(/^http/, 'ws') + '/ws/tanks' + auth); } catch (e) { onFail(false); return; }
   net.ws = ws;
   let opened = false;
   // A tunnel that swallows the upgrade can leave the socket hanging forever.
   const timer = setTimeout(() => { if (!opened && net.ws === ws) ws.close(); }, 10000);
-  ws.onopen = () => { opened = true; clearTimeout(timer); onOpen(); };
+  ws.onopen = () => {
+    opened = true;
+    clearTimeout(timer);
+    // The tunnel drops quiet connections, and the server drops ones silent for 90 s.
+    clearInterval(net.ping);
+    net.ping = setInterval(() => netSend({ t: 'ping' }), 20000);
+    onOpen();
+  };
   ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } onNet(m); };
   ws.onclose = () => {
     if (net.ws !== ws) return;
     net.ws = null;
     clearTimeout(timer);
-    lostLink(opened ? 'Связь с сервером прервалась.<br>' + REOPEN : serverAlive ? NO_SERVER.ws : NO_SERVER.down);
+    clearInterval(net.ping);
+    onFail(opened);
   };
 }
 
-function lostLink(text) {
-  const inGame = mode !== 'local';
+// The link dropped: with a seat in a room we try to come back, otherwise back to the menu.
+function onDrop(opened) {
+  if (net.retry) {
+    clearTimeout(net.retry.timer);
+    net.retry.timer = setTimeout(tryRejoin, 2000);
+  } else if (net.token) startRetry();
+  else lostLink(opened ? 'Связь с сервером прервалась.<br>' + REOPEN : serverAlive ? NO_SERVER.ws : NO_SERVER.down);
+}
+
+function connectFresh(onOpen) {
+  netClose();
+  connect(onOpen, onDrop);
+}
+
+// ---------- Coming back after the link drops ----------
+// The seat is held on the server, so we reconnect and ask for it by token.
+// Meanwhile the host's game stands still and both players see why.
+function startRetry() {
+  if (net.retry) return;
+  const limit = net.started ? REJOIN_MS : HOST_AWAY_MS;
+  net.retry = { until: Date.now() + limit, timer: 0 };
+  pauseOnline('СВЯЗЬ ПРЕРВАЛАСЬ', 'Переподключаемся…');
+  tryRejoin();
+}
+
+function tryRejoin() {
+  const r = net.retry;
+  if (!r) return;
+  if (Date.now() > r.until) {
+    const inGame = net.started;
+    stopRetry();
+    netClose();
+    mode = 'local';
+    lostLink('Не удалось вернуться в игру: связи не было слишком долго.<br>' + REOPEN, inGame);
+    return;
+  }
+  connect(() => netSend({ t: 'rejoin', code: net.code, token: net.token }), onDrop);
+}
+
+function stopRetry() {
+  if (net.retry) clearTimeout(net.retry.timer);
+  net.retry = null;
+}
+
+// Back from the background: try at once instead of waiting for a slowed-down timer.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !net.retry || net.ws) return;
+  clearTimeout(net.retry.timer);
+  tryRejoin();
+});
+
+// Stops the game while one of us is away; remembers whether it was running.
+function pauseOnline(title, text) {
+  if (running) { net.resume = true; running = false; }
+  showOverlay(title, text, 'Выйти', showMenu);
+}
+
+function resumeOnline() {
+  if (net.retry || net.peerAway) return;
+  if (!net.started) {
+    if (mode === 'host') roomScreen();
+    else if (mode === 'guest') showOverlay('КОМНАТА ' + net.code, 'Вы в игре! Ждём начала…', null, null, 'online');
+    return;
+  }
+  if (mode === 'host') {
+    net.cellsKey = ''; // the guest may have missed changes: send the whole field
+    if (net.resume) { net.resume = false; running = true; $('overlay').classList.add('hidden'); }
+    else if (state) afterStep(state); // a result screen was open: show it again
+  } else {
+    guestShown = 'wait'; // the next picture from the host decides what to show
+    running = true;
+  }
+}
+
+function lostLink(text, wasInGame) {
+  const inGame = wasInGame || mode !== 'local';
   running = false;
   mode = 'local';
   netClose();
@@ -938,19 +1034,30 @@ function lostLink(text) {
   else onlineMenu(text);
 }
 
+function roomScreen() {
+  showOverlay('КОМНАТА', 'Код комнаты: <b class="code">' + net.code + '</b><br>Отправьте код другу и ждите, пока он войдёт.', null, null, 'online');
+  $('onlineStart').classList.add('hidden');
+  $('btnInvite').classList.remove('hidden');
+}
+
 function onNet(m) {
   if (m.t === 'room') {
     net.code = m.code;
-    showOverlay('КОМНАТА', 'Код комнаты: <b class="code">' + m.code + '</b><br>Отправьте код другу и ждите, пока он войдёт.', null, null, 'online');
-    $('onlineStart').classList.add('hidden');
-    $('btnInvite').classList.remove('hidden');
+    net.token = m.token || '';
+    mode = 'host';
+    roomScreen();
   } else if (m.t === 'peer') {
     haptic('success');
     net.guestSkin = '';
     mode = 'host';
+    net.started = true;
     begin(2);
   } else if (m.t === 'joined') {
     mode = 'guest';
+    net.code = m.code;
+    net.token = m.token || '';
+    net.started = true;
+    net.rematch = { me: false, peer: false };
     netSend({ t: 'look', tank: look.tank });
     keyMap = KEYS_1P;
     clearPads();
@@ -959,11 +1066,39 @@ function onNet(m) {
     net.lastDir = -1;
     showOverlay('КОМНАТА ' + m.code, 'Вы в игре! Ждём начала…', null, null, 'online');
     $('onlineStart').classList.add('hidden');
+  } else if (m.t === 'rejoined') {
+    stopRetry();
+    haptic('success');
+    net.peerAway = !m.peer;
+    if (mode === 'guest') netSend({ t: 'look', tank: look.tank });
+    if (mode === 'host' && m.peer && !net.started) {
+      // The friend came in while we were away inviting them.
+      net.guestSkin = '';
+      net.started = true;
+      begin(2);
+    } else if (net.peerAway) pauseOnline('ДРУГ ПОТЕРЯЛ СВЯЗЬ', 'Ждём, пока он вернётся…');
+    else resumeOnline();
+  } else if (m.t === 'wait') {
+    net.peerAway = true;
+    if (mode === 'guest' && !view) pauseOnline('КОМНАТА ' + net.code, 'Друг отошёл позвать вас. Ждём его…');
+    else pauseOnline('ДРУГ ПОТЕРЯЛ СВЯЗЬ', 'Ждём, пока он вернётся…');
+  } else if (m.t === 'back') {
+    haptic('success');
+    net.peerAway = false;
+    if (mode === 'host' && !net.started) {
+      net.guestSkin = '';
+      net.started = true;
+      begin(2);
+    } else resumeOnline();
   } else if (m.t === 'error') {
+    if (net.retry) { stopRetry(); netClose(); lostLink('Не удалось вернуться в игру: ' + m.msg.toLowerCase() + '.', true); return; }
     netClose();
     onlineMenu(m.msg);
   } else if (m.t === 'left') {
     lostLink('Друг вышел из игры.');
+  } else if (m.t === 'rematch') {
+    net.rematch.peer = true;
+    rematchScreen();
   } else if (m.t === 'look' && mode === 'host') {
     // The guest's own tank colour; one the host does not know falls back to the default.
     net.guestSkin = TANK_SKINS.some((t) => t.id === m.tank) ? m.tank : '';
@@ -974,6 +1109,28 @@ function onNet(m) {
   } else if (m.t === 's' && mode === 'guest') {
     applySnapshot(m);
   }
+}
+
+// «Реванш»: the new game starts when both players have pressed it.
+function pressRematch() {
+  net.rematch.me = true;
+  netSend({ t: 'rematch' });
+  rematchScreen();
+}
+
+function rematchScreen() {
+  const s = state;
+  if (!s || s.phase !== 'overDone' || net.peerAway || net.retry) return;
+  if (net.rematch.me && net.rematch.peer) {
+    if (mode === 'host') begin(2);
+    else showOverlay('РЕВАНШ', 'Начинаем!', null, null, 'online');
+    return;
+  }
+  const score = s.players.reduce((a, p) => a + p.score, 0);
+  const why = s.baseAlive ? 'Все танки подбиты.' : 'Штаб разрушен.';
+  const note = net.rematch.me ? 'Ждём, когда друг нажмёт «Реванш»…' : net.rematch.peer ? 'Друг хочет реванш!' : '';
+  showOverlay('ИГРА ОКОНЧЕНА', why + '<br>Уровень: ' + (s.stage + 1) + '<br>Счёт: ' + score + (note ? '<br><br>' + note : ''),
+    net.rematch.me ? 'Выйти' : 'Реванш', net.rematch.me ? showMenu : pressRematch);
 }
 
 // The bot's tunnel address changes on every restart, so buttons in old
@@ -1022,14 +1179,14 @@ $('btnCreate').addEventListener('click', () => {
   audio();
   showOverlay('ОНЛАЙН ВДВОЁМ', 'Создаём комнату…', null, null, 'online');
   $('onlineStart').classList.add('hidden');
-  connect(() => netSend({ t: 'create' }));
+  connectFresh(() => netSend({ t: 'create' }));
 });
 function joinRoom(code) {
   code = String(code || '').replace(/\D/g, '');
-  if (code.length !== 4) { onlineMenu('Код — это 4 цифры.'); return; }
+  if (code.length !== 6) { onlineMenu('Код — это 6 цифр.'); return; }
   showOverlay('ОНЛАЙН ВДВОЁМ', 'Входим в комнату ' + code + '…', null, null, 'online');
   $('onlineStart').classList.add('hidden');
-  connect(() => netSend({ t: 'join', code }));
+  connectFresh(() => netSend({ t: 'join', code }));
 }
 $('btnJoin').addEventListener('click', () => { audio(); joinRoom($('code').value); });
 $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($('code').value); });
@@ -1101,10 +1258,12 @@ function guestScreens(v) {
   if (done === guestShown) return;
   guestShown = done;
   if (!done) {
+    net.rematch = { me: false, peer: false };
     $('overlay').classList.add('hidden');
     running = true;
     return;
   }
+  if (done === 'overDone') { rematchScreen(); return; }
   const score = v.players.reduce((a, p) => a + p.score, 0);
   const title = done === 'clearDone' ? 'УРОВЕНЬ ' + (v.stage + 1) + ' ПРОЙДЕН' : 'ИГРА ОКОНЧЕНА';
   const body = done === 'clearDone' ? 'Подбито:<br>' + killsTable(v) : (v.baseAlive ? 'Все танки подбиты.' : 'Штаб разрушен.');
@@ -1134,6 +1293,8 @@ function begin(players) {
   keyMap = players === 2 && mode === 'local' ? KEYS_2P : KEYS_1P;
   skins = [look.tank, mode === 'host' && net.guestSkin ? net.guestSkin : partnerSkin(look.tank)];
   net.remote = { dir: -1, fire: false };
+  net.rematch = { me: false, peer: false };
+  net.resume = false;
   net.cellsKey = '';
   net.events = [];
   clearPads();
@@ -1159,7 +1320,8 @@ function afterStep(s) {
     const score = s.players.reduce((a, p) => a + p.score, 0);
     const best = saveBest(score);
     const why = s.baseAlive ? 'Все танки подбиты.' : 'Штаб разрушен.';
-    showOverlay('ИГРА ОКОНЧЕНА', why + '<br>Уровень: ' + (s.stage + 1) + '<br>Счёт: ' + score + '<br>Рекорд: ' + best, 'Ещё раз', () => begin(s.players.length));
+    if (mode === 'host') rematchScreen();
+    else showOverlay('ИГРА ОКОНЧЕНА', why + '<br>Уровень: ' + (s.stage + 1) + '<br>Счёт: ' + score + '<br>Рекорд: ' + best, 'Ещё раз', () => begin(s.players.length));
   }
   // The guest sees the result screen too, so send the final frame.
   if (mode === 'host' && !running) sendSnapshot(s);
@@ -1192,6 +1354,15 @@ function frame(now) {
     hud(state);
     banner(state);
   }
+}
+
+// The collection's settings can switch the game off; then only the way back is shown.
+if (window.CARTRIDGE && !window.CARTRIDGE.isEnabled('tanks')) {
+  showOverlay('ТАНКОДРОМ', 'Игра отключена.', null, null);
+  $('menu').classList.add('hidden');
+  $('ovHint').classList.add('hidden');
+  $('back').classList.remove('hidden');
+  return;
 }
 
 bindTouch();

@@ -83,7 +83,8 @@ test("migrates a database made before migrations existed without losing data", (
 
 test("1000 created and abandoned rooms leave nothing behind", async () => {
   const dir = tmp();
-  const app = await startApp({ env: env(dir), botToken: "1:x", port: 0 });
+  // Все соединения теста идут с одного адреса, поэтому лимиты на адрес подняты.
+  const app = await startApp({ env: env(dir), botToken: "1:x", port: 0, tanksLimits: { perIp: 1000, roomsPerIp: 1000 } });
   const url = `ws://127.0.0.1:${app.port}/ws/tanks`;
   try {
     for (let batch = 0; batch < 10; batch++) {

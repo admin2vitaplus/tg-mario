@@ -79,7 +79,7 @@ const withBot = (url) => {
 };
 const gameUrl = withBot(withApi(baseGameUrl));
 
-// Приглашение в «Танкодром»: t.me/<бот>?start=tanks_1234 открывает комнату 1234.
+// Приглашение в «Танкодром»: t.me/<бот>?start=tanks_123456 открывает комнату 123456.
 const tanksRoomUrl = (code) => {
   const u = new URL(withBot(withApi(new URL("tanks/", baseGameUrl).toString())));
   u.searchParams.set("room", code);
@@ -92,7 +92,7 @@ const playKeyboard = () => new InlineKeyboard().webApp("🎮 Играть", game
 const medal = (place) => ["🥇", "🥈", "🥉"][place - 1] || `${place}.`;
 
 bot.command("start", (ctx) => {
-  const room = /^tanks_(\d{4})$/.exec(ctx.match || "");
+  const room = /^tanks_(\d{4,6})$/.exec(ctx.match || "");
   if (room) {
     return ctx.reply(`Тебя позвали в «Танкодром», комната ${room[1]}.`, {
       reply_markup: new InlineKeyboard().webApp("🛡 В бой", tanksRoomUrl(room[1])),
