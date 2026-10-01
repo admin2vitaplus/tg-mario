@@ -24,6 +24,20 @@ if (tg) {
   } catch (e) { /* not inside Telegram */ }
 }
 
+// ---------- Language ----------
+const LANG = window.TankStrings.pickLang(
+  (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || navigator.language);
+const T = window.TankStrings.make(LANG);
+document.documentElement.lang = LANG;
+// Static page text: elements carry data-t (text) or data-th (with line breaks).
+for (const el of document.querySelectorAll('[data-t]')) el.textContent = T(el.dataset.t);
+for (const el of document.querySelectorAll('[data-th]')) el.innerHTML = T(el.dataset.th);
+for (const el of document.querySelectorAll('[data-tp]')) el.placeholder = T(el.dataset.tp);
+document.title = T('title');
+
+// Usage statistics for the bot (../lib/events.js); silently off without a server.
+const track = (type, ref) => { try { if (window.GameEvents) window.GameEvents.send(type, 'tanks', ref); } catch (e) { /* ignore */ } };
+
 function haptic(kind) {
   try {
     if (!tg || !tg.HapticFeedback) return;
@@ -492,8 +506,8 @@ const LOOK_CATS = [
 // Saving, star prices and unlocking are handled by the shared panel in ../lib/looks.js.
 const LOOK_GROUPS = LOOK_CATS.map((c) => ({
   id: c.key,
-  title: c.name,
-  items: c.items.map((it) => ({ id: it.id, name: it.name, stars: it.stars, draw: (g, size) => drawThumb(g, size, c.key, it.id) })),
+  title: T('cat_' + c.key),
+  items: c.items.map((it) => ({ id: it.id, name: T(c.key + '_' + it.id), stars: it.stars, draw: (g, size) => drawThumb(g, size, c.key, it.id) })),
 }));
 const look = {};
 if (window.Looks) Object.assign(look, window.Looks.load(LOOK_KEY, LOOK_GROUPS));
@@ -646,7 +660,7 @@ function openLook() {
   if (!window.Looks) return;
   window.Looks.open({
     key: LOOK_KEY,
-    title: 'ВНЕШНИЙ ВИД',
+    title: T('look_title'),
     groups: LOOK_GROUPS,
     onChange: (sel) => {
       Object.assign(look, sel);
@@ -794,11 +808,17 @@ function hud(s) {
   $('stage').textContent = String(s.stage + 1);
 }
 
+// Map names live in sim.js in Russian; the dictionary has them by map number.
+function mapTitle(name) {
+  const i = S.MAPS.findIndex((m) => m.name === name);
+  return i < 0 ? String(name || '') : T('map_' + i);
+}
+
 let bannerText = '';
 function banner(s) {
   let text = '', cls = '';
-  if (s.phase === 'intro') text = 'УРОВЕНЬ ' + (s.stage + 1) + ' · ' + s.mapName.toUpperCase();
-  else if (s.phase === 'over' || s.phase === 'overDone') { text = 'ИГРА ОКОНЧЕНА'; cls = 'over'; }
+  if (s.phase === 'intro') text = T('banner_stage', { n: s.stage + 1, map: mapTitle(s.mapName).toUpperCase() });
+  else if (s.phase === 'over' || s.phase === 'overDone') { text = T('game_over'); cls = 'over'; }
   if (text === bannerText) return;
   bannerText = text;
   const el = $('banner');
@@ -831,6 +851,7 @@ function showOverlay(title, html, button, action, panel) {
   btn.classList.toggle('hidden', !button);
   btn.textContent = button || '';
   overlayAction = action;
+  $('ovShare').classList.add('hidden');
   $('overlay').classList.remove('hidden');
 }
 
@@ -839,7 +860,7 @@ function showMenu() {
   mode = 'local';
   view = null;
   netClose();
-  showOverlay('ТАНКОДРОМ', 'Защити штаб от вражеских танков.<br>Кирпич пробивается, сталь держит.<br>Рекорд: ' + loadBest(), null, null);
+  showOverlay(T('title'), T('intro') + '<br>' + T('best', { n: loadBest() }), null, null);
 }
 
 $('btnLook').addEventListener('click', () => { audio(); openLook(); });
@@ -855,8 +876,37 @@ for (const b of document.querySelectorAll('#menu button[data-players]')) {
   b.addEventListener('click', () => { audio(); begin(Number(b.dataset.players)); });
 }
 
+function resultText(s) {
+  const score = s.players.reduce((a, p) => a + p.score, 0);
+  return (s.baseAlive ? T('all_killed') : T('base_lost')) + '<br>' + T('stage_line', { n: s.stage + 1 }) + '<br>' + T('score_line', { n: score });
+}
+
+// «Поделиться итогом»: the result goes to any Telegram chat with a link to the bot.
+let shareText = '';
+function showShare(s) {
+  const score = s.players.reduce((a, p) => a + p.score, 0);
+  shareText = T(s.players.length > 1 ? 'share_duo' : 'share_solo', { n: s.stage + 1, score });
+  $('ovShare').textContent = T('btn_share');
+  $('ovShare').classList.remove('hidden');
+}
+$('ovShare').addEventListener('click', () => {
+  audio();
+  track('share_clicked');
+  // ref_<id> lets the bot count who came by this player's link.
+  const me = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  const link = 'https://t.me/' + BOT_NAME + '?start=' + (me && me.id ? 'ref_' + me.id : 'src_tanks');
+  try {
+    if (tg && tg.openTelegramLink) {
+      tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(shareText));
+      return;
+    }
+  } catch (e) { /* fall through */ }
+  if (navigator.share) navigator.share({ text: shareText, url: link }).catch(() => {});
+  else if (navigator.clipboard) navigator.clipboard.writeText(shareText + '\n' + link).then(() => { $('ovShare').textContent = T('link_copied'); });
+});
+
 function killsTable(s) {
-  const names = ['обычные', 'быстрые', 'скорострелы', 'броневики'];
+  const names = T('kinds').split('|');
   return names.map((n, i) => {
     const counts = s.players.map((p) => p.kills[i]).join(' / ');
     return n + ': ' + counts;
@@ -957,7 +1007,7 @@ function onDrop(opened) {
     clearTimeout(net.retry.timer);
     net.retry.timer = setTimeout(tryRejoin, 2000);
   } else if (net.token) startRetry();
-  else lostLink(opened ? 'Связь с сервером прервалась.<br>' + REOPEN : serverAlive ? NO_SERVER.ws : NO_SERVER.down);
+  else lostLink(opened ? T('link_broke') + '<br>' + REOPEN : serverAlive ? NO_SERVER.ws : NO_SERVER.down);
 }
 
 function connectFresh(onOpen) {
@@ -972,7 +1022,7 @@ function startRetry() {
   if (net.retry) return;
   const limit = net.started ? REJOIN_MS : HOST_AWAY_MS;
   net.retry = { until: Date.now() + limit, timer: 0 };
-  pauseOnline('СВЯЗЬ ПРЕРВАЛАСЬ', 'Переподключаемся…');
+  pauseOnline(T('link_lost_title'), T('reconnecting'));
   tryRejoin();
 }
 
@@ -984,7 +1034,7 @@ function tryRejoin() {
     stopRetry();
     netClose();
     mode = 'local';
-    lostLink('Не удалось вернуться в игру: связи не было слишком долго.<br>' + REOPEN, inGame);
+    lostLink(T('rejoin_late') + '<br>' + REOPEN, inGame);
     return;
   }
   connect(() => netSend({ t: 'rejoin', code: net.code, token: net.token }), onDrop);
@@ -1005,14 +1055,14 @@ document.addEventListener('visibilitychange', () => {
 // Stops the game while one of us is away; remembers whether it was running.
 function pauseOnline(title, text) {
   if (running) { net.resume = true; running = false; }
-  showOverlay(title, text, 'Выйти', showMenu);
+  showOverlay(title, text, T('btn_exit'), showMenu);
 }
 
 function resumeOnline() {
   if (net.retry || net.peerAway) return;
   if (!net.started) {
     if (mode === 'host') roomScreen();
-    else if (mode === 'guest') showOverlay('КОМНАТА ' + net.code, 'Вы в игре! Ждём начала…', null, null, 'online');
+    else if (mode === 'guest') showOverlay(T('room_n', { code: net.code }), T('in_room'), null, null, 'online');
     return;
   }
   if (mode === 'host') {
@@ -1030,12 +1080,12 @@ function lostLink(text, wasInGame) {
   running = false;
   mode = 'local';
   netClose();
-  if (inGame) showOverlay('СВЯЗЬ ПОТЕРЯНА', text, 'В меню', showMenu);
+  if (inGame) showOverlay(T('lost_title'), text, T('btn_menu'), showMenu);
   else onlineMenu(text);
 }
 
 function roomScreen() {
-  showOverlay('КОМНАТА', 'Код комнаты: <b class="code">' + net.code + '</b><br>Отправьте код другу и ждите, пока он войдёт.', null, null, 'online');
+  showOverlay(T('room'), T('room_code', { code: '<b class="code">' + net.code + '</b>' }), null, null, 'online');
   $('onlineStart').classList.add('hidden');
   $('btnInvite').classList.remove('hidden');
 }
@@ -1064,7 +1114,7 @@ function onNet(m) {
     view = null;
     guestShown = 'wait';
     net.lastDir = -1;
-    showOverlay('КОМНАТА ' + m.code, 'Вы в игре! Ждём начала…', null, null, 'online');
+    showOverlay(T('room_n', { code: m.code }), T('in_room'), null, null, 'online');
     $('onlineStart').classList.add('hidden');
   } else if (m.t === 'rejoined') {
     stopRetry();
@@ -1076,12 +1126,12 @@ function onNet(m) {
       net.guestSkin = '';
       net.started = true;
       begin(2);
-    } else if (net.peerAway) pauseOnline('ДРУГ ПОТЕРЯЛ СВЯЗЬ', 'Ждём, пока он вернётся…');
+    } else if (net.peerAway) pauseOnline(T('peer_lost_title'), T('peer_wait'));
     else resumeOnline();
   } else if (m.t === 'wait') {
     net.peerAway = true;
-    if (mode === 'guest' && !view) pauseOnline('КОМНАТА ' + net.code, 'Друг отошёл позвать вас. Ждём его…');
-    else pauseOnline('ДРУГ ПОТЕРЯЛ СВЯЗЬ', 'Ждём, пока он вернётся…');
+    if (mode === 'guest' && !view) pauseOnline(T('room_n', { code: net.code }), T('host_away'));
+    else pauseOnline(T('peer_lost_title'), T('peer_wait'));
   } else if (m.t === 'back') {
     haptic('success');
     net.peerAway = false;
@@ -1091,11 +1141,13 @@ function onNet(m) {
       begin(2);
     } else resumeOnline();
   } else if (m.t === 'error') {
-    if (net.retry) { stopRetry(); netClose(); lostLink('Не удалось вернуться в игру: ' + m.msg.toLowerCase() + '.', true); return; }
+    // The server names the error by code; its own Russian text is the fallback.
+    const why = m.code ? T('err_' + m.code) : String(m.msg || '');
+    if (net.retry) { stopRetry(); netClose(); lostLink(T('rejoin_failed', { why: why.toLowerCase() }), true); return; }
     netClose();
-    onlineMenu(m.msg);
+    onlineMenu(why);
   } else if (m.t === 'left') {
-    lostLink('Друг вышел из игры.');
+    lostLink(T('friend_left'));
   } else if (m.t === 'rematch') {
     net.rematch.peer = true;
     rematchScreen();
@@ -1123,26 +1175,24 @@ function rematchScreen() {
   if (!s || s.phase !== 'overDone' || net.peerAway || net.retry) return;
   if (net.rematch.me && net.rematch.peer) {
     if (mode === 'host') begin(2);
-    else showOverlay('РЕВАНШ', 'Начинаем!', null, null, 'online');
+    else showOverlay(T('rematch_title'), T('rematch_go'), null, null, 'online');
     return;
   }
   const score = s.players.reduce((a, p) => a + p.score, 0);
-  const why = s.baseAlive ? 'Все танки подбиты.' : 'Штаб разрушен.';
-  const note = net.rematch.me ? 'Ждём, когда друг нажмёт «Реванш»…' : net.rematch.peer ? 'Друг хочет реванш!' : '';
-  showOverlay('ИГРА ОКОНЧЕНА', why + '<br>Уровень: ' + (s.stage + 1) + '<br>Счёт: ' + score + (note ? '<br><br>' + note : ''),
-    net.rematch.me ? 'Выйти' : 'Реванш', net.rematch.me ? showMenu : pressRematch);
+  const note = net.rematch.me ? T('rematch_wait') : net.rematch.peer ? T('rematch_peer') : '';
+  showOverlay(T('game_over'), resultText(s) + (note ? '<br><br>' + note : ''),
+    net.rematch.me ? T('btn_exit') : T('btn_rematch'), net.rematch.me ? showMenu : pressRematch);
+  showShare(s);
 }
 
 // The bot's tunnel address changes on every restart, so buttons in old
 // messages lead to a dead server; the menu button always has the fresh one.
-const REOPEN = 'Закройте игру и откройте её заново кнопкой «Играть» внизу чата с ботом @' + BOT_NAME
-  + ' (не из старых сообщений: адрес сервера меняется при перезапуске бота).';
+const REOPEN = T('reopen', { bot: BOT_NAME });
 const NO_SERVER = {
-  none: 'Игра не знает адрес сервера, поэтому онлайн недоступен.<br>' + REOPEN,
-  http: 'Адрес сервера игры не https, а Telegram пускает только https.<br>' + REOPEN,
-  down: 'Сервер игры не отвечает: похоже, адрес устарел.<br>' + REOPEN,
-  ws: 'Сервер отвечает, но онлайн-соединение не открылось. Попробуйте ещё раз;'
-    + ' если не выходит, возможно, сеть блокирует WebSocket (попробуйте Wi-Fi или мобильный интернет).',
+  none: T('no_server_none') + '<br>' + REOPEN,
+  http: T('no_server_http') + '<br>' + REOPEN,
+  down: T('no_server_down') + '<br>' + REOPEN,
+  ws: T('no_server_ws'),
 };
 let serverAlive = false;
 
@@ -1150,9 +1200,9 @@ function onlineMenu(text) {
   running = false;
   mode = 'local';
   const html = API
-    ? (text ? text + '<br>' : '') + 'Создайте комнату и отправьте код другу<br>или введите код, который прислал друг.'
+    ? (text ? text + '<br>' : '') + T('online_menu')
     : NO_SERVER[apiProblem];
-  showOverlay('ОНЛАЙН ВДВОЁМ', html, null, null, 'online');
+  showOverlay(T('online_title'), html, null, null, 'online');
   $('onlineStart').classList.toggle('hidden', !API);
   $('btnInvite').classList.add('hidden');
   if (API && !text) checkServer();
@@ -1177,14 +1227,14 @@ $('btnOnline').addEventListener('click', () => { audio(); onlineMenu(); });
 $('btnCancel').addEventListener('click', () => { audio(); showMenu(); });
 $('btnCreate').addEventListener('click', () => {
   audio();
-  showOverlay('ОНЛАЙН ВДВОЁМ', 'Создаём комнату…', null, null, 'online');
+  showOverlay(T('online_title'), T('creating'), null, null, 'online');
   $('onlineStart').classList.add('hidden');
   connectFresh(() => netSend({ t: 'create' }));
 });
 function joinRoom(code) {
   code = String(code || '').replace(/\D/g, '');
-  if (code.length !== 6) { onlineMenu('Код — это 6 цифр.'); return; }
-  showOverlay('ОНЛАЙН ВДВОЁМ', 'Входим в комнату ' + code + '…', null, null, 'online');
+  if (code.length !== 6) { onlineMenu(T('code_6')); return; }
+  showOverlay(T('online_title'), T('joining', { code }), null, null, 'online');
   $('onlineStart').classList.add('hidden');
   connectFresh(() => netSend({ t: 'join', code }));
 }
@@ -1193,7 +1243,8 @@ $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($
 $('btnInvite').addEventListener('click', () => {
   // The bot answers /start tanks_<code> with a button that opens the game inside Telegram.
   const link = 'https://t.me/' + BOT_NAME + '?start=room_' + net.code;
-  const text = 'Сыграем в «Танкодром» вдвоём? Код комнаты: ' + net.code;
+  const text = T('invite_text', { code: net.code });
+  track('invite_created', net.code);
   try {
     if (tg && tg.openTelegramLink) {
       tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(text));
@@ -1201,7 +1252,7 @@ $('btnInvite').addEventListener('click', () => {
     }
   } catch (e) { /* fall through */ }
   if (navigator.share) navigator.share({ text, url: link }).catch(() => {});
-  else if (navigator.clipboard) navigator.clipboard.writeText(text + '\n' + link).then(() => { $('btnInvite').textContent = 'Ссылка скопирована'; });
+  else if (navigator.clipboard) navigator.clipboard.writeText(text + '\n' + link).then(() => { $('btnInvite').textContent = T('link_copied'); });
 });
 
 const packTank = (t) => [t.x, t.y, t.dir, t.side === 'p' ? 1 : 0, t.type, t.pi, t.hp, t.anim, t.shield, t.stun, t.flash ? 1 : 0];
@@ -1263,11 +1314,9 @@ function guestScreens(v) {
     running = true;
     return;
   }
-  if (done === 'overDone') { rematchScreen(); return; }
+  if (done === 'overDone') { track('match_finished', net.code); rematchScreen(); return; }
   const score = v.players.reduce((a, p) => a + p.score, 0);
-  const title = done === 'clearDone' ? 'УРОВЕНЬ ' + (v.stage + 1) + ' ПРОЙДЕН' : 'ИГРА ОКОНЧЕНА';
-  const body = done === 'clearDone' ? 'Подбито:<br>' + killsTable(v) : (v.baseAlive ? 'Все танки подбиты.' : 'Штаб разрушен.');
-  showOverlay(title, body + '<br><br>Счёт: ' + score + '<br>Ждём, когда друг продолжит…', 'Выйти', showMenu);
+  showOverlay(T('stage_clear', { n: v.stage + 1 }), T('kills') + '<br>' + killsTable(v) + '<br><br>' + T('score_line', { n: score }) + '<br>' + T('wait_friend_next'), T('btn_exit'), showMenu);
 }
 
 function guestTick() {
@@ -1299,6 +1348,7 @@ function begin(players) {
   net.events = [];
   clearPads();
   state = S.newGame(players, (Date.now() & 0x7fffffff) || 1);
+  track('game_start');
   lastHud = '';
   $('overlay').classList.add('hidden');
   running = true;
@@ -1309,7 +1359,7 @@ function afterStep(s) {
     running = false;
     const score = s.players.reduce((a, p) => a + p.score, 0);
     haptic('success');
-    showOverlay('УРОВЕНЬ ' + (s.stage + 1) + ' ПРОЙДЕН', 'Подбито:<br>' + killsTable(s) + '<br><br>Счёт: ' + score, 'Дальше', () => {
+    showOverlay(T('stage_clear', { n: s.stage + 1 }), T('kills') + '<br>' + killsTable(s) + '<br><br>' + T('score_line', { n: score }), T('btn_next'), () => {
       S.startStage(s, s.stage + 1);
       clearPads();
       $('overlay').classList.add('hidden');
@@ -1319,9 +1369,14 @@ function afterStep(s) {
     running = false;
     const score = s.players.reduce((a, p) => a + p.score, 0);
     const best = saveBest(score);
-    const why = s.baseAlive ? 'Все танки подбиты.' : 'Штаб разрушен.';
-    if (mode === 'host') rematchScreen();
-    else showOverlay('ИГРА ОКОНЧЕНА', why + '<br>Уровень: ' + (s.stage + 1) + '<br>Счёт: ' + score + '<br>Рекорд: ' + best, 'Ещё раз', () => begin(s.players.length));
+    if (mode === 'local') track('game_finish');
+    if (mode === 'host') {
+      track('match_finished', net.code);
+      rematchScreen();
+    } else {
+      showOverlay(T('game_over'), resultText(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => begin(s.players.length));
+      showShare(s);
+    }
   }
   // The guest sees the result screen too, so send the final frame.
   if (mode === 'host' && !running) sendSnapshot(s);
@@ -1358,13 +1413,14 @@ function frame(now) {
 
 // The collection's settings can switch the game off; then only the way back is shown.
 if (window.CARTRIDGE && !window.CARTRIDGE.isEnabled('tanks')) {
-  showOverlay('ТАНКОДРОМ', 'Игра отключена.', null, null);
+  showOverlay(T('title'), T('disabled'), null, null);
   $('menu').classList.add('hidden');
   $('ovHint').classList.add('hidden');
   $('back').classList.remove('hidden');
   return;
 }
 
+track('game_open');
 bindTouch();
 fitCanvas();
 state = S.newGame(1, 1);

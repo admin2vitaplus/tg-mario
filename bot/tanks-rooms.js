@@ -17,7 +17,7 @@ import { verifyInitData } from "./auth.js";
 //   Если связь оборвалась, второй получает { t: "wait" }; не вернулся за 20 с — { t: "left" }.
 //   Хозяин без гостя может отлучиться (позвать друга) на 2 минуты; гость, вошедший
 //   в это время, получает { t: "joined" } и сразу { t: "wait" }.
-//   Ошибки — { t: "error", msg }.
+//   Ошибки — { t: "error", code, msg }: code для перевода в игре, msg — текст по-русски.
 //
 // Подключение: wss://<сервер>/ws/tanks?auth=<initData> (initData необязателен,
 // с ним лимит соединений считается на игрока Telegram, без него — на адрес).
@@ -147,29 +147,29 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
       if (!msg || typeof msg !== "object") return;
 
       if (msg.t === "create") {
-        if (rooms.size >= L.maxRooms) return send(ws, { t: "error", msg: "Сервер занят, попробуйте позже" });
+        if (rooms.size >= L.maxRooms) return send(ws, { t: "error", code: "busy", msg: "Сервер занят, попробуйте позже" });
         let mine = 0;
         for (const room of rooms.values()) if (room.ip === ws.ip) mine++;
-        if (mine >= L.roomsPerIp) return send(ws, { t: "error", msg: "Слишком много комнат, подождите пару минут" });
+        if (mine >= L.roomsPerIp) return send(ws, { t: "error", code: "rooms", msg: "Слишком много комнат, подождите пару минут" });
         const code = newCode();
-        if (!code) return send(ws, { t: "error", msg: "Не удалось создать комнату" });
+        if (!code) return send(ws, { t: "error", code: "create", msg: "Не удалось создать комнату" });
         const token = newToken();
         rooms.set(code, { code, ip: ws.ip, seats: [{ ws, token, gone: 0 }, null], created: Date.now() });
         ws.room = code;
         send(ws, { t: "room", code, token });
       } else if (msg.t === "join" || msg.t === "rejoin") {
-        if (tooManyTries(ws)) return send(ws, { t: "error", msg: "Слишком много попыток, подождите минуту" });
+        if (tooManyTries(ws)) return send(ws, { t: "error", code: "tries", msg: "Слишком много попыток, подождите минуту" });
         const code = String(msg.code || "").trim();
         const room = rooms.get(code);
         if (!room) {
           failedTry(ws);
-          return send(ws, { t: "error", msg: "Комната не найдена" });
+          return send(ws, { t: "error", code: "not_found", msg: "Комната не найдена" });
         }
         if (msg.t === "rejoin") {
           const i = room.seats.findIndex((s) => s && s.token === String(msg.token || ""));
           if (i < 0) {
             failedTry(ws);
-            return send(ws, { t: "error", msg: "Комната не найдена" });
+            return send(ws, { t: "error", code: "not_found", msg: "Комната не найдена" });
           }
           const seat = room.seats[i];
           if (seat.ws && seat.ws !== ws) { seat.ws.room = null; seat.ws.terminate(); }
@@ -181,7 +181,7 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
           if (other && other.ws) { room.met = true; send(other.ws, { t: "back" }); }
           return;
         }
-        if (room.seats[1]) return send(ws, { t: "error", msg: "В комнате уже двое" });
+        if (room.seats[1]) return send(ws, { t: "error", code: "full", msg: "В комнате уже двое" });
         const token = newToken();
         room.seats[1] = { ws, token, gone: 0 };
         ws.room = code;
@@ -215,7 +215,7 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
       const host = room.seats[0];
       if (!room.seats[1]) {
         if (now - room.created > L.waitMs || (!host.ws && now - host.gone > L.hostAwayMs)) {
-          closeRoom(room, { t: "error", msg: "Никто не пришёл, комната закрыта" });
+          closeRoom(room, { t: "error", code: "expired", msg: "Никто не пришёл, комната закрыта" });
         }
         continue;
       }
