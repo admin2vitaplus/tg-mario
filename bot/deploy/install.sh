@@ -133,10 +133,14 @@ if [ ! -f "$ENV_FILE" ]; then
     read -r -s -p "Токен бота от @BotFather: " token </dev/tty
     echo
   done
+  webapp="${WEBAPP_URL:-}"
+  while [ -z "$webapp" ]; do
+    read -r -p "Адрес игры (https://…, сайт Mini App): " webapp </dev/tty
+  done
   umask 077
   {
     echo "BOT_TOKEN=$token"
-    echo "WEBAPP_URL=${WEBAPP_URL:-https://admin2vitaplus.github.io/tg-mario/}"
+    echo "WEBAPP_URL=$webapp"
     echo "API_PORT=$PORT"
     echo "DB_FILE=$DATA_DIR/scores.db"
   } > "$ENV_FILE"
@@ -145,6 +149,7 @@ if [ -n "${PUBLIC_API_URL:-}" ]; then
   sed -i '/^PUBLIC_API_URL=/d' "$ENV_FILE"
   echo "PUBLIC_API_URL=$PUBLIC_API_URL" >> "$ENV_FILE"
 fi
+grep -q '^WEBAPP_URL=.' "$ENV_FILE" || die "в $ENV_FILE не задан WEBAPP_URL (адрес игры). Впишите его и запустите снова."
 chown root:"$APP_USER" "$ENV_FILE"
 chmod 640 "$ENV_FILE"
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -151,4 +151,24 @@ test("rate limiter memory stays bounded and expires old keys", async () => {
   clock.t += 1001;
   rl.take("fresh");
   assert.equal(rl.size, 1);
+});
+
+// ТЗ P0-1: адрес игры задаётся только в .env, в коде бота его нет.
+test("bot has no hardcoded GitHub Pages address and requires WEBAPP_URL", async () => {
+  const root = new URL("..", import.meta.url).pathname;
+  const found = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      if (["node_modules", "test", ".git", "data"].includes(name)) continue;
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) walk(p);
+      // Только код и шаблоны; настоящий .env на сервере адрес содержит, и это правильно.
+      else if (/\.(js|mjs|sh|example|service|md)$/.test(name) && /github\.io/i.test(readFileSync(p, "utf8"))) {
+        found.push(p.slice(root.length));
+      }
+    }
+  };
+  walk(root);
+  assert.deepEqual(found, []);
+  await assert.rejects(startApp({ env: { DB_FILE: ":memory:" }, port: 0 }), /WEBAPP_URL/);
 });

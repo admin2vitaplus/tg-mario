@@ -13,6 +13,10 @@ if (!token) {
   process.exit(1);
 }
 addSecret(token);
+if (!process.env.WEBAPP_URL) {
+  console.error("Не задан WEBAPP_URL — адрес игры (Mini App). Впишите его в .env, например WEBAPP_URL=https://<сайт игры>/");
+  process.exit(1);
+}
 
 const bot = new Bot(token);
 
