@@ -916,7 +916,16 @@ function apiBase() {
   return '';
 }
 const API = apiBase();
-const BOT_NAME = 'agentmario_bot';
+// Имя бота приходит в ссылке от бота (?bot=) и запоминается; запасное — текущее имя бота.
+const BOT_NAME = (() => {
+  let name = new URLSearchParams(location.search).get('bot');
+  try {
+    if (name) localStorage.setItem('prygskok_bot', name);
+    else name = localStorage.getItem('prygskok_bot');
+  } catch (e) { /* ignore */ }
+  name = (name || '').replace(/[^A-Za-z0-9_]/g, '');
+  return name || 'yellow_cartridge_bot';
+})();
 
 let mode = 'local'; // local | host | guest
 let view = null;    // what the guest draws
