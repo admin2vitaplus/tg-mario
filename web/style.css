@@ -89,7 +89,8 @@ html, body {
 #dpad .right { grid-area: right; }
 
 /* Dendy-style 2x2 block: turbo buttons above, B and A below */
-#actions { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
+/* The padding widens the area that catches fingers around the buttons. */
+#actions { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; padding: 10px; margin: -10px; }
 .btn.on { background: rgba(255, 255, 255, 0.45); }
 
 /* Phone on its side: the game takes the whole height, the score sits in the

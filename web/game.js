@@ -81,66 +81,81 @@ const WORLD_GRAVITY = 1100;
 const JUMP_GRAVITY = [[450, 1575], [422, 1350], [562, 2025]];
 const TURBO_MS = 67; // about 7.5 presses per second, like a turbo button
 
+// Both pads track every finger by pointerId and work out the pressed buttons
+// from where the fingers are, so a thumb can slide or roll between buttons
+// without losing a press, and any number of fingers can be down at once.
 function bindControls() {
   // Cross d-pad: the direction comes from where the thumb is relative to the
   // center, so sliding the thumb switches direction and diagonals press two.
   const dpad = document.getElementById('dpad');
+  const dirs = ['up', 'down', 'left', 'right'];
   const btn = {};
-  for (const dir of ['up', 'down', 'left', 'right']) btn[dir] = dpad.querySelector('.' + dir);
-  const pointers = new Map();
-  const refresh = () => {
-    const r = dpad.getBoundingClientRect();
+  for (const dir of dirs) btn[dir] = dpad.querySelector('.' + dir);
+  trackPointers(dpad, (points, r) => {
     const cx = r.left + r.width / 2;
     const cy = r.top + r.height / 2;
     const dead = r.width * 0.12;
     const on = { up: false, down: false, left: false, right: false };
-    for (const [x, y] of pointers.values()) {
+    for (const [x, y] of points) {
       const dx = x - cx;
       const dy = y - cy;
       if (Math.hypot(dx, dy) < dead) continue;
       if (Math.abs(dx) > Math.abs(dy) * 0.5) on[dx < 0 ? 'left' : 'right'] = true;
       if (Math.abs(dy) > Math.abs(dx) * 0.5) on[dy < 0 ? 'up' : 'down'] = true;
     }
-    for (const dir in on) {
-      touch[dir] = on[dir];
-      btn[dir].classList.toggle('on', on[dir]);
-    }
-  };
-  dpad.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    audio();
-    try { dpad.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
-    pointers.set(e.pointerId, [e.clientX, e.clientY]);
-    refresh();
+    for (const dir of dirs) setKey(dir, on[dir], btn[dir]);
   });
-  dpad.addEventListener('pointermove', (e) => {
-    if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, [e.clientX, e.clientY]);
-    refresh();
-  });
-  for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    dpad.addEventListener(name, (e) => { pointers.delete(e.pointerId); refresh(); });
-  }
 
   // Dendy pad: A jumps, B runs while held and fires on each press.
   // Turbo buttons act as A/B pressed and released many times a second.
-  const hold = (id, key, onPress) => {
-    const el = document.getElementById(id);
-    el.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      audio();
-      touch[key] = true;
-      if (onPress) onPress();
-      el.classList.add('on');
-    });
-    for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
-      el.addEventListener(name, () => { touch[key] = false; el.classList.remove('on'); });
+  // A finger presses every button within reach (the button plus a margin),
+  // so a thumb in the gap between B and A holds both: run and jump high.
+  const actions = document.getElementById('actions');
+  const pads = [['btnA', 'a'], ['btnB', 'b'], ['btnTA', 'turboA'], ['btnTB', 'turboB']]
+    .map(([id, key]) => ({ el: document.getElementById(id), key }));
+  trackPointers(actions, (points) => {
+    for (const p of pads) {
+      const r = p.rect;
+      const m = r.width * 0.22;
+      const on = points.some(([x, y]) => x > r.left - m && x < r.right + m && y > r.top - m && y < r.bottom + m);
+      if (on && !touch[p.key] && p.key === 'b') touch.bPressed = true;
+      setKey(p.key, on, p.el);
     }
-  };
-  hold('btnA', 'a');
-  hold('btnB', 'b', () => { touch.bPressed = true; });
-  hold('btnTA', 'turboA');
-  hold('btnTB', 'turboB');
+  }, () => { for (const p of pads) p.rect = p.el.getBoundingClientRect(); });
+}
+
+function setKey(key, on, el) {
+  if (touch[key] === on) return;
+  touch[key] = on;
+  el.classList.toggle('on', on);
+}
+
+// Calls update(points, rect) whenever a finger on `el` goes down, moves or lifts.
+// Layout is measured once per new finger, not on every move.
+function trackPointers(el, update, measure) {
+  const pointers = new Map();
+  let rect = null;
+  const run = () => update([...pointers.values()], rect);
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    audio();
+    try { el.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+    rect = el.getBoundingClientRect();
+    if (measure) measure();
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    run();
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    run();
+  });
+  for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    el.addEventListener(name, (e) => {
+      if (!pointers.delete(e.pointerId)) return;
+      run();
+    });
+  }
 }
 
 // ---------- HUD and overlay ----------
@@ -2173,11 +2188,14 @@ const game = new Phaser.Game({
   backgroundColor: '#000000',
   pixelArt: true,
   roundPixels: true,
+  // Touch buttons are plain HTML (bindControls); the engine only needs the keyboard.
+  input: { mouse: false, touch: false },
   physics: { default: 'arcade', arcade: { gravity: { y: WORLD_GRAVITY }, tileBias: 20 } },
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: [Play],
 });
 window.__game = game;
+window.__touch = touch;
 
 // Turning the phone changes the layout; refit the picture once the new size settles.
 const refit = () => setTimeout(() => game.scale.refresh(), 150);
