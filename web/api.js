@@ -7,20 +7,9 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = (tg && tg.initData) || '';
 const myId = tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id;
 
-function pickBase() {
-  let url = new URLSearchParams(location.search).get('api');
-  try {
-    if (url) localStorage.setItem('prygskok_api', url);
-    else url = localStorage.getItem('prygskok_api');
-  } catch (e) { /* ignore */ }
-  try {
-    const u = new URL(url);
-    return u.protocol === 'https:' || u.hostname === 'localhost' ? u.origin : '';
-  } catch (e) {
-    return '';
-  }
-}
-const base = pickBase();
+// Address, health check and requests: lib/server.js.
+const server = window.Server;
+const base = server.hasServer;
 const botName = (() => {
   let name = new URLSearchParams(location.search).get('bot');
   try {
@@ -32,16 +21,9 @@ const botName = (() => {
 })();
 
 // Адрес туннеля меняется при перезапуске сервера, и запомненный или старый адрес ведёт в никуда.
-// Проверяем сервер сразу, чтобы честно сказать об этом и предложить открыть игру заново.
-let online = null; // null — ещё проверяем
-const ready = !base ? Promise.resolve(false) : (() => {
-  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
-  const timer = setTimeout(() => ctl && ctl.abort(), 6000);
-  return fetch(base + '/api/health', { signal: ctl ? ctl.signal : undefined })
-    .then((r) => r.ok)
-    .catch(() => false)
-    .then((ok) => { clearTimeout(timer); online = ok; return ok; });
-})();
+// lib/server.js проверяет все известные адреса сразу; если ни один не ответил — честно говорим
+// об этом и предлагаем открыть игру заново через бота.
+const ready = server.ready;
 
 function reopenViaBot() {
   if (!botName) return;
@@ -58,13 +40,7 @@ function offlineHtml() {
              : '<p class="scNote">Отправьте боту /start и откройте игру кнопкой «Играть» из его ответа.</p>');
 }
 
-function request(method, path, body) {
-  if (!base) return Promise.reject(new Error('no server'));
-  const headers = { 'Content-Type': 'application/json' };
-  if (initData) headers.Authorization = 'tma ' + initData;
-  return fetch(base + '/api/mario' + path, { method, headers, body: body ? JSON.stringify(body) : undefined })
-    .then((r) => r.json().then((j) => (r.ok ? j : Promise.reject(new Error(j.error || r.status)))));
-}
+const request = (method, path, body) => server.request(method, '/api/mario' + path, body);
 
 // Счётчики текущей игры.
 let run;
@@ -77,7 +53,7 @@ function track(kind) {
   else if (kind === 'bossFire') run.bossFire = true;
 }
 
-const canSave = () => !!(base && initData && online !== false);
+const canSave = () => !!(base && initData && server.online !== false);
 
 function levelDone(level, score, timeLeft) {
   const deaths = run.levelDeaths;
@@ -150,9 +126,9 @@ function showTab(tab) {
       'адрес запомнится и рекорды будут видны отовсюду.</p>';
     return;
   }
-  if (online === false) { bodyEl.innerHTML = offlineHtml(); return; }
+  if (server.online === false) { bodyEl.innerHTML = offlineHtml(); return; }
   const fail = () => {
-    bodyEl.innerHTML = online === false ? offlineHtml()
+    bodyEl.innerHTML = server.online === false ? offlineHtml()
       : '<p class="scNote">Сервер рекордов сейчас недоступен: бот выключен или нет связи. Попробуйте позже.</p>';
   };
   if (tab === 'top') {

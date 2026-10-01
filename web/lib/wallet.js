@@ -23,6 +23,11 @@ const STR = {
     tab_how: 'Как получить', tab_history: 'История', tab_shop: 'Магазин',
     close: 'Закрыть', loading: 'Загрузка…',
     offline: 'Сервер сейчас недоступен. Попробуйте позже.',
+    moved: 'сервер переехал — открыть заново',
+    not_ready: 'Жетоны появятся, когда сервер обновится до новой версии.',
+    expired: 'Игра открыта слишком давно, и Telegram больше не подтверждает вход. Откройте её заново.',
+    moved_long: 'Сервер перезапустился и сменил адрес, а игра открыта по старой ссылке.',
+    reopen: 'Открыть игру заново',
     balance: 'Баланс: {n}',
     today: 'Сегодня получено {n} из {cap}. Серия дней: {streak}.',
     how_ach: 'Достижение — {n} (каждое один раз)',
@@ -51,6 +56,11 @@ const STR = {
     tab_how: 'How to get', tab_history: 'History', tab_shop: 'Shop',
     close: 'Close', loading: 'Loading…',
     offline: 'The server is not reachable right now. Try again later.',
+    moved: 'server moved — reopen',
+    not_ready: 'Tickets will appear once the server is updated.',
+    expired: 'The game has been open too long and Telegram no longer confirms who you are. Open it again.',
+    moved_long: 'The server restarted at a new address, and the game was opened by an old link.',
+    reopen: 'Open the game again',
     balance: 'Balance: {n}',
     today: 'Today: {n} of {cap}. Days in a row: {streak}.',
     how_ach: 'Achievement — {n} (each one once)',
@@ -91,21 +101,15 @@ function T(key, vars) {
   return s;
 }
 
-const base = (() => {
-  let url = new URLSearchParams(location.search).get('api');
-  try { if (!url) url = localStorage.getItem('prygskok_api'); } catch (e) { /* ignore */ }
-  try {
-    const u = new URL(url);
-    return u.protocol === 'https:' || u.hostname === 'localhost' ? u.origin : '';
-  } catch (e) { return ''; }
-})();
+// Address and requests: lib/server.js.
+const server = window.Server || { hasServer: false };
 const botName = (() => {
   let name = new URLSearchParams(location.search).get('bot');
   try { if (!name) name = localStorage.getItem('prygskok_bot'); } catch (e) { /* ignore */ }
   if (!name && window.CARTRIDGE) name = window.CARTRIDGE.bot;
   return (name || '').replace(/[^A-Za-z0-9_]/g, '');
 })();
-const enabled = !!(base && initData);
+const enabled = !!(server.hasServer && initData);
 
 const OWNED_KEY = 'wallet_owned';
 let owned = (() => {
@@ -114,26 +118,26 @@ let owned = (() => {
 let me = null;
 let info = null;
 
-function request(method, path, body) {
-  const headers = { 'Content-Type': 'application/json', Authorization: 'tma ' + initData };
-  return fetch(base + '/api/wallet' + path, { method, headers, body: body ? JSON.stringify(body) : undefined })
-    .then((r) => r.json().catch(() => ({})).then((j) => (r.ok ? j : Promise.reject(Object.assign(new Error(j.error || r.status), { body: j })))));
-}
+const request = (method, path, body) => server.request(method, '/api/wallet' + path, body);
 
 function keepOwned(list) {
   owned = list.slice();
   try { localStorage.setItem(OWNED_KEY, JSON.stringify(owned)); } catch (e) { /* private mode */ }
 }
 
+// One refresh at a time: opening tabs quickly does not pile up requests.
+let loading = null;
 function refresh() {
   if (!enabled) return Promise.resolve(null);
-  return Promise.all([info ? info : request('GET', '/info'), request('GET', '/me')]).then(([i, m]) => {
+  if (loading) return loading;
+  loading = Promise.all([info ? info : request('GET', '/info'), request('GET', '/me')]).then(([i, m]) => {
     info = i;
     me = m;
     keepOwned(m.owned || []);
     badge();
     return m;
-  });
+  }).finally(() => { loading = null; });
+  return loading;
 }
 
 // ---------- Balance in the menu ----------
@@ -145,11 +149,12 @@ function badge() {
   if (!badgeEl) {
     badgeEl = document.createElement('button');
     badgeEl.id = 'walletBadge';
-    badgeEl.addEventListener('click', () => open('how'));
+    badgeEl.addEventListener('click', () => (server.online === false ? reopen() : open('how')));
     const h1 = menu.querySelector('h1');
     if (h1) h1.insertAdjacentElement('afterend', badgeEl); else menu.prepend(badgeEl);
   }
-  badgeEl.textContent = '◆ ' + (me ? me.balance + ' ' + word(me.balance) : T('title').toLowerCase());
+  badgeEl.textContent = '◆ ' + (me ? me.balance + ' ' + word(me.balance)
+    : server.online === false ? T('moved') : T('title').toLowerCase());
 }
 
 // ---------- Toasts after a game result ----------
@@ -232,7 +237,17 @@ function show(tab) {
   if (me && info) render(body);
   else body.innerHTML = `<p class="wNote">${esc(T('loading'))}</p>`;
   refresh().then(() => { if (panel && current === tab) render(body); })
-    .catch(() => { if (panel && !me) body.innerHTML = `<p class="wNote">${esc(T('offline'))}</p>`; });
+    .catch((e) => {
+      if (!panel || me) return;
+      // Which of the failures it was, so the player (and whoever reads the report) can tell.
+      let html = `<p class="wNote">${esc(T('offline'))}</p>`;
+      if (server.online === false && botName) {
+        html = `<p class="wNote">${esc(T('moved_long'))}</p><button class="wAct" data-act="reopen">${esc(T('reopen'))}</button>`;
+      } else if (e && e.status === 404) html = `<p class="wNote">${esc(T('not_ready'))}</p>`;
+      else if (e && e.status === 401) html = `<p class="wNote">${esc(T('expired'))}</p>` +
+        (botName ? `<button class="wAct" data-act="reopen">${esc(T('reopen'))}</button>` : '');
+      body.innerHTML = html + `<p class="wNote wCode">${esc(e && e.status ? 'HTTP ' + e.status : (e && e.message) || '')}</p>`;
+    });
 }
 
 function close() {
@@ -266,10 +281,21 @@ function open(tab) {
     if (!b) return;
     if (b.dataset.act === 'buy') buy(b.dataset.id).then((ok) => { if (ok && panel) show('shop'); });
     if (b.dataset.act === 'invite') invite();
+    if (b.dataset.act === 'reopen') reopen();
   });
   document.addEventListener('keydown', onKey, true);
   document.body.append(panel);
   show(tab || 'how');
+}
+
+// The bot's /start answers with a button that carries the server's current address.
+function reopen() {
+  if (!botName) return;
+  const link = 'https://t.me/' + botName + '?start=play';
+  try {
+    if (tg && tg.openTelegramLink) { tg.openTelegramLink(link); tg.close(); return; }
+  } catch (e) { /* fall through */ }
+  location.href = link;
 }
 
 function invite() {
@@ -328,6 +354,6 @@ window.Wallet = {
 
 if (enabled) {
   badge();
-  refresh().catch(() => {});
+  refresh().catch(() => badge());
 }
 })();
