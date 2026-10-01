@@ -221,3 +221,5 @@ html, body {
   color: #f8d020;
   font: bold 16px "Courier New", monospace;
 }
+#menu.loading .hint { opacity: 1; color: #f8d020; animation: blink 0.8s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0.3; } }

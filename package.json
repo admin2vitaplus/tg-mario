@@ -1,0 +1,8 @@
+{
+  "name": "yellow-cartridge",
+  "private": true,
+  "description": "Checks for the web/ folder; the bot has its own package in bot/.",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.mjs\" \"web/**/*.test.mjs\""
+  }
+}
