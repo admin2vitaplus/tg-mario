@@ -11,10 +11,10 @@
 <body>
   <div id="app">
     <div id="hud">
-      <div>СЧЁТ<br><span id="score">000000</span></div>
-      <div>ЖИЗНИ<br><span id="lives">3</span></div>
-      <div>ВРАГИ<br><span id="foes">20</span></div>
-      <div>УРОВЕНЬ<br><span id="stage">1</span></div>
+      <div><span data-t="hud_score">СЧЁТ</span><br><span id="score">000000</span></div>
+      <div><span data-t="hud_lives">ЖИЗНИ</span><br><span id="lives">3</span></div>
+      <div><span data-t="hud_foes">ВРАГИ</span><br><span id="foes">20</span></div>
+      <div><span data-t="hud_stage">УРОВЕНЬ</span><br><span id="stage">1</span></div>
     </div>
     <div id="game">
       <canvas id="screen" width="256" height="224"></canvas>
@@ -28,8 +28,8 @@
         <div class="btn down">▼</div>
       </div>
       <div id="actions">
-        <div class="btn round turbo" id="btnTB">ТУРБО<br>B</div>
-        <div class="btn round turbo" id="btnTA">ТУРБО<br>A</div>
+        <div class="btn round turbo" id="btnTB" data-th="turbo_b">ТУРБО<br>B</div>
+        <div class="btn round turbo" id="btnTA" data-th="turbo_a">ТУРБО<br>A</div>
         <div class="btn round ab" id="btnB">B</div>
         <div class="btn round ab" id="btnA">A</div>
       </div>
@@ -38,30 +38,33 @@
       <h1 id="ovTitle">ТАНКОДРОМ</h1>
       <p id="ovText">Защити штаб от вражеских танков.<br>Кирпич пробивается, сталь держит.</p>
       <div id="menu">
-        <button data-players="1">1 игрок</button>
-        <button data-players="2" class="desk">2 игрока за одной клавиатурой</button>
-        <button id="btnOnline">Онлайн вдвоём</button>
-        <button id="btnLook" class="ghost">Внешний вид</button>
+        <button data-players="1" data-t="menu_1p">1 игрок</button>
+        <button data-players="2" class="desk" data-t="menu_2p">2 игрока за одной клавиатурой</button>
+        <button id="btnOnline" data-t="menu_online">Онлайн вдвоём</button>
+        <button id="btnLook" class="ghost" data-t="menu_look">Внешний вид</button>
       </div>
       <div id="online" class="hidden">
         <div id="onlineStart">
-          <button id="btnCreate">Создать комнату</button>
+          <button id="btnCreate" data-t="btn_create">Создать комнату</button>
           <div class="join">
-            <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="код" autocomplete="off">
-            <button id="btnJoin">Войти</button>
+            <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="код" data-tp="code_placeholder" autocomplete="off">
+            <button id="btnJoin" data-t="btn_join">Войти</button>
           </div>
         </div>
-        <button id="btnInvite" class="hidden">Позвать друга в Telegram</button>
-        <button id="btnCancel" class="ghost">Назад</button>
+        <button id="btnInvite" class="hidden" data-t="btn_invite">Позвать друга в Telegram</button>
+        <button id="btnCancel" class="ghost" data-t="btn_back">Назад</button>
       </div>
       <button id="ovBtn" class="hidden">Дальше</button>
-      <p class="hint" id="ovHint">Крестовина — ехать, A и B — огонь, ТУРБО — очередь.<br>Клавиатура: стрелки или WASD, огонь — пробел/Z, турбо — C.<br>Вдвоём: 1-й WASD + пробел (турбо G), 2-й стрелки + Enter (турбо K).</p>
-      <a id="back" href="../">← к выбору игр</a>
+      <button id="ovShare" class="hidden ghost">Поделиться итогом</button>
+      <p class="hint" id="ovHint" data-th="hint">Крестовина — ехать, A и B — огонь, ТУРБО — очередь.<br>Клавиатура: стрелки или WASD, огонь — пробел/Z, турбо — C.<br>Вдвоём: 1-й WASD + пробел (турбо G), 2-й стрелки + Enter (турбо K).</p>
+      <a id="back" href="../" data-t="back">← к выбору игр</a>
     </div>
   </div>
   <script src="../config.js"></script>
   <script src="../sw-register.js"></script>
   <script src="../lib/looks.js"></script>
+  <script src="../lib/events.js"></script>
+  <script src="strings.js"></script>
   <script src="sim.js"></script>
   <script src="tanks.js"></script>
 </body>
