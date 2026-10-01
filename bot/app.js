@@ -6,7 +6,7 @@ import { currentCommit } from "./version.js";
 
 // Всё, кроме самого бота Telegram и туннеля: база, HTTP API и комнаты «Танкодрома».
 // Вынесено отдельно, чтобы запуск и остановку можно было проверить тестом без сети и токена.
-export async function startApp({ env = process.env, botToken, onAchievements, port } = {}) {
+export async function startApp({ env = process.env, botToken, onAchievements, port, tanksLimits } = {}) {
   // Адрес игры не вшит в код: он задаётся в .env, чтобы переезд сайта не требовал правки бота.
   const gameUrl = env.WEBAPP_URL;
   if (!gameUrl || !/^https?:\/\//.test(gameUrl)) {
@@ -27,7 +27,7 @@ export async function startApp({ env = process.env, botToken, onAchievements, po
   const pruneTimer = setInterval(prune, 24 * 3600 * 1000);
   pruneTimer.unref();
   const server = createApiServer({ store, botToken, allowedOrigins, onAchievements, commit, tracker });
-  const tanks = attachTanksRooms(server, { allowedOrigins });
+  const tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
 
   // Соединения держим в списке, чтобы при остановке закрыть и «живые» keep-alive.
   const sockets = new Set();

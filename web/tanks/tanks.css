@@ -223,3 +223,4 @@ html, body {
   #overlay button { padding: 8px 22px; font-size: 15px; }
   #menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 }
+#ovShare { margin-top: 10px; }
