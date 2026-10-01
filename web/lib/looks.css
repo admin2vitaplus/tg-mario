@@ -1,0 +1,60 @@
+/* «Внешний вид» panel (lib/looks.js), shared by all games. */
+.looks {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  background: #000;
+  color: #fff;
+  font-family: "Courier New", monospace;
+  text-align: center;
+}
+.looks h1 { margin: 4px 0 8px; font-size: 22px; color: #f8d020; letter-spacing: 2px; }
+.looksBody { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; }
+.looks section { min-width: 0; margin-bottom: 12px; }
+.looks h2 { margin: 0 0 6px; font-size: 14px; text-align: left; opacity: 0.85; }
+.looksRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  touch-action: pan-x pan-y;
+}
+.looksItem {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 76px;
+  padding: 6px 4px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: bold 11px "Courier New", monospace;
+}
+.looksItem.on { border-color: #f8d020; background: rgba(248, 208, 32, 0.15); }
+.looksItem.locked { opacity: 0.45; }
+.looksItem i { position: absolute; top: 4px; right: 4px; font-style: normal; color: #f8d020; }
+.looksItem canvas { width: 48px; height: 48px; image-rendering: pixelated; }
+.looksDone {
+  margin: 10px auto 0;
+  padding: 12px 40px;
+  border: 0;
+  border-radius: 10px;
+  background: #1fa2a8;
+  color: #fff;
+  font: bold 18px "Courier New", monospace;
+}
+
+/* Phone on its side: short screen, so groups go in two columns. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .looks { padding: 8px calc(12px + env(safe-area-inset-right)) 8px calc(12px + env(safe-area-inset-left)); }
+  .looks h1 { margin: 0 0 4px; font-size: 18px; }
+  .looksBody { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; align-content: start; }
+  .looksDone { margin-top: 6px; padding: 8px 40px; }
+}

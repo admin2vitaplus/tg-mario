@@ -194,10 +194,15 @@ function drawRows(ctx, rows, scale, pal) {
   });
 }
 
+// A fresh canvas texture; an old one with the same key is dropped, so looks can be redrawn.
+function canvasTex(scene, key, w, h) {
+  if (scene.textures.exists(key)) scene.textures.remove(key);
+  return scene.textures.createCanvas(key, w, h);
+}
+
 function pix(scene, key, rows, scale = 1, pal = PAL) {
   const w = Math.max(...rows.map((r) => r.length));
-  if (scene.textures.exists(key)) scene.textures.remove(key);
-  const c = scene.textures.createCanvas(key, w * scale, rows.length * scale);
+  const c = canvasTex(scene, key, w * scale, rows.length * scale);
   const ctx = c.getContext();
   rows.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
@@ -314,6 +319,11 @@ const BUG_TOP = [
   '...YYYYYYYYYY...',
 ];
 
+const BUG_LEGS = [
+  ['..KK..KK..KK..KK', '.KK..KK..KK..KK.'],
+  ['.KK..KK..KK..KK.', '..KK..KK..KK..KK'],
+];
+
 const BERRY = [
     '.......G........',
     '......GGG.......',
@@ -337,8 +347,9 @@ function makeTextures(scene) {
   makeHeroTextures(scene);
   pix(scene, 'fireball', ['..FF..', '.FJJF.', 'FJWWJF', 'FJWWJF', '.FJJF.', '..FF..']);
 
-  pix(scene, 'bug0', [...BUG_TOP, '..KK..KK..KK..KK', '.KK..KK..KK..KK.']);
-  pix(scene, 'bug1', [...BUG_TOP, '.KK..KK..KK..KK.', '..KK..KK..KK..KK']);
+  const foe = Object.assign({}, PAL, lookOf('enemy').pal);
+  pix(scene, 'bug0', [...BUG_TOP, ...BUG_LEGS[0]], 1, foe);
+  pix(scene, 'bug1', [...BUG_TOP, ...BUG_LEGS[1]], 1, foe);
   pix(scene, 'bugFlat', [
     ...Array(10).fill('................'),
     '..EEEEEEEEEEEE..',
@@ -347,7 +358,7 @@ function makeTextures(scene) {
     '..YYYYYYYYYYYY..',
     '.KK.KK.KK.KK.KK.',
     '................',
-  ]);
+  ], 1, foe);
 
   pix(scene, 'coin', [
     '................',
@@ -469,7 +480,8 @@ const TILESETS = {
 function drawTiles(scene, key, colors) {
   const count = TILE_COUNT;
   const { g, b, h } = colors;
-  const c = scene.textures.createCanvas(key, TILE * count, TILE);
+  const p = lookOf('pipe').c;
+  const c = canvasTex(scene, key, TILE * count, TILE);
   const ctx = c.getContext();
   const r = (i, x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(i * TILE + x, y, w, h); };
 
@@ -514,19 +526,19 @@ function drawTiles(scene, key, colors) {
   r(4, 4, 4, 8, 8, h[3]);
 
   // pipe lip left / right
-  r(5, 0, 0, 16, 16, '#0a300a');
-  r(5, 1, 1, 15, 14, '#30a030');
-  r(5, 4, 1, 3, 14, '#a0f080');
-  r(6, 0, 0, 16, 16, '#0a300a');
-  r(6, 0, 1, 15, 14, '#30a030');
-  r(6, 9, 1, 3, 14, '#107010');
+  r(5, 0, 0, 16, 16, p[0]);
+  r(5, 1, 1, 15, 14, p[1]);
+  r(5, 4, 1, 3, 14, p[2]);
+  r(6, 0, 0, 16, 16, p[0]);
+  r(6, 0, 1, 15, 14, p[1]);
+  r(6, 9, 1, 3, 14, p[3]);
   // pipe body left / right
-  r(7, 2, 0, 14, 16, '#30a030');
-  r(7, 2, 0, 1, 16, '#0a300a');
-  r(7, 5, 0, 3, 16, '#a0f080');
-  r(8, 0, 0, 13, 16, '#30a030');
-  r(8, 13, 0, 1, 16, '#0a300a');
-  r(8, 8, 0, 3, 16, '#107010');
+  r(7, 2, 0, 14, 16, p[1]);
+  r(7, 2, 0, 1, 16, p[0]);
+  r(7, 5, 0, 3, 16, p[2]);
+  r(8, 0, 0, 13, 16, p[1]);
+  r(8, 13, 0, 1, 16, p[0]);
+  r(8, 8, 0, 3, 16, p[3]);
 
   // flag pole and its top ball
   r(9, 7, 0, 2, 16, '#58d858');
@@ -569,25 +581,25 @@ function drawTiles(scene, key, colors) {
   for (const x of [2, 10]) r(17, x, 6, 2, 4, '#8a8a8a');
 
   // side pipe: mouth (top/bottom) and body (top/bottom), opening to the left
-  r(18, 0, 0, 16, 16, '#0a300a');
-  r(18, 1, 1, 14, 15, '#30a030');
-  r(18, 1, 4, 14, 3, '#a0f080');
-  r(19, 0, 0, 16, 16, '#0a300a');
-  r(19, 1, 0, 14, 15, '#30a030');
-  r(19, 1, 9, 14, 3, '#107010');
-  r(20, 0, 2, 16, 14, '#30a030');
-  r(20, 0, 2, 16, 1, '#0a300a');
-  r(20, 0, 5, 16, 3, '#a0f080');
-  r(21, 0, 0, 16, 13, '#30a030');
-  r(21, 0, 13, 16, 1, '#0a300a');
-  r(21, 0, 8, 16, 3, '#107010');
+  r(18, 0, 0, 16, 16, p[0]);
+  r(18, 1, 1, 14, 15, p[1]);
+  r(18, 1, 4, 14, 3, p[2]);
+  r(19, 0, 0, 16, 16, p[0]);
+  r(19, 1, 0, 14, 15, p[1]);
+  r(19, 1, 9, 14, 3, p[3]);
+  r(20, 0, 2, 16, 14, p[1]);
+  r(20, 0, 2, 16, 1, p[0]);
+  r(20, 0, 5, 16, 3, p[2]);
+  r(21, 0, 0, 16, 13, p[1]);
+  r(21, 0, 13, 16, 1, p[0]);
+  r(21, 0, 8, 16, 3, p[3]);
 
   c.refresh();
   for (let i = 0; i < count; i++) c.add(i, 0, i * TILE, 0, TILE, TILE);
 }
 
 function drawScenery(scene) {
-  let c = scene.textures.createCanvas('cloud', 40, 20);
+  let c = canvasTex(scene, 'cloud', 40, 20);
   let ctx = c.getContext();
   ctx.fillStyle = '#ffffff';
   for (const [x, y, rad] of [[10, 12, 7], [20, 8, 9], [30, 12, 7]]) {
@@ -598,19 +610,18 @@ function drawScenery(scene) {
   ctx.fillRect(4, 12, 32, 7);
   c.refresh();
 
-  c = scene.textures.createCanvas('hill', 80, 36);
-  ctx = c.getContext();
-  ctx.fillStyle = '#107010';
-  ctx.beginPath();
-  ctx.ellipse(40, 36, 40, 34, 0, Math.PI, 0);
-  ctx.fill();
-  ctx.fillStyle = '#30a030';
-  ctx.beginPath();
-  ctx.ellipse(40, 37, 37, 32, 0, Math.PI, 0);
-  ctx.fill();
+  const back = lookOf('back');
+  c = canvasTex(scene, 'hill', back.w, back.h);
+  back.paint(c.getContext(), night());
   c.refresh();
 
-  c = scene.textures.createCanvas('flag', 16, 16);
+  // Night sky: stars and a moon, fixed to the screen.
+  c = canvasTex(scene, 'stars', VIEW_W, 150);
+  ctx = c.getContext();
+  drawStars(ctx, VIEW_W, 150);
+  c.refresh();
+
+  c = canvasTex(scene, 'flag', 16, 16);
   ctx = c.getContext();
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
@@ -939,26 +950,196 @@ const LEVELS = [
   { name: 'ЗАМОК', build: levelCastle, time: 300 },
 ];
 
-// ---------- Skins ----------
-// Each skin recolors the hero: C cap, J jacket, P overalls, B boots, S skin, K hair.
+// ---------- Looks («Внешний вид») ----------
+// Each item has a stars price for later; everything is free for now.
+// Hero skins recolor the hero: C cap, J jacket, P overalls, B boots, S skin, K hair.
 const SKINS = [
-  { id: 'classic', name: 'Классика', pal: {} },
-  { id: 'forest', name: 'Лесник', pal: { C: '#2a7a2a', J: '#a86c30', P: '#4a4a20', B: '#3a2008' } },
-  { id: 'space', name: 'Космонавт', pal: { C: '#e8e8f0', J: '#b8bcc8', P: '#3050c8', B: '#606070', K: '#e8e8f0' } },
-  { id: 'ninja', name: 'Ниндзя', pal: { C: '#303040', J: '#404050', P: '#202028', B: '#101010', K: '#d82800' } },
-  { id: 'pirate', name: 'Пират', pal: { C: '#d82800', J: '#f0f0f0', P: '#202020', B: '#6b3a10', S: '#e0a070' } },
-  { id: 'pink', name: 'Зефирка', pal: { C: '#f878b8', J: '#f8b8d8', P: '#8040c0', B: '#c03080', K: '#8a4a20' } },
+  { id: 'classic', name: 'Классика', stars: 0, pal: {} },
+  { id: 'forest', name: 'Лесник', stars: 0, pal: { C: '#2a7a2a', J: '#a86c30', P: '#4a4a20', B: '#3a2008' } },
+  { id: 'space', name: 'Космонавт', stars: 0, pal: { C: '#e8e8f0', J: '#b8bcc8', P: '#3050c8', B: '#606070', K: '#e8e8f0' } },
+  { id: 'ninja', name: 'Ниндзя', stars: 0, pal: { C: '#303040', J: '#404050', P: '#202028', B: '#101010', K: '#d82800' } },
+  { id: 'pirate', name: 'Пират', stars: 0, pal: { C: '#d82800', J: '#f0f0f0', P: '#202020', B: '#6b3a10', S: '#e0a070' } },
+  { id: 'pink', name: 'Зефирка', stars: 0, pal: { C: '#f878b8', J: '#f8b8d8', P: '#8040c0', B: '#c03080', K: '#8a4a20' } },
 ];
-const SKIN_KEY = 'prygskok_skin';
 
-function loadSkin() {
-  try {
-    const id = localStorage.getItem(SKIN_KEY);
-    return SKINS.find((sk) => sk.id === id) || SKINS[0];
-  } catch (e) { return SKINS[0]; }
+const DAY_SKY = '#6b8cff';
+const NIGHT_SKY = '#101838';
+const TIMES = [
+  { id: 'day', name: 'День', stars: 0 },
+  { id: 'night', name: 'Ночь', stars: 0 },
+];
+
+// Enemy shells: E shell, O spots.
+const ENEMIES = [
+  { id: 'red', name: 'Жук', stars: 0, pal: {} },
+  { id: 'blue', name: 'Синий', stars: 0, pal: { E: '#2848a8', O: '#58a0f8' } },
+  { id: 'green', name: 'Травяной', stars: 0, pal: { E: '#107010', O: '#58d858' } },
+  { id: 'gold', name: 'Золотой', stars: 0, pal: { E: '#c07000', O: '#f8d020' } },
+  { id: 'shadow', name: 'Тень', stars: 0, pal: { E: '#303040', O: '#9090b0', Y: '#c0c0d0' } },
+];
+
+// Pipe colors: outline, body, highlight, shade.
+const PIPES = [
+  { id: 'green', name: 'Зелёные', stars: 0, c: ['#0a300a', '#30a030', '#a0f080', '#107010'] },
+  { id: 'red', name: 'Красные', stars: 0, c: ['#400808', '#c03020', '#f8a080', '#801010'] },
+  { id: 'blue', name: 'Синие', stars: 0, c: ['#081840', '#2860c0', '#90c8f8', '#103880'] },
+  { id: 'gold', name: 'Золотые', stars: 0, c: ['#402800', '#d8a020', '#f8f0a0', '#906000'] },
+  { id: 'steel', name: 'Стальные', stars: 0, c: ['#202020', '#8c8c8c', '#e0e0e0', '#505050'] },
+];
+
+function hump(ctx, x, w, h, bottom, col) {
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, bottom, w / 2, h, 0, Math.PI, 0);
+  ctx.fill();
 }
 
-let skin = loadSkin();
+// Backdrops painted behind outdoor areas, w x h pixels standing on the ground.
+const BACKS = [
+  { id: 'hills', name: 'Холмы', stars: 0, w: 80, h: 36, paint(ctx, n) {
+    hump(ctx, 0, 80, 34, 36, n ? '#0a3a20' : '#107010');
+    hump(ctx, 3, 74, 32, 37, n ? '#185a30' : '#30a030');
+  } },
+  { id: 'mountains', name: 'Горы', stars: 0, w: 160, h: 80, paint(ctx, n) {
+    const peak = (x, w, h, col, snow) => {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(x, 80);
+      ctx.lineTo(x + w / 2, 80 - h);
+      ctx.lineTo(x + w, 80);
+      ctx.fill();
+      ctx.fillStyle = snow;
+      ctx.beginPath();
+      ctx.moveTo(x + w / 2 - w * 0.12, 80 - h * 0.76);
+      ctx.lineTo(x + w / 2, 80 - h);
+      ctx.lineTo(x + w / 2 + w * 0.12, 80 - h * 0.76);
+      ctx.fill();
+    };
+    peak(60, 100, 64, n ? '#232a50' : '#5868a8', n ? '#8890b8' : '#ffffff');
+    peak(0, 110, 80, n ? '#2c3460' : '#7080c0', n ? '#a0a8c8' : '#ffffff');
+  } },
+  { id: 'forest', name: 'Лес', stars: 0, w: 128, h: 52, paint(ctx, n) {
+    for (const [x, r] of [[14, 14], [40, 18], [70, 15], [100, 19], [120, 10]]) {
+      ctx.fillStyle = n ? '#3a2410' : '#6b3a10';
+      ctx.fillRect(x - 2, 52 - 14, 4, 14);
+      ctx.fillStyle = n ? '#0a2a18' : '#107010';
+      ctx.beginPath();
+      ctx.arc(x, 52 - 12 - r, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = n ? '#12402a' : '#30a030';
+      ctx.beginPath();
+      ctx.arc(x - r * 0.3, 52 - 14 - r * 1.2, r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } },
+  { id: 'city', name: 'Город', stars: 0, w: 144, h: 76, paint(ctx, n) {
+    [[0, 22, 46], [24, 26, 70], [52, 20, 38], [74, 30, 58], [106, 18, 44], [126, 18, 64]].forEach(([x, w, h], i) => {
+      ctx.fillStyle = n ? '#202840' : '#506080';
+      ctx.fillRect(x, 76 - h, w, h);
+      for (let y = 76 - h + 4; y < 72; y += 8) {
+        for (let wx = x + 3; wx < x + w - 4; wx += 6) {
+          const lit = (wx * 7 + y * 3 + i) % 5 < 2;
+          ctx.fillStyle = n ? (lit ? '#f8d878' : '#303850') : '#a8c8f0';
+          ctx.fillRect(wx, y, 3, 4);
+        }
+      }
+    });
+  } },
+  { id: 'desert', name: 'Пустыня', stars: 0, w: 128, h: 40, paint(ctx, n) {
+    hump(ctx, 0, 128, 22, 40, n ? '#605030' : '#e0b060');
+    hump(ctx, 60, 68, 30, 41, n ? '#706038' : '#f0c878');
+    ctx.fillStyle = n ? '#185a30' : '#30a030';
+    ctx.fillRect(28, 8, 6, 26);
+    ctx.fillRect(20, 14, 4, 10);
+    ctx.fillRect(20, 20, 8, 4);
+    ctx.fillRect(38, 12, 4, 10);
+    ctx.fillRect(34, 18, 8, 4);
+  } },
+];
+
+function drawStars(ctx, w, h) {
+  ctx.fillStyle = '#f8f0c0';
+  for (let i = 0; i < 40; i++) {
+    const x = (i * 97 + 13) % w;
+    const y = (i * 53 + i * i * 7) % h;
+    ctx.fillRect(x, y, 1, 1 + (i % 7 === 0));
+  }
+  ctx.beginPath();
+  ctx.arc(w - 40, 30, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = NIGHT_SKY;
+  ctx.beginPath();
+  ctx.arc(w - 35, 26, 9, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+const LOOKS_KEY = 'prygskok_looks';
+const LOOK_GROUPS = [
+  { id: 'hero', title: 'Выбери героя', items: SKINS, draw(it, ctx, size) {
+    drawRows(ctx, [...HEAD, ...SMALL_BODY, ...SMALL_LEGS], size / 16, skinPal(it));
+  } },
+  { id: 'time', title: 'Погода: день или ночь', items: TIMES, draw(it, ctx, size) {
+    const n = it.id === 'night';
+    ctx.fillStyle = n ? NIGHT_SKY : DAY_SKY;
+    ctx.fillRect(0, 0, size, size);
+    if (n) {
+      drawStars(ctx, size + 20, size);
+    } else {
+      ctx.fillStyle = '#f8d020';
+      ctx.beginPath();
+      ctx.arc(size - 14, 14, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(4, 26, 18, 6);
+      ctx.fillRect(8, 22, 10, 4);
+    }
+    ctx.fillStyle = n ? '#185a30' : '#30a030';
+    ctx.fillRect(0, size - 8, size, 8);
+  } },
+  { id: 'enemy', title: 'Враги', items: ENEMIES, draw(it, ctx, size) {
+    drawRows(ctx, [...BUG_TOP, ...BUG_LEGS[0]], size / 16, Object.assign({}, PAL, it.pal));
+  } },
+  { id: 'pipe', title: 'Трубы', items: PIPES, draw(it, ctx, size) {
+    const [o, m, l, d] = it.c;
+    const box = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
+    box(8, 4, 32, 12, o);
+    box(9, 5, 30, 10, m);
+    box(13, 5, 4, 10, l);
+    box(31, 5, 4, 10, d);
+    box(11, 16, 26, 32, o);
+    box(12, 16, 24, 32, m);
+    box(15, 16, 4, 32, l);
+    box(29, 16, 4, 32, d);
+  } },
+  { id: 'back', title: 'Фон', items: BACKS, draw(it, ctx, size) {
+    ctx.fillStyle = night() ? NIGHT_SKY : DAY_SKY;
+    ctx.fillRect(0, 0, size, size);
+    const cv = document.createElement('canvas');
+    cv.width = it.w;
+    cv.height = it.h;
+    it.paint(cv.getContext('2d'), night());
+    const k = Math.min(size / it.w, (size - 6) / it.h);
+    ctx.drawImage(cv, (size - it.w * k) / 2, size - 6 - it.h * k, it.w * k, it.h * k);
+    ctx.fillStyle = '#c0601c';
+    ctx.fillRect(0, size - 6, size, 6);
+  } },
+].map((g) => Object.assign(g, { items: g.items.map((it) => Object.assign(it, { draw: (ctx, size) => g.draw(it, ctx, size) })) }));
+
+// The hero skin used to be saved on its own; carry it over once.
+try {
+  const old = localStorage.getItem('prygskok_skin');
+  if (old && !localStorage.getItem(LOOKS_KEY)) localStorage.setItem(LOOKS_KEY, JSON.stringify({ hero: old }));
+} catch (e) { /* ignore */ }
+
+let looks = window.Looks ? window.Looks.load(LOOKS_KEY, LOOK_GROUPS) : {};
+// Bumped on every change, so the scene redraws its textures on the next start.
+let looksVersion = 1;
+
+function lookOf(groupId) {
+  const g = LOOK_GROUPS.find((gr) => gr.id === groupId);
+  return g.items.find((it) => it.id === looks[groupId]) || g.items[0];
+}
+const night = () => lookOf('time').id === 'night';
 
 function skinPal(sk) { return Object.assign({}, PAL, sk.pal); }
 
@@ -966,7 +1147,7 @@ function skinPal(sk) { return Object.assign({}, PAL, sk.pal); }
 const fire = (rows) => rows.map((r) => r.replace(/J/g, 'F').replace(/C/g, 'W'));
 
 function makeHeroTextures(scene) {
-  const pal = skinPal(skin);
+  const pal = skinPal(lookOf('hero'));
   const hp = (key, rows) => pix(scene, key, rows, 1, pal);
   hp('hs0', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS]);
   hp('hs1', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS_WALK]);
@@ -981,32 +1162,24 @@ function makeHeroTextures(scene) {
   hp('hfc', fire(CROUCH));
 }
 
-// Skin picker on the title and game-over screens.
-function buildSkinPicker() {
-  const box = document.getElementById('skins');
-  box.innerHTML = '';
-  for (const sk of SKINS) {
-    const item = document.createElement('button');
-    item.className = 'skin' + (sk.id === skin.id ? ' on' : '');
-    const cv = document.createElement('canvas');
-    cv.width = 48;
-    cv.height = 48;
-    drawRows(cv.getContext('2d'), [...HEAD, ...SMALL_BODY, ...SMALL_LEGS], 3, skinPal(sk));
-    const label = document.createElement('span');
-    label.textContent = sk.name;
-    item.append(cv, label);
-    item.addEventListener('click', () => {
-      skin = sk;
-      try { localStorage.setItem(SKIN_KEY, sk.id); } catch (e) { /* ignore */ }
-      for (const el of box.children) el.classList.toggle('on', el === item);
+// «Внешний вид» opens from the title and game-over screens.
+function openLooks() {
+  if (!window.Looks) return;
+  window.Looks.open({
+    key: LOOKS_KEY,
+    title: 'ВНЕШНИЙ ВИД',
+    groups: LOOK_GROUPS,
+    onChange(sel) { looks = Object.assign({}, sel); },
+    onClose(sel, changed) {
+      if (!changed) return;
+      looks = Object.assign({}, sel);
+      looksVersion++;
+      // Before the first game the level behind the title is redrawn at once;
+      // after a game over the restart picks the new look up.
       const scene = window.__scene;
-      if (scene && scene.player) {
-        makeHeroTextures(scene);
-        scene.player.setTexture(scene.heroTex() + '0');
-      }
-    });
-    box.append(item);
-  }
+      if (scene && !started) scene.scene.restart();
+    },
+  });
 }
 
 // ---------- Game scene ----------
@@ -1033,7 +1206,10 @@ class Play extends Phaser.Scene {
   }
 
   create() {
-    if (!this.textures.exists('tiles')) makeTextures(this);
+    if (this.game.looksVersion !== looksVersion) {
+      makeTextures(this);
+      this.game.looksVersion = looksVersion;
+    }
     const cam = this.cameras.main;
 
     const lvl = this.def.build();
@@ -1067,9 +1243,12 @@ class Play extends Phaser.Scene {
       // With scroll factor f an image at X shows at X - f * scrollX, so cover the area's scroll range.
       const span = (f) => [Math.floor(f * ar.x0 * TILE), f * (ar.x1 * TILE - VIEW_W) + VIEW_W];
       if (ar.scenery !== 'none') {
+        if (night()) box.push(this.add.image(0, 0, 'stars').setOrigin(0).setScrollFactor(0).setDepth(DEPTH.SCENERY - 1));
         const [a, b] = span(0.5);
         for (let x = a; x < b; x += 190) {
-          box.push(this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5).setDepth(DEPTH.SCENERY));
+          const cloud = this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5).setDepth(DEPTH.SCENERY);
+          if (night()) cloud.setTint(0x5a6488);
+          box.push(cloud);
         }
       }
       if (ar.scenery === 'field') {
@@ -1199,7 +1378,7 @@ class Play extends Phaser.Scene {
   setArea(i) {
     this.area = i;
     const ar = this.lvl.areas[i];
-    this.cameras.main.setBackgroundColor(ar.sky);
+    this.cameras.main.setBackgroundColor(ar.sky === DAY_SKY && night() ? NIGHT_SKY : ar.sky);
     this.scenery.forEach((box, j) => box.forEach((img) => img.setVisible(i === j)));
   }
 
@@ -1969,7 +2148,7 @@ class Play extends Phaser.Scene {
 // ---------- Boot ----------
 bindControls();
 
-buildSkinPicker();
+$('ovLooks').addEventListener('click', openLooks);
 
 $('ovBtn').addEventListener('click', () => {
   audio();
@@ -1999,4 +2178,9 @@ const game = new Phaser.Game({
   scene: [Play],
 });
 window.__game = game;
+
+// Turning the phone changes the layout; refit the picture once the new size settles.
+const refit = () => setTimeout(() => game.scale.refresh(), 150);
+window.addEventListener('orientationchange', refit);
+if (tg) try { tg.onEvent('viewportChanged', refit); } catch (e) { /* old client */ }
 })();

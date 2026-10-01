@@ -92,19 +92,47 @@ html, body {
 #actions { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
 .btn.on { background: rgba(255, 255, 255, 0.45); }
 
-/* Phone in landscape: buttons float over the game */
+/* Phone on its side: the game takes the whole height, the score sits in the
+   top-left corner and the buttons float over the free space at the sides. */
 @media (orientation: landscape) and (max-height: 500px) {
+  #hud {
+    position: absolute;
+    top: 6px;
+    left: calc(10px + env(safe-area-inset-left));
+    z-index: 2;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 0;
+    font-size: 11px;
+    text-align: left;
+    pointer-events: none;
+  }
+  #hud br { display: none; }
+  #hud span { margin-left: 6px; }
   #controls {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
     height: auto;
-    padding: 12px 24px;
+    padding: 12px calc(20px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
     pointer-events: none;
   }
   #controls > div { pointer-events: auto; }
   .btn { opacity: 0.6; }
+
+  /* Title, game-over and game menu must fit a short screen */
+  #overlay, #menu { justify-content: safe center; overflow-y: auto; padding: 8px 16px; touch-action: pan-y; }
+  #overlay h1 { margin: 0 0 6px; font-size: 22px; }
+  #overlay p { margin: 0 0 10px; font-size: 13px; }
+  #overlay .hint { display: none; }
+  #overlay button { padding: 8px 28px; font-size: 16px; }
+  #overlay #ovScores, #overlay #ovLooks { margin-top: 8px; padding: 6px 14px; font-size: 13px; }
+  #menu h1 { margin: 0 0 8px; font-size: 20px; }
+  #menu li { padding: 5px 12px 5px 36px; font-size: 16px; }
+  #menuScores { margin-top: 8px; padding: 6px 18px; }
+  #menu .hint { margin-top: 8px; }
 }
 
 /* Mouse and keyboard: no on-screen buttons */
@@ -148,31 +176,15 @@ html, body {
   .btn.turbo { font-size: 9px; }
 }
 
-/* Skin picker */
-#overlay .skins-title { margin: 0 0 8px; font-size: 13px; opacity: 0.8; }
-#skins {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  max-width: 360px;
-  margin-bottom: 20px;
+/* «Внешний вид» button under «Играть» */
+#overlay #ovLooks {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border: 2px solid #f8d020;
+  background: transparent;
+  color: #f8d020;
+  font-size: 14px;
 }
-#overlay .skin {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  width: 72px;
-  padding: 6px 4px;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  font: bold 11px "Courier New", monospace;
-}
-#overlay .skin.on { border-color: #f8d020; background: rgba(248, 208, 32, 0.15); }
-#overlay .skin canvas { width: 48px; height: 48px; image-rendering: pixelated; }
 
 /* Game menu, shown first, like a multi-game cartridge */
 #menu {
