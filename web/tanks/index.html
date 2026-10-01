@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Танкодром</title>
   <link rel="stylesheet" href="tanks.css">
+  <link rel="stylesheet" href="../lib/looks.css">
   <script src="../lib/telegram-web-app.js"></script>
 </head>
 <body>
@@ -42,11 +43,6 @@
         <button id="btnOnline">Онлайн вдвоём</button>
         <button id="btnLook" class="ghost">Внешний вид</button>
       </div>
-      <div id="look" class="hidden">
-        <canvas id="lookPreview" width="112" height="64"></canvas>
-        <div id="lookRows"></div>
-        <button id="btnLookDone">Готово</button>
-      </div>
       <div id="online" class="hidden">
         <div id="onlineStart">
           <button id="btnCreate">Создать комнату</button>
@@ -63,6 +59,7 @@
       <a id="back" href="../">← к выбору игр</a>
     </div>
   </div>
+  <script src="../lib/looks.js"></script>
   <script src="sim.js"></script>
   <script src="tanks.js"></script>
 </body>
