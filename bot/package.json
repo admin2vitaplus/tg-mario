@@ -6,7 +6,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env index.js",
-    "test": "node --disable-warning=ExperimentalWarning --test"
+    "test": "node --disable-warning=ExperimentalWarning --test",
+    "export:season": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/export-season.js"
   },
   "engines": {
     "node": ">=22.13"

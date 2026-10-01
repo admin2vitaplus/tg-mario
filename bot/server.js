@@ -4,6 +4,7 @@ import { ACHIEVEMENTS, publicList } from "./achievements.js";
 import { createRateLimiter } from "./ratelimit.js";
 import { checkLevel, checkRun, SEQUENCE_TTL_MS } from "./plausibility.js";
 import { CLIENT_EVENTS, GAMES } from "./stats.js";
+import { publicRules } from "./economy.js";
 
 // Один HTTP-сервер на все игры. Маршруты игры «Прыг-Скок» живут под /api/mario/.
 // Сетевые игры (например, танки) подключаются к этому же серверу через событие
@@ -60,7 +61,7 @@ function clientIp(req) {
 export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
-  store, botToken, allowedOrigins, onAchievements, tracker = null,
+  store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -83,7 +84,7 @@ export function createApiServer({
     return start < 0 ? [] : rows.slice(start);
   };
 
-  const newAchievements = (playerId, event) => {
+  const newAchievements = (playerId, event, grants = []) => {
     const player = store.getPlayer(playerId);
     const won = [];
     for (const a of ACHIEVEMENTS) {
@@ -91,6 +92,7 @@ export function createApiServer({
     }
     const out = won.map(({ code, icon, title, text }) => ({ code, icon, title, text }));
     if (out.length && onAchievements) onAchievements(playerId, out);
+    if (out.length && economy) economy.achievements(playerId, out, grants);
     return out;
   };
 
@@ -103,6 +105,9 @@ export function createApiServer({
       achievements: store.earned(id),
     };
   };
+
+  // Жетоны, начисленные за этот запрос, и баланс после них (без economy — ничего).
+  const walletBody = (id, grants) => (economy ? { wallet: { grants, balance: economy.me(id).balance } } : {});
 
   const routes = {
     // Для мониторинга с сервера: какой коммит запущен и сколько секунд работает.
@@ -135,10 +140,12 @@ export function createApiServer({
       const verdict = checkLevel(e, e.level === 0 ? [] : sequence(user.id), now());
       if (!verdict.ok) {
         console.warn(`Отклонён отчёт об уровне: ${verdict.why}`);
+        economy?.rejected(user.id);
         return [422, { error: "implausible" }];
       }
       store.addLevel(user.id, e, now());
-      return [200, { newAchievements: newAchievements(user.id, e) }];
+      const grants = [];
+      return [200, { newAchievements: newAchievements(user.id, e, grants), ...walletBody(user.id, grants) }];
     },
 
     // Итог всей игры: { score, coins, levels, deaths, completed, bossFire }
@@ -159,15 +166,41 @@ export function createApiServer({
       const verdict = checkRun(e, sequence(user.id));
       if (!verdict.ok) {
         console.warn(`Отклонён итог игры: ${verdict.why}`);
+        economy?.rejected(user.id);
         return [422, { error: "implausible" }];
       }
       const before = store.getPlayer(user.id).best_score;
       store.addRun(user.id, e, now());
-      const won = newAchievements(user.id, e);
+      const grants = [];
+      const won = newAchievements(user.id, e, grants);
+      const newRecord = e.score > before;
+      economy?.setLang(user.id, user.language_code);
+      economy?.run(user.id, { newRecord }, grants);
       tracker?.event(user.id, "game_finish", "mario");
-      return [200, { ...meBody(user.id), newRecord: e.score > before, newAchievements: won }];
+      return [200, { ...meBody(user.id), newRecord, newAchievements: won, ...walletBody(user.id, grants) }];
     },
   };
+
+  // Жетоны (ТЗ P1-7). Начисления идут только сервером внутри маршрутов выше; клиент может
+  // лишь посмотреть баланс и потратить жетоны в магазине.
+  if (economy) {
+    routes["GET /api/wallet/info"] = () => [200, publicRules(economy.cfg)];
+    routes["GET /api/wallet/me"] = (_body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      store.touchPlayer(user);
+      economy.setLang(user.id, user.language_code);
+      return [200, economy.me(user.id)];
+    };
+    // { item } → { ok, balance }; повторная покупка того же товара ничего не списывает.
+    routes["POST /api/wallet/buy"] = (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      if (typeof body.item !== "string") return [400, { error: "bad data" }];
+      store.touchPlayer(user);
+      const r = economy.buy(user.id, body.item);
+      if (!r.ok) return [r.error === "unknown item" ? 404 : 409, r];
+      return [200, { ...r, owned: economy.me(user.id).owned }];
+    };
+  }
 
   // Статистика (ТЗ P0-5): { type, game, ref? }. Ответ всегда 204 — игре не нужно ничего с ним делать.
   routes["POST /api/events"] = (body, user) => {

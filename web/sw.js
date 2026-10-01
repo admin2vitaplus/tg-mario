@@ -10,7 +10,7 @@
 const BUILD = '__BUILD__';
 const CACHE = 'cartridge-' + BUILD;
 // The menu, cached up front; everything else is cached the first time it is loaded.
-const CORE = ['./', 'index.html', 'style.css', 'scores.css', 'config.js', 'menu.js', 'api.js', 'sw-register.js', 'lib/telegram-web-app.js'];
+const CORE = ['./', 'index.html', 'style.css', 'scores.css', 'config.js', 'menu.js', 'api.js', 'sw-register.js', 'lib/telegram-web-app.js', 'lib/wallet.js', 'lib/wallet.css'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => Promise.all(CORE.map((f) => c.add(f).catch(() => {})))));

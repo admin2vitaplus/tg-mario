@@ -435,6 +435,8 @@ const TANK_SKINS = [
   { id: 'arctic', name: 'Арктика', stars: 0, col: { body: '#d0dae6', light: '#ffffff', dark: '#5a6a90', spot: '#98a8c8' } },
   { id: 'crimson', name: 'Багровый', stars: 0, col: { body: '#b82838', light: '#f07080', dark: '#4c0c16' } },
   { id: 'cobalt', name: 'Кобальт', stars: 0, col: { body: '#3060d0', light: '#90b8ff', dark: '#10205c' } },
+  // Sold for жетоны in the shop (../lib/wallet.js); `tokens` is only the price shown offline.
+  { id: 'emerald', name: 'Изумруд', stars: 0, shop: 'tanks-tank-emerald', tokens: 300, col: { body: '#10a080', light: '#70f0c8', dark: '#04402c' } },
 ];
 
 const WEATHERS = [
@@ -507,7 +509,7 @@ const LOOK_CATS = [
 const LOOK_GROUPS = LOOK_CATS.map((c) => ({
   id: c.key,
   title: T('cat_' + c.key),
-  items: c.items.map((it) => ({ id: it.id, name: T(c.key + '_' + it.id), stars: it.stars, draw: (g, size) => drawThumb(g, size, c.key, it.id) })),
+  items: c.items.map((it) => ({ id: it.id, name: T(c.key + '_' + it.id), stars: it.stars, shop: it.shop, tokens: it.tokens, draw: (g, size) => drawThumb(g, size, c.key, it.id) })),
 }));
 const look = {};
 if (window.Looks) Object.assign(look, window.Looks.load(LOOK_KEY, LOOK_GROUPS));

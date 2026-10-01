@@ -6,6 +6,10 @@
 // once stars are earned, an item with stars > 0 stays locked until it is
 // bought, see Looks.setStars / Looks.unlock.
 //
+// An item with `shop: '<id>'` is sold for жетоны (lib/wallet.js, docs/TZ.md P1-7): it stays
+// locked until Wallet says it is bought; tapping it offers to buy it. `tokens` is the price
+// shown before the shop list has loaded.
+//
 //   Looks.load(key, groups)             -> { groupId: itemId }
 //   Looks.open({ key, title, doneText, groups, onChange(sel, groupId), onClose(sel, changed) })
 //   title and doneText default to «ВНЕШНИЙ ВИД» and «Готово».
@@ -28,6 +32,7 @@ function write(key, value) {
 }
 
 function unlocked(key, item) {
+  if (item.shop) return !!(window.Wallet && window.Wallet.owns(item.shop));
   if (!(item.stars > 0)) return true;
   const owned = read(OWNED_KEY, {});
   return !!(owned[key] && owned[key].includes(item.id));
@@ -50,13 +55,16 @@ function item(groups, sel, groupId) {
 }
 
 let panel = null;
+let detach = null; // removes the open panel's key handler
 
 function open(opts) {
   const { key, groups } = opts;
   const sel = load(key, groups);
   let changed = false;
   if (panel) panel.remove();
+  if (detach) detach();
   panel = document.createElement('div');
+  const mine = panel;
   panel.className = 'looks';
   panel.innerHTML = '<h1></h1><div class="looksBody"></div><button class="looksDone"></button>';
   panel.querySelector('h1').textContent = opts.title || 'ВНЕШНИЙ ВИД';
@@ -89,10 +97,16 @@ function open(opts) {
       b.append(cv, name);
       if (!open) {
         const price = document.createElement('i');
-        price.textContent = '★ ' + it.stars;
+        price.textContent = it.shop ? '◆ ' + ((window.Wallet && window.Wallet.price(it.shop)) || it.tokens || '')
+          : '★ ' + it.stars;
         b.append(price);
       }
       b.addEventListener('click', () => {
+        if (!open && it.shop && window.Wallet && window.Wallet.enabled) {
+          // Bought: the panel opens again with the item available.
+          window.Wallet.buy(it.shop).then((ok) => { if (ok && panel === mine) window.Looks.open(opts); });
+          return;
+        }
         if (!open || sel[g.id] === it.id) return;
         sel[g.id] = it.id;
         changed = true;
@@ -107,7 +121,9 @@ function open(opts) {
   });
 
   const close = () => {
+    if (panel !== mine) return;
     document.removeEventListener('keydown', onKey, true);
+    detach = null;
     panel.remove();
     panel = null;
     if (opts.onClose) opts.onClose(sel, changed);
@@ -120,6 +136,7 @@ function open(opts) {
   };
   panel.querySelector('.looksDone').addEventListener('click', close);
   document.addEventListener('keydown', onKey, true);
+  detach = () => { document.removeEventListener('keydown', onKey, true); detach = null; };
   document.body.append(panel);
 }
 
