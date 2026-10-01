@@ -975,6 +975,9 @@ const SKINS = [
   { id: 'ninja', name: 'Ниндзя', stars: 0, pal: { C: '#303040', J: '#404050', P: '#202028', B: '#101010', K: '#d82800' } },
   { id: 'pirate', name: 'Пират', stars: 0, pal: { C: '#d82800', J: '#f0f0f0', P: '#202020', B: '#6b3a10', S: '#e0a070' } },
   { id: 'pink', name: 'Зефирка', stars: 0, pal: { C: '#f878b8', J: '#f8b8d8', P: '#8040c0', B: '#c03080', K: '#8a4a20' } },
+  // Sold for жетоны in the shop (lib/wallet.js); `tokens` is only the price shown offline.
+  { id: 'knight', name: 'Рыцарь', stars: 0, shop: 'pryg-hero-knight', tokens: 300,
+    pal: { C: '#c8c8d8', J: '#8c8ca0', P: '#3c3c50', B: '#202028', K: '#f8d020' } },
 ];
 
 const DAY_SKY = '#6b8cff';
@@ -991,6 +994,7 @@ const ENEMIES = [
   { id: 'green', name: 'Травяной', stars: 0, pal: { E: '#107010', O: '#58d858' } },
   { id: 'gold', name: 'Золотой', stars: 0, pal: { E: '#c07000', O: '#f8d020' } },
   { id: 'shadow', name: 'Тень', stars: 0, pal: { E: '#303040', O: '#9090b0', Y: '#c0c0d0' } },
+  { id: 'ruby', name: 'Рубин', stars: 0, shop: 'pryg-enemy-ruby', tokens: 150, pal: { E: '#a01040', O: '#ff6098' } },
 ];
 
 // Pipe colors: outline, body, highlight, shade.
@@ -1000,6 +1004,7 @@ const PIPES = [
   { id: 'blue', name: 'Синие', stars: 0, c: ['#081840', '#2860c0', '#90c8f8', '#103880'] },
   { id: 'gold', name: 'Золотые', stars: 0, c: ['#402800', '#d8a020', '#f8f0a0', '#906000'] },
   { id: 'steel', name: 'Стальные', stars: 0, c: ['#202020', '#8c8c8c', '#e0e0e0', '#505050'] },
+  { id: 'neon', name: 'Неон', stars: 0, shop: 'pryg-pipe-neon', tokens: 100, c: ['#200040', '#c020f0', '#f8a0ff', '#6010a0'] },
 ];
 
 function hump(ctx, x, w, h, bottom, col) {

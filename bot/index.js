@@ -4,6 +4,8 @@ import { startApp } from "./app.js";
 import { startTunnel } from "./tunnel.js";
 import { addSecret, installSafeConsole } from "./log.js";
 import { statsReport } from "./stats.js";
+import { economyReport } from "./economy.js";
+import { installWalletCommands, walletNotifier } from "./wallet-bot.js";
 
 installSafeConsole();
 
@@ -23,6 +25,7 @@ const app = await startApp({
     bot.api
       .sendMessage(userId, "Новые достижения!\n" + list.map((a) => `${a.icon} ${a.title}: ${a.text}`).join("\n"))
       .catch(() => {}),
+  notify: walletNotifier(bot),
 });
 const { store, tracker } = app;
 // Telegram id администраторов через запятую; пусто — команда /stats выключена.
@@ -136,7 +139,9 @@ bot.command("invite", (ctx) => {
   const link = `https://t.me/${bot.botInfo.username}?start=ref_${ctx.from.id}`;
   tracker.event(ctx.from.id, "invite_created");
   const share = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("Сыграем? Тут ретро-игры прямо в Telegram.")}`;
-  return ctx.reply(`Позови друга по этой ссылке:\n${link}`, {
+  const { invite } = app.economy.cfg;
+  return ctx.reply(`Позови друга по этой ссылке:\n${link}\n\nКогда друг сыграет ${invite.gamesNeeded} игры, ` +
+    `тебе ${invite.inviter} жетонов, ему ${invite.newcomer}.`, {
     reply_markup: new InlineKeyboard().url("📨 Отправить другу", share),
   });
 });
@@ -144,8 +149,11 @@ bot.command("invite", (ctx) => {
 // Статистика только для администраторов (ADMIN_ID); остальным команда как будто не существует.
 bot.command("stats", (ctx, next) => {
   if (!admins.has(ctx.from?.id)) return next();
-  return ctx.reply(statsReport(store.db));
+  return ctx.reply(statsReport(store.db) + "\n\n" + economyReport(store.db, app.economy.cfg));
 });
+
+// Жетоны: итоги недели и команды администратора (/wallet, /flag, /unflag, /annul).
+installWalletCommands(bot, { economy: app.economy, admins });
 
 bot.command("help", (ctx) =>
   ctx.reply(

@@ -87,6 +87,69 @@ export const MIGRATIONS = [
     INSERT OR IGNORE INTO users_seen (user_id, at, day, source)
       SELECT id, created_at, (created_at + 10800000) / 86400000, 'old' FROM players;
   `,
+  // 4: жетоны (ТЗ P1-7), см. economy.js. ledger — журнал операций, только добавление (триггеры
+  // запрещают UPDATE и DELETE); одно событие начисляет один раз — UNIQUE (игрок, причина, событие).
+  // wallets — кэш баланса (обновляется в той же транзакции), серия дней, пометка и настройки игрока.
+  // seasons/season_* — закрытие недели по шагам: снимок → призы → сообщения → готово.
+  `
+    CREATE TABLE ledger (
+      id INTEGER PRIMARY KEY,
+      player_id INTEGER NOT NULL,
+      amount INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      event TEXT NOT NULL,
+      season INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      at INTEGER NOT NULL,
+      UNIQUE (player_id, reason, event)
+    );
+    CREATE INDEX ledger_player_day ON ledger(player_id, day);
+    CREATE INDEX ledger_season ON ledger(season, reason);
+    CREATE TRIGGER ledger_no_update BEFORE UPDATE ON ledger BEGIN SELECT RAISE(ABORT, 'ledger is append-only'); END;
+    CREATE TRIGGER ledger_no_delete BEFORE DELETE ON ledger BEGIN SELECT RAISE(ABORT, 'ledger is append-only'); END;
+    CREATE TABLE wallets (
+      player_id INTEGER PRIMARY KEY,
+      balance INTEGER NOT NULL DEFAULT 0,
+      streak INTEGER NOT NULL DEFAULT 0,
+      streak_day INTEGER,
+      flagged TEXT,
+      flagged_at INTEGER,
+      strikes INTEGER NOT NULL DEFAULT 0,
+      strike_day INTEGER,
+      notify INTEGER NOT NULL DEFAULT 1,
+      lang TEXT
+    );
+    CREATE TABLE seasons (
+      season INTEGER PRIMARY KEY,
+      state TEXT NOT NULL,
+      at INTEGER NOT NULL
+    );
+    CREATE TABLE season_balances (
+      season INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      balance INTEGER NOT NULL,
+      gained INTEGER NOT NULL,
+      PRIMARY KEY (season, player_id)
+    );
+    CREATE TABLE season_places (
+      season INTEGER NOT NULL,
+      board TEXT NOT NULL,
+      place INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      value INTEGER NOT NULL,
+      prize INTEGER NOT NULL,
+      PRIMARY KEY (season, board, place)
+    );
+    CREATE TABLE season_notified (
+      season INTEGER NOT NULL,
+      player_id INTEGER NOT NULL,
+      PRIMARY KEY (season, player_id)
+    );
+    CREATE TABLE economy_meta (
+      key TEXT PRIMARY KEY,
+      value INTEGER NOT NULL
+    );
+  `,
 ];
 
 export function migrate(db) {

@@ -84,7 +84,7 @@ function levelDone(level, score, timeLeft) {
   run.levelDeaths = 0;
   if (!canSave()) return;
   request('POST', '/level', { level, score, timeLeft, deaths })
-    .then((r) => showAchievements(r.newAchievements))
+    .then((r) => { showAchievements(r.newAchievements); if (window.Wallet) window.Wallet.grants(r.wallet); })
     .catch(() => {});
 }
 
@@ -97,6 +97,7 @@ function runDone(score, levels, completed) {
     score, levels, completed, coins: r.coins, deaths: r.deaths, bossFire: r.bossFire,
   }).then((res) => {
     showAchievements(res.newAchievements);
+    if (window.Wallet) window.Wallet.grants(res.wallet);
     return res;
   }).catch(() => null);
 }
