@@ -189,7 +189,7 @@ function startStage(s, n) {
   s.bullets = [];
   s.booms = [];
   s.spawns = [];
-  s.bonus = null;
+  s.bonuses = [];
   s.freeze = 0;
   s.shovel = 0;
   s.nextId = 1;
@@ -394,20 +394,35 @@ function updateBullets(s) {
 }
 
 // ---------- Bonuses ----------
+const MAX_BONUSES = 3;
+
+// A bonus may lie at most half on water or steel, so a tank can always drive onto it.
+function bonusSpotOk(s, x, y) {
+  if (y >= 168 && x > 72 && x < 120) return false; // not on the base
+  let blocked = 0;
+  boxCells(x, y, 16, 16, (cx, cy) => {
+    const c = s.cells[cy * N + cx];
+    if (c === WATER || c === STEEL || c === BASE) blocked++;
+    return false;
+  });
+  return blocked <= 2;
+}
+
 function spawnBonus(s) {
   let x = 0, y = 0;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 200; i++) {
     x = Math.floor(rnd(s) * 25) * CELL;
     y = Math.floor(rnd(s) * 23) * CELL;
-    if (!(y >= 168 && x > 72 && x < 120)) break;
+    if (bonusSpotOk(s, x, y)) break;
   }
-  s.bonus = { x, y, type: BONUSES[Math.floor(rnd(s) * BONUSES.length)], t: 0 };
+  // Every flashing tank leaves its own bonus; only the oldest gives way past the limit.
+  if (s.bonuses.length >= MAX_BONUSES) s.bonuses.shift();
+  s.bonuses.push({ x, y, type: BONUSES[Math.floor(rnd(s) * BONUSES.length)], t: 0 });
   s.events.push('bonus');
 }
 
-function takeBonus(s, p, t) {
-  const b = s.bonus;
-  s.bonus = null;
+function takeBonus(s, p, t, b) {
+  s.bonuses = s.bonuses.filter((o) => o !== b);
   p.score += 500;
   s.events.push('pick');
   switch (b.type) {
@@ -448,8 +463,9 @@ function updatePlayer(s, p, inp) {
     if (inp.dir >= 0) t.slide = onIce(s, t) ? 24 : 0;
   }
   if (inp.fire) fire(s, t);
-  const b = s.bonus;
-  if (b && t.x < b.x + 12 && t.x + 12 > b.x && t.y < b.y + 12 && t.y + 12 > b.y) takeBonus(s, p, t);
+  for (const b of s.bonuses) {
+    if (t.x < b.x + 12 && t.x + 12 > b.x && t.y < b.y + 12 && t.y + 12 > b.y) { takeBonus(s, p, t, b); break; }
+  }
 }
 
 // ---------- Enemies ----------
@@ -470,21 +486,32 @@ function pickDir(s, e) {
   return Math.floor(rnd(s) * 4);
 }
 
+// Difficulty grows with the stage: more enemies at once, shorter pauses between them.
+function fieldCap(s) {
+  return Math.min(s.twoP ? 8 : 6, (s.twoP ? 6 : 4) + Math.floor(s.stage / 2));
+}
+
+function spawnDelay(s) {
+  if (s.spawnStarts < 3) return 20;
+  return Math.max(30, 100 - s.stage * 12);
+}
+
 function updateEnemies(s, spawning) {
-  const cap = s.twoP ? 6 : 4;
+  const cap = fieldCap(s);
   if (spawning && s.queue.length > s.spawns.length && s.enemies.length + s.spawns.length < cap) {
     if (--s.spawnTimer <= 0) {
       const x = ENEMY_SPAWN_X[s.spawnPoint];
-      if (!occupied(s, x, 0)) {
+      s.spawnPoint = (s.spawnPoint + 1) % ENEMY_SPAWN_X.length;
+      // A busy spawn point is skipped instead of holding up the wave.
+      if (!occupied(s, x, 0) && !s.spawns.some((sp) => sp.x === x)) {
         s.spawns.push({ x, y: 0, t: 0 });
-        s.spawnPoint = (s.spawnPoint + 1) % ENEMY_SPAWN_X.length;
         s.spawnStarts++;
-        s.spawnTimer = s.spawnStarts < 3 ? 30 : Math.max(50, 170 - s.stage * 12);
+        s.spawnTimer = spawnDelay(s);
       }
     }
   }
   for (const sp of s.spawns) {
-    if (++sp.t < 60 || occupied(s, sp.x, sp.y)) continue;
+    if (++sp.t < 45 || occupied(s, sp.x, sp.y)) continue;
     sp.done = true;
     const e = makeTank(s, sp.x, sp.y, DOWN, 'e', s.queue.shift(), -1);
     e.flash = FLASH_AT.includes(s.spawned++);
@@ -501,7 +528,7 @@ function updateEnemies(s, spawning) {
     const moved = move(s, e, e.want);
     if (moved) e.anim++;
     else if (rnd(s) < 1 / 12) e.want = pickDir(s, e);
-    if (rnd(s) < (moved ? 1 / 56 : 1 / 14)) fire(s, e);
+    if (rnd(s) < (moved ? 1 / Math.max(28, 56 - s.stage * 5) : 1 / 14)) fire(s, e);
   }
 }
 
@@ -521,7 +548,8 @@ function step(s, inputs) {
   s.enemies = s.enemies.filter((e) => !e.dead);
   for (const b of s.booms) b.t++;
   s.booms = s.booms.filter((b) => b.t < (b.big ? 28 : 12));
-  if (s.bonus && ++s.bonus.t > 1200) s.bonus = null;
+  for (const b of s.bonuses) b.t++;
+  s.bonuses = s.bonuses.filter((b) => b.t <= 1200);
   if (s.freeze > 0) s.freeze--;
   if (s.shovel > 0 && --s.shovel === 0) setWalls(s, BRICK);
   if (s.phase === 'play') {
@@ -541,6 +569,7 @@ function step(s, inputs) {
 }
 
 root.TankSim = {
+  fieldCap, spawnDelay, bonusSpotOk, spawnBonus,
   CELL, N, FIELD, EMPTY, BRICK, STEEL, WATER, FOREST, ICE, BASE, UP, RIGHT, DOWN, LEFT,
   ENEMY, MAPS, newGame, startStage, step,
 };
