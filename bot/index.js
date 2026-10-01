@@ -56,11 +56,18 @@ const withApi = (url) => {
   if (apiUrl) u.searchParams.set("api", apiUrl);
   return u.toString();
 };
-const gameUrl = withApi(baseGameUrl);
+// Имя бота нужно игре, чтобы при переезде сервера предложить открыть её заново через бота.
+await bot.init();
+const withBot = (url) => {
+  const u = new URL(url);
+  u.searchParams.set("bot", bot.botInfo.username);
+  return u.toString();
+};
+const gameUrl = withBot(withApi(baseGameUrl));
 
 // Приглашение в «Танкодром»: t.me/<бот>?start=tanks_1234 открывает комнату 1234.
 const tanksRoomUrl = (code) => {
-  const u = new URL(withApi(new URL("tanks/", baseGameUrl).toString()));
+  const u = new URL(withBot(withApi(new URL("tanks/", baseGameUrl).toString())));
   u.searchParams.set("room", code);
   return u.toString();
 };

@@ -21,6 +21,41 @@ function pickBase() {
   }
 }
 const base = pickBase();
+const botName = (() => {
+  let name = new URLSearchParams(location.search).get('bot');
+  try {
+    if (name) localStorage.setItem('prygskok_bot', name);
+    else name = localStorage.getItem('prygskok_bot');
+  } catch (e) { /* ignore */ }
+  return (name || '').replace(/[^A-Za-z0-9_]/g, '');
+})();
+
+// Адрес туннеля меняется при перезапуске сервера, и запомненный или старый адрес ведёт в никуда.
+// Проверяем сервер сразу, чтобы честно сказать об этом и предложить открыть игру заново.
+let online = null; // null — ещё проверяем
+const ready = !base ? Promise.resolve(false) : (() => {
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = setTimeout(() => ctl && ctl.abort(), 6000);
+  return fetch(base + '/api/health', { signal: ctl ? ctl.signal : undefined })
+    .then((r) => r.ok)
+    .catch(() => false)
+    .then((ok) => { clearTimeout(timer); online = ok; return ok; });
+})();
+
+function reopenViaBot() {
+  if (!botName) return;
+  const link = 'https://t.me/' + botName + '?start=play';
+  try {
+    if (tg && tg.openTelegramLink) { tg.openTelegramLink(link); tg.close(); return; }
+  } catch (e) { /* fall through */ }
+  location.href = link;
+}
+
+function offlineHtml() {
+  return '<p class="scNote">Сервер рекордов переехал на новый адрес, а игра открыта по старой ссылке.</p>' +
+    (botName ? '<p class="scNote"><button class="scReopen">Открыть игру заново</button></p>'
+             : '<p class="scNote">Отправьте боту /start и откройте игру кнопкой «Играть» из его ответа.</p>');
+}
 
 function request(method, path, body) {
   if (!base) return Promise.reject(new Error('no server'));
@@ -41,7 +76,7 @@ function track(kind) {
   else if (kind === 'bossFire') run.bossFire = true;
 }
 
-const canSave = () => !!(base && initData);
+const canSave = () => !!(base && initData && online !== false);
 
 function levelDone(level, score, timeLeft) {
   const deaths = run.levelDeaths;
@@ -113,7 +148,11 @@ function showTab(tab) {
       'адрес запомнится и рекорды будут видны отовсюду.</p>';
     return;
   }
-  const fail = () => { bodyEl.innerHTML = '<p class="scNote">Сервер рекордов сейчас недоступен: бот выключен или нет связи. Попробуйте позже.</p>'; };
+  if (online === false) { bodyEl.innerHTML = offlineHtml(); return; }
+  const fail = () => {
+    bodyEl.innerHTML = online === false ? offlineHtml()
+      : '<p class="scNote">Сервер рекордов сейчас недоступен: бот выключен или нет связи. Попробуйте позже.</p>';
+  };
   if (tab === 'top') {
     request('GET', '/top').then((list) => {
       if (!list.length) { bodyEl.innerHTML = '<p class="scNote">Рекордов пока нет. Будь первым!</p>'; return; }
@@ -141,6 +180,7 @@ panel.querySelector('.scTabs').addEventListener('click', (e) => {
   if (t) showTab(t.dataset.tab);
 });
 panel.querySelector('.scClose').addEventListener('click', () => panel.classList.add('hidden'));
+bodyEl.addEventListener('click', (e) => { if (e.target.closest('.scReopen')) reopenViaBot(); });
 
 function openScores() {
   panel.classList.remove('hidden');
@@ -156,7 +196,8 @@ function openScores() {
   btn.addEventListener('click', openScores);
   const ov = document.getElementById('ovBtn');
   if (ov) ov.insertAdjacentElement('afterend', btn);
+  ready.then((ok) => { if (base && !ok) btn.textContent = '⚠️ Рекорды: сервер переехал'; });
 }
 
-window.GameAPI = { enabled: !!base, track, levelDone, runDone, newRun, openScores };
+window.GameAPI = { enabled: !!base, ready, track, levelDone, runDone, newRun, openScores, reopenViaBot };
 })();

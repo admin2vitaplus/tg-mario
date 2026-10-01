@@ -2,7 +2,10 @@ import { spawn } from "node:child_process";
 
 // Запускает бесплатный туннель Cloudflare (без регистрации) и возвращает его https-адрес.
 // Адрес случайный и меняется при каждом запуске, бот сам обновляет кнопку игры.
-export function startTunnel(port, bin = "cloudflared") {
+// Если туннель упадёт уже после запуска, вызывается onDown (по умолчанию бот завершается,
+// и systemd перезапускает его вместе с новым туннелем: без туннеля игра до сервера не достучится).
+export function startTunnel(port, bin = "cloudflared", onDown = defaultOnDown) {
+  let up = false;
   return new Promise((resolve, reject) => {
     const proc = spawn(bin, ["tunnel", "--no-autoupdate", "--url", `http://localhost:${port}`], {
       stdio: ["ignore", "pipe", "pipe"],
@@ -10,7 +13,8 @@ export function startTunnel(port, bin = "cloudflared") {
     const timer = setTimeout(() => reject(new Error("туннель не ответил за 30 секунд")), 30_000);
     const onData = (buf) => {
       const m = buf.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
-      if (m) {
+      if (m && !up) {
+        up = true;
         clearTimeout(timer);
         resolve(m[0]);
       }
@@ -23,9 +27,14 @@ export function startTunnel(port, bin = "cloudflared") {
     });
     proc.on("exit", (code) => {
       clearTimeout(timer);
-      console.error(`Туннель cloudflared остановился (код ${code}), игра не сможет сохранять очки.`);
-      reject(new Error(`cloudflared завершился с кодом ${code}`));
+      if (up) onDown(code);
+      else reject(new Error(`cloudflared завершился с кодом ${code}`));
     });
     process.on("exit", () => proc.kill());
   });
+}
+
+function defaultOnDown(code) {
+  console.error(`Туннель cloudflared остановился (код ${code}). Перезапускаю бота, чтобы поднять новый туннель.`);
+  process.exit(1);
 }

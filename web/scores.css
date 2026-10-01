@@ -85,3 +85,12 @@
   animation: achIn 0.3s ease-out;
 }
 @keyframes achIn { from { transform: translateY(-20px); opacity: 0; } }
+
+.scReopen {
+  padding: 10px 18px;
+  font: bold 14px "Courier New", monospace;
+  color: #fff;
+  background: #1fa2a8;
+  border: 0;
+  border-radius: 6px;
+}
