@@ -6,31 +6,14 @@
 
 const tg = window.Telegram && window.Telegram.WebApp;
 const initData = (tg && tg.initData) || '';
-const base = (() => {
-  let url = new URLSearchParams(location.search).get('api');
-  try {
-    if (!url) url = localStorage.getItem('prygskok_api');
-  } catch (e) { /* ignore */ }
-  try {
-    const u = new URL(url);
-    return u.protocol === 'https:' || u.hostname === 'localhost' ? u.origin : '';
-  } catch (e) {
-    return '';
-  }
-})();
 
+// The address comes from lib/server.js; events wait until a server has answered.
 function send(type, game, ref) {
-  if (!base || !initData) return;
+  const server = window.Server;
+  if (!server || !server.hasServer || !initData) return;
   const body = { type, game };
   if (ref != null) body.ref = String(ref);
-  try {
-    fetch(base + '/api/events', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json', Authorization: 'tma ' + initData },
-      body: JSON.stringify(body),
-    }).catch(() => {});
-  } catch (e) { /* ignore */ }
+  server.request('POST', '/api/events', body).catch(() => {});
 }
 
 window.GameEvents = { send };
