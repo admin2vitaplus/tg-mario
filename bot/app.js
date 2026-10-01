@@ -1,6 +1,7 @@
 import { openDb } from "./db.js";
 import { createApiServer } from "./server.js";
 import { attachTanksRooms } from "./tanks-rooms.js";
+import { createTracker } from "./stats.js";
 import { currentCommit } from "./version.js";
 
 // Всё, кроме самого бота Telegram и туннеля: база, HTTP API и комнаты «Танкодрома».
@@ -15,7 +16,13 @@ export async function startApp({ env = process.env, botToken, onAchievements, po
     console.log(`База ${dbFile}: схема обновлена с версии ${store.version.from} до ${store.version.to}`);
   }
   const commit = currentCommit(env);
-  const server = createApiServer({ store, botToken, allowedOrigins, onAchievements, commit });
+  const tracker = createTracker(store);
+  // Сырые события старше 90 дней сворачиваются в суммы по дням: при запуске и раз в сутки.
+  const prune = () => { try { store.pruneEvents(); } catch (err) { console.error("Ошибка очистки статистики:", err.message); } };
+  prune();
+  const pruneTimer = setInterval(prune, 24 * 3600 * 1000);
+  pruneTimer.unref();
+  const server = createApiServer({ store, botToken, allowedOrigins, onAchievements, commit, tracker });
   const tanks = attachTanksRooms(server, { allowedOrigins });
 
   // Соединения держим в списке, чтобы при остановке закрыть и «живые» keep-alive.
@@ -27,6 +34,7 @@ export async function startApp({ env = process.env, botToken, onAchievements, po
 
   let closing = null;
   const close = () => closing ??= (async () => {
+    clearInterval(pruneTimer);
     for (const ws of tanks.wss.clients) ws.close(1001, "server shutdown");
     await new Promise((ok) => {
       server.close(() => ok());
@@ -37,5 +45,5 @@ export async function startApp({ env = process.env, botToken, onAchievements, po
     store.close();
   })();
 
-  return { server, store, tanks, commit, gameUrl, allowedOrigins, port: server.address().port, close };
+  return { server, store, tanks, tracker, commit, gameUrl, allowedOrigins, port: server.address().port, close };
 }

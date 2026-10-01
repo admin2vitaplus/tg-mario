@@ -3,6 +3,7 @@ import { verifyInitData } from "./auth.js";
 import { ACHIEVEMENTS, publicList } from "./achievements.js";
 import { createRateLimiter } from "./ratelimit.js";
 import { checkLevel, checkRun, SEQUENCE_TTL_MS } from "./plausibility.js";
+import { CLIENT_EVENTS, GAMES } from "./stats.js";
 
 // Один HTTP-сервер на все игры. Маршруты игры «Прыг-Скок» живут под /api/mario/.
 // Сетевые игры (например, танки) подключаются к этому же серверу через событие
@@ -16,6 +17,7 @@ const int = (v, max) => {
 };
 
 function send(res, status, body) {
+  if (body == null) return res.writeHead(status).end();
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(body));
 }
@@ -58,12 +60,16 @@ function clientIp(req) {
 export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
-  store, botToken, allowedOrigins, onAchievements,
+  store, botToken, allowedOrigins, onAchievements, tracker = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
     const h = req.headers.authorization || "";
-    return h.startsWith("tma ") ? verifyInitData(h.slice(4), botToken, now()) : null;
+    if (!h.startsWith("tma ")) return null;
+    const user = verifyInitData(h.slice(4), botToken, now());
+    // start_param — метка из ссылки t.me/<бот>/<app>?startapp=..., подписана вместе с initData.
+    if (user) user.startParam = new URLSearchParams(h.slice(4)).get("start_param") || "";
+    return user;
   };
   const byIp = createRateLimiter({ limit: limits.ipPerMinute, now });
   const byUser = createRateLimiter({ limit: limits.userWritesPerMinute, now });
@@ -158,8 +164,22 @@ export function createApiServer({
       const before = store.getPlayer(user.id).best_score;
       store.addRun(user.id, e, now());
       const won = newAchievements(user.id, e);
+      tracker?.event(user.id, "game_finish", "mario");
       return [200, { ...meBody(user.id), newRecord: e.score > before, newAchievements: won }];
     },
+  };
+
+  // Статистика (ТЗ P0-5): { type, game, ref? }. Ответ всегда 204 — игре не нужно ничего с ним делать.
+  routes["POST /api/events"] = (body, user) => {
+    if (!user) return [401, { error: "unauthorized" }];
+    if (!tracker) return [204, null];
+    const ref = typeof body.ref === "string" || typeof body.ref === "number" ? String(body.ref) : null;
+    if (!CLIENT_EVENTS.has(body.type) || !GAMES.includes(body.game) || (ref && !/^\w{1,16}$/.test(ref))) {
+      return [400, { error: "bad data" }];
+    }
+    tracker.arrive(user.id, user.startParam);
+    tracker.event(user.id, body.type, body.game, ref);
+    return [204, null];
   };
 
   const server = createServer(async (req, res) => {
