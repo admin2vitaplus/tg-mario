@@ -22,6 +22,8 @@ test("start labels: src_, ref_, room_ and old tanks_ links", () => {
   assert.deepEqual(parseStart("src_TikTok"), { source: "src_tiktok", ref: null });
   assert.deepEqual(parseStart("ref_42"), { source: "ref", ref: "42" });
   assert.deepEqual(parseStart("room_1234"), { source: "room", ref: "1234" });
+  assert.deepEqual(parseStart("room_123456__abc-def-ghi"), { source: "room", ref: "123456" });
+  assert.deepEqual(parseStart("ref_42__abc-def"), { source: "ref", ref: "42" });
   assert.deepEqual(parseStart("tanks_1234"), { source: "room", ref: "1234" });
   for (const p of ["", "play", undefined, "src_", "ref_abc", "src_" + "x".repeat(40), "room_12"]) {
     assert.deepEqual(parseStart(p), { source: "direct", ref: null }, String(p));
