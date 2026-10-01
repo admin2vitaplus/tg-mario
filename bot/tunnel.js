@@ -4,8 +4,10 @@ import { spawn } from "node:child_process";
 // Адрес случайный и меняется при каждом запуске, бот сам обновляет кнопку игры.
 // Если туннель упадёт уже после запуска, вызывается onDown (по умолчанию бот завершается,
 // и systemd перезапускает его вместе с новым туннелем: без туннеля игра до сервера не достучится).
+// Возвращает { url, stop }; stop() гасит туннель при штатной остановке бота.
 export function startTunnel(port, bin = "cloudflared", onDown = defaultOnDown) {
   let up = false;
+  let stopping = false;
   return new Promise((resolve, reject) => {
     const proc = spawn(bin, ["tunnel", "--no-autoupdate", "--url", `http://localhost:${port}`], {
       stdio: ["ignore", "pipe", "pipe"],
@@ -16,7 +18,16 @@ export function startTunnel(port, bin = "cloudflared", onDown = defaultOnDown) {
       if (m && !up) {
         up = true;
         clearTimeout(timer);
-        resolve(m[0]);
+        resolve({
+          url: m[0],
+          stop: () => new Promise((done) => {
+            stopping = true;
+            if (proc.exitCode !== null || proc.signalCode) return done();
+            proc.once("exit", () => done());
+            proc.kill("SIGTERM");
+            setTimeout(() => proc.kill("SIGKILL"), 3000).unref();
+          }),
+        });
       }
     };
     proc.stdout.on("data", onData);
@@ -27,10 +38,10 @@ export function startTunnel(port, bin = "cloudflared", onDown = defaultOnDown) {
     });
     proc.on("exit", (code) => {
       clearTimeout(timer);
-      if (up) onDown(code);
+      if (up) { if (!stopping) onDown(code); }
       else reject(new Error(`cloudflared завершился с кодом ${code}`));
     });
-    process.on("exit", () => proc.kill());
+    process.on("exit", () => { if (proc.exitCode === null) proc.kill(); });
   });
 }
 

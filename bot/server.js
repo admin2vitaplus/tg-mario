@@ -29,7 +29,7 @@ async function readJson(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
-export function createApiServer({ store, botToken, allowedOrigins, onAchievements }) {
+export function createApiServer({ store, botToken, allowedOrigins, onAchievements, commit = "unknown", startedAt = Date.now() }) {
   const userFrom = (req) => {
     const h = req.headers.authorization || "";
     return h.startsWith("tma ") ? verifyInitData(h.slice(4), botToken) : null;
@@ -57,7 +57,8 @@ export function createApiServer({ store, botToken, allowedOrigins, onAchievement
   };
 
   const routes = {
-    "GET /api/health": () => [200, { ok: true }],
+    // Для мониторинга с сервера: какой коммит запущен и сколько секунд работает.
+    "GET /api/health": () => [200, { ok: true, commit, uptime: Math.floor((Date.now() - startedAt) / 1000) }],
 
     "GET /api/mario/achievements": () => [200, publicList()],
 
