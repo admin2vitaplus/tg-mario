@@ -1,7 +1,7 @@
 import { Bot, InlineKeyboard } from "grammy";
 import { ACHIEVEMENTS } from "./achievements.js";
 import { startApp } from "./app.js";
-import { startTunnel } from "./tunnel.js";
+import { startTunnel, watchTunnel } from "./tunnel.js";
 import { addSecret, installSafeConsole } from "./log.js";
 import { statsReport } from "./stats.js";
 import { economyReport } from "./economy.js";
@@ -40,7 +40,18 @@ console.log(`Сервер очков слушает порт ${app.port}, ком
 // Публичный https-адрес сервера: свой домен (PUBLIC_API_URL) или бесплатный туннель.
 let apiUrl = process.env.PUBLIC_API_URL || "";
 let tunnel = null;
-if (!apiUrl && process.env.TUNNEL !== "off") {
+if (!apiUrl && process.env.TUNNEL_METRICS) {
+  // Туннель — отдельная служба: её адрес переживает перезапуски бота.
+  try {
+    tunnel = await watchTunnel(process.env.TUNNEL_METRICS);
+    apiUrl = tunnel.url;
+    console.log(`Туннель (служба): ${apiUrl}`);
+  } catch (err) {
+    // Без адреса игра до сервера не достучится; systemd перезапустит бота и попробует снова.
+    console.error(`Туннель не найден: ${err.message}.`);
+    process.exit(1);
+  }
+} else if (!apiUrl && process.env.TUNNEL !== "off") {
   try {
     tunnel = await startTunnel(app.port, process.env.CLOUDFLARED || "cloudflared");
     apiUrl = tunnel.url;
