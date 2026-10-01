@@ -110,7 +110,8 @@ html, body {
 #dpad .left { grid-area: left; }
 #dpad .right { grid-area: right; }
 
-#actions { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
+/* Padding with a matching negative margin: touches at the button edges still land on the pad */
+#actions { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; padding: 10px; margin: -10px; }
 
 /* Mouse and keyboard: no on-screen buttons */
 @media (hover: hover) and (pointer: fine) {

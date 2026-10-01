@@ -157,19 +157,21 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => { if (e.target.tagName !== 'INPUT') onKey(e, false); });
 window.addEventListener('blur', clearPads);
 
+// Both pads track every finger by pointerId and work out the pressed buttons
+// from where the fingers are, so a thumb can slide between buttons without
+// losing a press, and any number of fingers can be down at once.
 function bindTouch() {
   const pad = pads[0];
   const dpad = document.getElementById('dpad');
   const btn = {};
   const names = ['up', 'right', 'down', 'left'];
   names.forEach((n) => { btn[n] = dpad.querySelector('.' + n); });
-  const pointers = new Map();
-  const refresh = () => {
-    const r = dpad.getBoundingClientRect();
+  const dirOn = [false, false, false, false];
+  trackPointers(dpad, (points, r) => {
     const cx = r.left + r.width / 2;
     const cy = r.top + r.height / 2;
     const on = [false, false, false, false];
-    for (const [x, y] of pointers.values()) {
+    for (const [x, y] of points) {
       const dx = x - cx;
       const dy = y - cy;
       if (Math.hypot(dx, dy) < r.width * 0.12) continue;
@@ -177,41 +179,60 @@ function bindTouch() {
       if (Math.abs(dx) > Math.abs(dy)) on[dx < 0 ? LEFT : RIGHT] = true;
       else on[dy < 0 ? UP : DOWN] = true;
     }
-    on.forEach((v, d) => { setDir(pad, d, v); btn[names[d]].classList.toggle('on', v); });
-  };
-  dpad.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    audio();
-    try { dpad.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
-    pointers.set(e.pointerId, [e.clientX, e.clientY]);
-    refresh();
+    on.forEach((v, d) => {
+      if (dirOn[d] === v) return;
+      dirOn[d] = v;
+      setDir(pad, d, v);
+      btn[names[d]].classList.toggle('on', v);
+    });
   });
-  dpad.addEventListener('pointermove', (e) => {
-    if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, [e.clientX, e.clientY]);
-    refresh();
-  });
-  for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    dpad.addEventListener(name, (e) => { pointers.delete(e.pointerId); refresh(); });
-  }
 
   // Two-button retro pad: A and B both fire; the turbo buttons keep firing while held.
-  const hold = (id, onDown, onUp) => {
-    const el = document.getElementById(id);
-    el.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      audio();
-      onDown();
-      el.classList.add('on');
-    });
-    for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
-      el.addEventListener(name, () => { if (onUp) onUp(); el.classList.remove('on'); });
+  // A finger presses every button within reach (the button plus a margin).
+  const actions = document.getElementById('actions');
+  const keys = [['btnA', 'a'], ['btnB', 'b'], ['btnTA', 'ta'], ['btnTB', 'tb']]
+    .map(([id, key]) => ({ el: document.getElementById(id), key, on: false }));
+  trackPointers(actions, (points) => {
+    for (const k of keys) {
+      const r = k.rect;
+      const m = r.width * 0.22;
+      const on = points.some(([x, y]) => x > r.left - m && x < r.right + m && y > r.top - m && y < r.bottom + m);
+      if (on === k.on) continue;
+      k.on = on;
+      k.el.classList.toggle('on', on);
+      if (k.key === 'ta' || k.key === 'tb') {
+        if (on) pad.turbo.add(k.key); else pad.turbo.delete(k.key);
+      } else if (on) pad.fire = true;
     }
-  };
-  hold('btnA', () => { pad.fire = true; });
-  hold('btnB', () => { pad.fire = true; });
-  hold('btnTA', () => pad.turbo.add('ta'), () => pad.turbo.delete('ta'));
-  hold('btnTB', () => pad.turbo.add('tb'), () => pad.turbo.delete('tb'));
+  }, () => { for (const k of keys) k.rect = k.el.getBoundingClientRect(); });
+}
+
+// Calls update(points, rect) whenever a finger on `el` goes down, moves or lifts.
+// Layout is measured once per new finger, not on every move.
+function trackPointers(el, update, measure) {
+  const pointers = new Map();
+  let rect = null;
+  const run = () => update([...pointers.values()], rect);
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    audio();
+    try { el.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+    rect = el.getBoundingClientRect();
+    if (measure) measure();
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    run();
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    run();
+  });
+  for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    el.addEventListener(name, (e) => {
+      if (!pointers.delete(e.pointerId)) return;
+      run();
+    });
+  }
 }
 
 // ---------- Pixel art (all drawn in code) ----------
