@@ -217,7 +217,7 @@ function bindTouch() {
 // ---------- Pixel art (all drawn in code) ----------
 const $ = (id) => document.getElementById(id);
 const canvas = $('screen');
-const ctx = canvas.getContext('2d');
+let ctx = canvas.getContext('2d'); // swapped for the preview canvas while it draws
 ctx.imageSmoothingEnabled = false;
 
 function sprite(w, h, draw) {
@@ -239,16 +239,6 @@ function fromRows(rows, pal) {
 }
 
 const TILE = {
-  [BRICK]: fromRows([
-    'hrrmhrrr',
-    'rrrmrrrr',
-    'rrrmrrrr',
-    'mmmmmmmm',
-    'rhrrrmhr',
-    'rrrrrmrr',
-    'rrrrrmrr',
-    'mmmmmmmm',
-  ], { r: '#a84818', h: '#e07840', m: '#3c1c0a' }),
   [STEEL]: sprite(8, 8, (R) => {
     R(0, 0, 8, 8, '#8c8ca0');
     R(0, 0, 8, 1, '#e8e8f8');
@@ -298,14 +288,6 @@ const BASE_DEAD = sprite(16, 16, (R) => {
   R(2, 14, 3, 1, '#202028');
 });
 
-const COLORS = {
-  p0: { body: '#d8a818', light: '#f8e070', dark: '#6c4800' },
-  p1: { body: '#28a048', light: '#88e890', dark: '#0c4818' },
-  e: { body: '#a0a0b0', light: '#f0f0f8', dark: '#44445a' },
-  red: { body: '#c82818', light: '#ff9070', dark: '#581008' },
-  armor4: { body: '#5a7a4a', light: '#b8d0a0', dark: '#223018' },
-  armor3: { body: '#b08830', light: '#f0d890', dark: '#503808' },
-};
 const VARIANT = ['basic', 'fast', 'power', 'armor'];
 
 function drawTankUp(col, variant, frame) {
@@ -335,6 +317,12 @@ function drawTankUp(col, variant, frame) {
       R(7, 0, 2, 7, col.light);
       R(8, 1, 1, 6, col.body);
     }
+    if (col.spot) {
+      R(tw + 1, 6, 2, 2, col.spot);
+      R(11 - tw + 2, 9, 2, 2, col.spot);
+      R(tw + 2, 12, 3, 1, col.spot);
+      R(9, 4, 2, 1, col.spot);
+    }
     if (variant === 'player') R(7, 8, 2, 2, col.light);
   });
 }
@@ -344,7 +332,7 @@ function tankSprite(colKey, variant, dir, frame) {
   const key = colKey + variant + dir + (frame & 1);
   let c = tankCache.get(key);
   if (!c) {
-    const up = drawTankUp(COLORS[colKey], variant, frame);
+    const up = drawTankUp(colorOf(colKey), variant, frame);
     c = sprite(16, 16, (R, g) => {
       g.translate(8, 8);
       g.rotate((dir * Math.PI) / 2);
@@ -399,6 +387,303 @@ function circle(cx, cy, r, col) {
   }
 }
 
+// ---------- Appearance («Внешний вид») ----------
+// Every item carries a star price so items can later be unlocked with stars.
+// For now all prices are 0, so everything is open.
+const LOOK_KEY = 'tankodrom_look';
+const STARS_KEY = 'tankodrom_stars';
+
+const TANK_SKINS = [
+  { id: 'gold', name: 'Золотой', stars: 0, col: { body: '#d8a818', light: '#f8e070', dark: '#6c4800' } },
+  { id: 'green', name: 'Зелёный', stars: 0, col: { body: '#28a048', light: '#88e890', dark: '#0c4818' } },
+  { id: 'camo', name: 'Камуфляж', stars: 0, col: { body: '#5a7a30', light: '#a8c060', dark: '#26340e', spot: '#3c2c12' } },
+  { id: 'desert', name: 'Пустынный', stars: 0, col: { body: '#c8a060', light: '#f0d8a0', dark: '#64441c', spot: '#9a7038' } },
+  { id: 'arctic', name: 'Арктика', stars: 0, col: { body: '#d0dae6', light: '#ffffff', dark: '#5a6a90', spot: '#98a8c8' } },
+  { id: 'crimson', name: 'Багровый', stars: 0, col: { body: '#b82838', light: '#f07080', dark: '#4c0c16' } },
+  { id: 'cobalt', name: 'Кобальт', stars: 0, col: { body: '#3060d0', light: '#90b8ff', dark: '#10205c' } },
+];
+
+const WEATHERS = [
+  { id: 'day', name: 'День', stars: 0 },
+  { id: 'dusk', name: 'Закат', stars: 0 },
+  { id: 'night', name: 'Ночь', stars: 0 },
+  { id: 'rain', name: 'Дождь', stars: 0 },
+  { id: 'snow', name: 'Снегопад', stars: 0 },
+];
+
+const ENEMY_SKINS = [
+  { id: 'steel', name: 'Стальные', stars: 0,
+    e: { body: '#a0a0b0', light: '#f0f0f8', dark: '#44445a' },
+    a4: { body: '#5a7a4a', light: '#b8d0a0', dark: '#223018' },
+    a3: { body: '#b08830', light: '#f0d890', dark: '#503808' } },
+  { id: 'rust', name: 'Ржавые', stars: 0,
+    e: { body: '#9a5a30', light: '#e0a070', dark: '#42200c' },
+    a4: { body: '#6a4a30', light: '#b08860', dark: '#2a1808' },
+    a3: { body: '#b87828', light: '#f0c060', dark: '#503008' } },
+  { id: 'sand', name: 'Песчаные', stars: 0,
+    e: { body: '#b8a070', light: '#f0e0b0', dark: '#54442a' },
+    a4: { body: '#8a7040', light: '#c8b080', dark: '#3a2c10' },
+    a3: { body: '#c08848', light: '#f8d090', dark: '#5a3410' } },
+  { id: 'black', name: 'Чёрные', stars: 0,
+    e: { body: '#484852', light: '#a0a0b0', dark: '#121216' },
+    a4: { body: '#34403a', light: '#78907e', dark: '#0a100c' },
+    a3: { body: '#605030', light: '#a89868', dark: '#201808' } },
+  { id: 'ghost', name: 'Призраки', stars: 0, alpha: 0.7,
+    e: { body: '#7090c0', light: '#d8ecff', dark: '#203050' },
+    a4: { body: '#5060a0', light: '#a8b8f0', dark: '#182040' },
+    a3: { body: '#9080d0', light: '#e8d8ff', dark: '#302060' } },
+];
+
+// Breakable walls: the tanks' counterpart of the platformer's pipes.
+const WALL_SKINS = [
+  { id: 'brick', name: 'Кирпич', stars: 0, rows: [
+    'hrrmhrrr', 'rrrmrrrr', 'rrrmrrrr', 'mmmmmmmm', 'rhrrrmhr', 'rrrrrmrr', 'rrrrrmrr', 'mmmmmmmm',
+  ], pal: { r: '#a84818', h: '#e07840', m: '#3c1c0a' } },
+  { id: 'stone', name: 'Камень', stars: 0, rows: [
+    'hsssmhss', 'ssssmsss', 'sssdmssd', 'mmmmmmmm', 'shsmhsss', 'sssmssss', 'sdsmsssd', 'mmmmmmmm',
+  ], pal: { s: '#80808c', h: '#c0c0cc', d: '#5a5a66', m: '#2c2c34' } },
+  { id: 'crates', name: 'Ящики', stars: 0, rows: [
+    'kkkkkkkk', 'kwhwwwwk', 'kwkwwkwk', 'kwwkkwwk', 'kwwkkwwk', 'kwkwwkwk', 'kwwwwwhk', 'kkkkkkkk',
+  ], pal: { w: '#a8702c', h: '#e0a860', k: '#5a3410' } },
+  { id: 'concrete', name: 'Бетон', stars: 0, rows: [
+    'cccccccd', 'clcccccd', 'ccccxccd', 'cccxcccd', 'ccxcclcd', 'cccccccd', 'clccccc d', 'dddddddd',
+  ], pal: { c: '#a8a89c', l: '#d8d8cc', x: '#6c6c62', d: '#5c5c54' } },
+  { id: 'bags', name: 'Мешки', stars: 0, rows: [
+    'obbbobbb', 'bhbbbhbb', 'bbbbbbbb', 'oooooooo', 'bbobbbob', 'bbbhbbbb', 'bbbbbbbb', 'oooooooo',
+  ], pal: { b: '#c8b078', h: '#f0dca8', o: '#7a6438' } },
+];
+
+const GROUNDS = [
+  { id: 'asphalt', name: 'Асфальт', stars: 0, fill: '#000000', frame: '#707070' },
+  { id: 'grass', name: 'Трава', stars: 0, fill: '#1e3a16', dots: ['#2a4c1e', '#36602a'], frame: '#4c5c3c' },
+  { id: 'sand', name: 'Песок', stars: 0, fill: '#5c4c2c', dots: ['#6c5a36', '#4c3e22'], frame: '#8a7a5a' },
+  { id: 'snowfield', name: 'Снег', stars: 0, fill: '#aebccc', dots: ['#c8d4e0', '#98a8bc'], frame: '#6c7c90' },
+  { id: 'space', name: 'Космос', stars: 0, fill: '#05050e', stars_: ['#ffffff', '#8090ff', '#ffe0a0'], frame: '#2c2c48' },
+];
+
+const LOOK_CATS = [
+  { key: 'tank', name: 'Танк', items: TANK_SKINS },
+  { key: 'weather', name: 'Погода', items: WEATHERS },
+  { key: 'enemies', name: 'Враги', items: ENEMY_SKINS },
+  { key: 'walls', name: 'Стены', items: WALL_SKINS },
+  { key: 'ground', name: 'Фон', items: GROUNDS },
+];
+
+function starsOwned() {
+  try { return Number(localStorage.getItem(STARS_KEY)) || 0; } catch (e) { return 0; }
+}
+const unlocked = (item) => item.stars <= starsOwned();
+const findItem = (cat, id) => cat.items.find((it) => it.id === id);
+
+const look = {};
+function loadLook() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(LOOK_KEY) || '{}') || {}; } catch (e) { /* ignore */ }
+  for (const cat of LOOK_CATS) {
+    const it = findItem(cat, saved[cat.key]);
+    look[cat.key] = it && unlocked(it) ? it.id : cat.items[0].id;
+  }
+}
+function saveLook() {
+  try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) { /* ignore */ }
+}
+loadLook();
+
+const lookItem = (key) => findItem(LOOK_CATS.find((c) => c.key === key), look[key]);
+const tankSkin = (id) => TANK_SKINS.find((t) => t.id === id) || TANK_SKINS[0];
+const partnerSkin = (id) => (id === 'green' ? 'gold' : 'green');
+
+// Skins of player 1 and 2 in the current game (online each player brings their own).
+let skins = [look.tank, partnerSkin(look.tank)];
+
+function colorOf(key) {
+  const [kind, a, b] = key.split(':');
+  if (kind === 'p') return tankSkin(a).col;
+  if (kind === 'red') return { body: '#c82818', light: '#ff9070', dark: '#581008' };
+  return (ENEMY_SKINS.find((e) => e.id === a) || ENEMY_SKINS[0])[b];
+}
+
+const wallCache = new Map();
+function wallTile() {
+  const w = lookItem('walls');
+  let img = wallCache.get(w.id);
+  if (!img) {
+    img = fromRows(w.rows.map((r) => r.replace(/ /g, '').padEnd(8, r[0]).slice(0, 8)), w.pal);
+    wallCache.set(w.id, img);
+  }
+  return img;
+}
+
+const groundCache = new Map();
+function groundImage() {
+  const g = lookItem('ground');
+  let img = groundCache.get(g.id);
+  if (!img) {
+    let seed = 12345;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    img = sprite(FIELD, FIELD, (R) => {
+      R(0, 0, FIELD, FIELD, g.fill);
+      if (g.dots) for (let i = 0; i < 900; i++) R(Math.floor(rnd() * FIELD), Math.floor(rnd() * FIELD), 1 + (i % 3 === 0), 1, g.dots[i % 2]);
+      if (g.stars_) for (let i = 0; i < 90; i++) R(Math.floor(rnd() * FIELD), Math.floor(rnd() * FIELD), 1, 1, g.stars_[i % 3]);
+    });
+    groundCache.set(g.id, img);
+  }
+  return img;
+}
+
+// Night: a dark layer with holes of light around tanks, shots and blasts.
+const nightLayer = document.createElement('canvas');
+function drawWeather(s, w, h) {
+  const f = s.frame;
+  switch (look.weather) {
+    case 'dusk':
+      ctx.fillStyle = 'rgba(255, 110, 40, 0.18)';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(70, 0, 90, 0.14)';
+      ctx.fillRect(0, 0, w, h);
+      break;
+    case 'night': {
+      nightLayer.width = w;
+      nightLayer.height = h;
+      const g = nightLayer.getContext('2d');
+      g.fillStyle = 'rgba(4, 6, 22, 0.88)';
+      g.fillRect(0, 0, w, h);
+      g.globalCompositeOperation = 'destination-out';
+      const light = (x, y, r) => {
+        const gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, 'rgba(0,0,0,1)');
+        gr.addColorStop(0.6, 'rgba(0,0,0,0.8)');
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr;
+        g.fillRect(x - r, y - r, r * 2, r * 2);
+      };
+      for (const p of s.players) if (p.tank) light(p.tank.x + 8 + [0, 10, 0, -10][p.tank.dir], p.tank.y + 8 + [-10, 0, 10, 0][p.tank.dir], 46);
+      for (const b of s.bullets) light(b.x, b.y, 12);
+      for (const b of s.booms) light(b.x, b.y, b.big ? 34 : 14);
+      for (const sp of s.spawns) light(sp.x + 8, sp.y + 8, 16);
+      if (s.baseCenter) light(s.baseCenter[0], s.baseCenter[1], 22);
+      ctx.drawImage(nightLayer, 0, 0);
+      break;
+    }
+    case 'rain':
+      ctx.fillStyle = 'rgba(30, 50, 110, 0.2)';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(180, 205, 255, 0.55)';
+      for (let i = 0; i < 70; i++) {
+        const x = ((i * 53 + f * 2) % (w + 20)) - 10;
+        const y = (i * 97 + f * 6) % h;
+        ctx.fillRect(Math.floor(x), Math.floor(y), 1, 3);
+        ctx.fillRect(Math.floor(x) - 1, Math.floor(y) + 3, 1, 2);
+      }
+      break;
+    case 'snow':
+      ctx.fillStyle = 'rgba(220, 230, 255, 0.1)';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 60; i++) {
+        const x = (i * 71 + Math.sin((f + i * 13) / 25) * 5 + w) % w;
+        const y = (i * 41 + f * (0.4 + (i % 3) * 0.25)) % h;
+        const sz = i % 4 === 0 ? 2 : 1;
+        ctx.fillRect(Math.floor(x), Math.floor(y), sz, sz);
+      }
+      break;
+  }
+}
+
+// Menu: one row per category, ◀ ▶ to flip through, a live preview above.
+const preview = document.getElementById('lookPreview');
+let lookOpen = false;
+
+function buildLookRows() {
+  const rows = $('lookRows');
+  rows.innerHTML = '';
+  for (const cat of LOOK_CATS) {
+    const row = document.createElement('div');
+    row.className = 'lrow';
+    const name = document.createElement('span');
+    name.className = 'lname';
+    name.textContent = cat.name;
+    const prev = document.createElement('button');
+    prev.className = 'arr';
+    prev.textContent = '◀';
+    const val = document.createElement('span');
+    val.className = 'lval';
+    const next = document.createElement('button');
+    next.className = 'arr';
+    next.textContent = '▶';
+    const show = () => {
+      const it = findItem(cat, look[cat.key]);
+      val.textContent = it.name;
+    };
+    const flip = (d) => {
+      audio();
+      const items = cat.items;
+      let i = items.findIndex((it) => it.id === look[cat.key]);
+      for (let n = 0; n < items.length; n++) {
+        i = (i + d + items.length) % items.length;
+        if (unlocked(items[i])) break; // locked items are skipped until stars unlock them
+      }
+      look[cat.key] = items[i].id;
+      saveLook();
+      show();
+      tone(660, 0, 0.04, 'square', 0.04);
+    };
+    prev.addEventListener('click', () => flip(-1));
+    next.addEventListener('click', () => flip(1));
+    show();
+    row.append(name, prev, val, next);
+    rows.append(row);
+  }
+}
+
+function openLook() {
+  buildLookRows();
+  lookOpen = true;
+  showOverlay('ВНЕШНИЙ ВИД', '', null, null, 'look');
+}
+
+function drawPreview(t) {
+  const pctx = preview.getContext('2d');
+  pctx.imageSmoothingEnabled = false;
+  const pw = preview.width, ph = preview.height;
+  const main = ctx;
+  ctx = pctx;
+  const g = lookItem('ground');
+  ctx.fillStyle = g.frame;
+  ctx.fillRect(0, 0, pw, ph);
+  ctx.save();
+  ctx.translate(4, 4);
+  const w = pw - 8, h = ph - 8;
+  ctx.beginPath();
+  ctx.rect(0, 0, w, h);
+  ctx.clip();
+  ctx.drawImage(groundImage(), 0, 0);
+  const wall = wallTile();
+  for (let x = 0; x < w; x += 8) { ctx.drawImage(wall, x, 0); ctx.drawImage(wall, x, 8); }
+  for (let y = 16; y < h; y += 8) { ctx.drawImage(wall, 0, y); ctx.drawImage(wall, w - 8, y); }
+  ctx.drawImage(TILE[STEEL], 56, 32);
+  ctx.drawImage(TILE[STEEL], 64, 32);
+  const frame = Math.floor(t / 16.7);
+  const bob = Math.floor(frame / 8) % 2;
+  const fake = {
+    frame,
+    players: [{ tank: { x: 24, y: 36, dir: RIGHT, side: 'p', pi: 0, anim: frame, shield: 0, stun: 0 } }],
+    enemies: [
+      { x: 80, y: 20 + bob, dir: DOWN, side: 'e', type: 0, hp: 1, anim: frame, flash: false },
+      { x: 92, y: 40 - bob, dir: LEFT, side: 'e', type: 3, hp: 4, anim: frame, flash: false },
+    ],
+    bullets: [{ x: 44 + (frame % 30), y: 44 }],
+    booms: [],
+    spawns: [],
+  };
+  drawTank(fake, fake.players[0].tank);
+  for (const e of fake.enemies) drawTank(fake, e);
+  drawBullet(fake.bullets[0]);
+  drawWeather(fake, w, h);
+  ctx.restore();
+  ctx = main;
+}
+
 // ---------- Drawing ----------
 function drawCells(s, layer) {
   const water = WATER_FRAMES[(s.frame >> 5) & 1];
@@ -406,10 +691,10 @@ function drawCells(s, layer) {
     for (let cx = 0; cx < N; cx++) {
       const c = s.cells[cy * N + cx];
       if ((c === FOREST) !== layer) continue;
-      let img = TILE[c];
+      let img = c === BRICK ? wallTile() : TILE[c];
       if (c === WATER) img = water;
       // A few seconds before the shovel runs out the wall blinks back to brick.
-      if (c === STEEL && s.shovel > 0 && s.shovel < 180 && (s.frame & 16) && isBaseWall(cx, cy)) img = TILE[BRICK];
+      if (c === STEEL && s.shovel > 0 && s.shovel < 180 && (s.frame & 16) && isBaseWall(cx, cy)) img = wallTile();
       if (img) ctx.drawImage(img, cx * CELL, cy * CELL);
     }
   }
@@ -418,17 +703,20 @@ function drawCells(s, layer) {
 const isBaseWall = (cx, cy) => cy >= 23 && cx >= 11 && cx <= 14 && !(cx >= 12 && cx <= 13 && cy >= 24);
 
 function tankColor(t, s) {
-  if (t.side === 'p') return 'p' + t.pi;
+  if (t.side === 'p') return 'p:' + skins[t.pi];
   if (t.flash && (s.frame & 8)) return 'red';
-  if (t.type === 3) return t.hp >= 4 ? 'armor4' : t.hp === 3 ? 'armor3' : 'e';
-  return 'e';
+  const part = t.type === 3 ? (t.hp >= 4 ? 'a4' : t.hp === 3 ? 'a3' : 'e') : 'e';
+  return 'e:' + look.enemies + ':' + part;
 }
 
 function drawTank(s, t) {
   if (t.stun && (s.frame & 8)) return;
   const variant = t.side === 'p' ? 'player' : VARIANT[t.type];
   const img = tankSprite(tankColor(t, s), variant, t.dir, t.anim >> 2);
+  const alpha = t.side === 'e' ? lookItem('enemies').alpha : 0;
+  if (alpha) ctx.globalAlpha = alpha;
   ctx.drawImage(img, Math.round(t.x), Math.round(t.y));
+  ctx.globalAlpha = 1;
   if (t.shield && (s.frame & 4)) {
     const x = Math.round(t.x) - 1, y = Math.round(t.y) - 1;
     ctx.fillStyle = (s.frame & 8) ? '#ffffff' : '#60d0ff';
@@ -450,6 +738,15 @@ function drawSpawn(sp) {
   for (const [dx, dy] of [[-d, -d], [d, -d], [-d, d], [d, d]]) ctx.fillRect(cx + dx - 1, cy + dy - 1, 2, 2);
 }
 
+// Dark rim keeps shells visible on light ground such as snow.
+function drawBullet(b) {
+  const x = Math.round(b.x) - 2, y = Math.round(b.y) - 2;
+  ctx.fillStyle = '#202020';
+  ctx.fillRect(x, y, 4, 4);
+  ctx.fillStyle = '#f8f8f8';
+  ctx.fillRect(x + 1, y + 1, 2, 2);
+}
+
 function drawBoom(b) {
   if (b.big) {
     const r = b.t < 14 ? 3 + b.t : 3 + (28 - b.t);
@@ -464,10 +761,10 @@ function drawBoom(b) {
 }
 
 function render(s) {
-  ctx.fillStyle = '#707070';
+  const ground = lookItem('ground');
+  ctx.fillStyle = ground.frame;
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(OX, OY, FIELD, FIELD);
+  ctx.drawImage(groundImage(), OX, OY);
   ctx.save();
   ctx.translate(OX, OY);
   drawCells(s, false);
@@ -475,16 +772,17 @@ function render(s) {
   for (const sp of s.spawns) drawSpawn(sp);
   for (const p of s.players) if (p.tank) drawTank(s, p.tank);
   for (const e of s.enemies) drawTank(s, e);
-  ctx.fillStyle = '#e8e8e8';
-  for (const b of s.bullets) ctx.fillRect(Math.round(b.x) - 2, Math.round(b.y) - 2, 4, 4);
+  for (const b of s.bullets) drawBullet(b);
   drawCells(s, true);
   for (const b of s.booms) drawBoom(b);
+  s.baseCenter = [104, 200];
+  drawWeather(s, FIELD, FIELD);
   if (s.bonus && (s.frame % 32) < 24) ctx.drawImage(BONUS[s.bonus.type], s.bonus.x, s.bonus.y);
   // Stage curtain
   if (s.phase === 'intro') {
     const k = s.phaseT < 25 ? 1 - s.phaseT / 25 : s.phaseT > 75 ? (s.phaseT - 75) / 25 : 0;
     const h = Math.round((FIELD / 2) * (1 - k));
-    ctx.fillStyle = '#707070';
+    ctx.fillStyle = ground.frame;
     ctx.fillRect(0, 0, FIELD, h);
     ctx.fillRect(0, FIELD - h, FIELD, h);
   }
@@ -507,6 +805,8 @@ function fitCanvas() {
   canvas.style.height = Math.floor(H * k) + 'px';
 }
 window.addEventListener('resize', fitCanvas);
+// Rotating the phone or showing the Telegram header changes the space without a window resize.
+if (window.ResizeObserver) new ResizeObserver(fitCanvas).observe($('game'));
 
 let lastHud = '';
 function hud(s) {
@@ -554,6 +854,9 @@ function showOverlay(title, html, button, action, panel) {
   $('ovHint').classList.toggle('hidden', panel !== 'menu');
   $('back').classList.toggle('hidden', panel !== 'menu');
   $('online').classList.toggle('hidden', panel !== 'online');
+  $('look').classList.toggle('hidden', panel !== 'look');
+  $('ovText').classList.toggle('hidden', !html);
+  lookOpen = panel === 'look';
   const btn = $('ovBtn');
   btn.classList.toggle('hidden', !button);
   btn.textContent = button || '';
@@ -568,6 +871,9 @@ function showMenu() {
   netClose();
   showOverlay('ТАНКОДРОМ', 'Защити штаб от вражеских танков.<br>Кирпич пробивается, сталь держит.<br>Рекорд: ' + loadBest(), null, null);
 }
+
+$('btnLook').addEventListener('click', () => { audio(); openLook(); });
+$('btnLookDone').addEventListener('click', () => { audio(); showMenu(); });
 
 $('ovBtn').addEventListener('click', () => {
   audio();
@@ -662,10 +968,12 @@ function onNet(m) {
     $('btnInvite').classList.remove('hidden');
   } else if (m.t === 'peer') {
     haptic('success');
+    net.guestSkin = '';
     mode = 'host';
     begin(2);
   } else if (m.t === 'joined') {
     mode = 'guest';
+    netSend({ t: 'look', tank: look.tank });
     keyMap = KEYS_1P;
     clearPads();
     view = null;
@@ -678,6 +986,10 @@ function onNet(m) {
     onlineMenu(m.msg);
   } else if (m.t === 'left') {
     lostLink('Друг вышел из игры.');
+  } else if (m.t === 'look' && mode === 'host') {
+    // The guest's own tank colour; one the host does not know falls back to the default.
+    net.guestSkin = TANK_SKINS.some((t) => t.id === m.tank) ? m.tank : '';
+    skins[1] = net.guestSkin || partnerSkin(look.tank);
   } else if (m.t === 'i' && mode === 'host') {
     net.remote.dir = m.d;
     if (m.f) net.remote.fire = true;
@@ -774,6 +1086,7 @@ function sendSnapshot(s) {
     sp: s.spawns.map((x) => [x.x, x.y, x.t]),
     bn: s.bonus ? [s.bonus.x, s.bonus.y, s.bonus.type, s.bonus.t] : 0,
     ev: net.events,
+    sk: skins,
   };
   if (key !== net.cellsKey || s.frame % 120 === 0) { m.c = btoa(key); net.cellsKey = key; }
   netSend(m);
@@ -797,6 +1110,7 @@ function applySnapshot(m) {
     const raw = atob(m.c);
     for (let i = 0; i < raw.length; i++) v.cells[i] = raw.charCodeAt(i);
   }
+  if (Array.isArray(m.sk)) skins = m.sk.map((id, i) => (TANK_SKINS.some((t) => t.id === id) ? id : partnerSkin(look.tank)));
   for (const ev of m.ev) if (SFX[ev]) SFX[ev]();
   state = v;
   guestScreens(v);
@@ -840,6 +1154,7 @@ let running = false;
 
 function begin(players) {
   keyMap = players === 2 && mode === 'local' ? KEYS_2P : KEYS_1P;
+  skins = [look.tank, mode === 'host' && net.guestSkin ? net.guestSkin : partnerSkin(look.tank)];
   net.remote = { dir: -1, fire: false };
   net.cellsKey = '';
   net.events = [];
@@ -894,6 +1209,7 @@ function frame(now) {
       if (mode === 'host' && running && state.frame % 2 === 0) sendSnapshot(state);
     }
   } else acc = 0;
+  if (lookOpen) drawPreview(now);
   if (state) {
     render(state);
     hud(state);
