@@ -1192,7 +1192,7 @@ $('btnJoin').addEventListener('click', () => { audio(); joinRoom($('code').value
 $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($('code').value); });
 $('btnInvite').addEventListener('click', () => {
   // The bot answers /start tanks_<code> with a button that opens the game inside Telegram.
-  const link = 'https://t.me/' + BOT_NAME + '?start=tanks_' + net.code;
+  const link = 'https://t.me/' + BOT_NAME + '?start=room_' + net.code;
   const text = 'Сыграем в «Танкодром» вдвоём? Код комнаты: ' + net.code;
   try {
     if (tg && tg.openTelegramLink) {

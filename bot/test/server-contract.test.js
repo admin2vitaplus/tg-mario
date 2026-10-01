@@ -64,6 +64,8 @@ test("migrates a database made before migrations existed without losing data", (
     assert.equal(store.getPlayer(7).best_score, 45000);
     assert.equal(store.top(10)[0].name, "Старый игрок");
     assert.deepEqual(store.earned(7).map((a) => a.code), ["first_level"]);
+    // Миграция 3: игроки, бывшие до статистики, помечены как old и не считаются новыми.
+    assert.equal(store.getSeen(7).source, "old");
     store.close();
 
     // Повторный запуск ничего не меняет.

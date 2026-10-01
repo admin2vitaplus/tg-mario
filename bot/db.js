@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { dayOf } from "./days.js";
 
 // Миграции только вперёд: каждая выполняется один раз, номер последней хранится
 // в PRAGMA user_version. Старые миграции не меняются, новые добавляются в конец.
@@ -49,6 +50,43 @@ export const MIGRATIONS = [
     CREATE INDEX IF NOT EXISTS level_results_player ON level_results(player_id, created_at);
     CREATE INDEX IF NOT EXISTS runs_player ON runs(player_id, created_at);
   `,
+  // 3: статистика (ТЗ P0-5). events — сырые события за последние 90 дней, day — номер дня по Москве.
+  // users_seen — когда и откуда игрок пришёл впервые (хранится всегда, нужен для «новый/вернувшийся»).
+  // stats_daily — суммы по дням для событий старше 90 дней, после чего сами события удаляются.
+  // Игроки, появившиеся до статистики, переносятся с источником old и в когорты не попадают.
+  `
+    CREATE TABLE events (
+      id INTEGER PRIMARY KEY,
+      at INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      user_id INTEGER,
+      type TEXT NOT NULL,
+      game TEXT NOT NULL DEFAULT '',
+      source TEXT,
+      ref TEXT,
+      detail TEXT
+    );
+    CREATE INDEX events_day ON events(day, type);
+    CREATE INDEX events_user ON events(user_id, day);
+    CREATE TABLE users_seen (
+      user_id INTEGER PRIMARY KEY,
+      at INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      source TEXT NOT NULL,
+      inviter INTEGER
+    );
+    CREATE INDEX users_seen_day ON users_seen(day);
+    CREATE TABLE stats_daily (
+      day INTEGER NOT NULL,
+      game TEXT NOT NULL,
+      type TEXT NOT NULL,
+      events INTEGER NOT NULL,
+      users INTEGER NOT NULL,
+      PRIMARY KEY (day, game, type)
+    );
+    INSERT OR IGNORE INTO users_seen (user_id, at, day, source)
+      SELECT id, created_at, (created_at + 10800000) / 86400000, 'old' FROM players;
+  `,
 ];
 
 export function migrate(db) {
@@ -98,6 +136,18 @@ export function openDb(file) {
       WHERE player_id = ? AND created_at > ? ORDER BY id`),
     rank: db.prepare(`SELECT COUNT(*) + 1 AS rank FROM players
       WHERE best_score > ? OR (best_score = ? AND best_at < ?)`),
+    addEvent: db.prepare(`INSERT INTO events (at, day, user_id, type, game, source, ref, detail)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+    lastEvent: db.prepare(`SELECT * FROM events WHERE user_id = ? AND type = ? AND at >= ?
+      ORDER BY id DESC LIMIT 1`),
+    lastEventByRef: db.prepare(`SELECT * FROM events WHERE type = ? AND ref = ? AND at >= ?
+      ORDER BY id DESC LIMIT 1`),
+    seen: db.prepare(`INSERT OR IGNORE INTO users_seen (user_id, at, day, source, inviter) VALUES (?, ?, ?, ?, ?)`),
+    getSeen: db.prepare("SELECT * FROM users_seen WHERE user_id = ?"),
+    archive: db.prepare(`INSERT INTO stats_daily (day, game, type, events, users)
+      SELECT day, game, type, COUNT(*), COUNT(DISTINCT user_id) FROM events WHERE day < ? GROUP BY day, game, type
+      ON CONFLICT(day, game, type) DO UPDATE SET events = events + excluded.events, users = users + excluded.users`),
+    pruneEvents: db.prepare("DELETE FROM events WHERE day < ?"),
   };
 
   return {
@@ -120,6 +170,33 @@ export function openDb(file) {
     earned: (id) => q.earned.all(id),
     earn: (id, code) => q.earn.run(id, code, Date.now()).changes > 0,
     top: (limit = 20) => q.top.all(limit),
+    // ---------- Статистика ----------
+    addEvent({ userId = null, type, game = "", source = null, ref = null, detail = null }, at = Date.now()) {
+      q.addEvent.run(at, dayOf(at), userId, type, game, source, ref == null ? null : String(ref), detail);
+    },
+    lastEvent: (userId, type, since) => q.lastEvent.get(userId, type, since),
+    lastEventByRef: (type, ref, since) => q.lastEventByRef.get(type, String(ref), since),
+    // true, если игрок появился впервые (тогда же пишется событие user_first_seen).
+    seen(userId, { source, inviter = null, ref = null }, at = Date.now()) {
+      if (q.seen.run(userId, at, dayOf(at), source, inviter).changes === 0) return false;
+      this.addEvent({ userId, type: "user_first_seen", source, ref }, at);
+      return true;
+    },
+    getSeen: (userId) => q.getSeen.get(userId),
+    // Сырые события старше keepDays дней сворачиваются в суммы по дням и удаляются.
+    pruneEvents(at = Date.now(), keepDays = 90) {
+      const before = dayOf(at) - keepDays;
+      db.exec("BEGIN");
+      try {
+        q.archive.run(before);
+        const removed = q.pruneEvents.run(before).changes;
+        db.exec("COMMIT");
+        return removed;
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
+    },
     rank(p) {
       if (!p || p.best_score <= 0) return null;
       return q.rank.get(p.best_score, p.best_score, p.best_at).rank;

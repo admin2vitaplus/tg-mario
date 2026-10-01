@@ -3,6 +3,7 @@ import { ACHIEVEMENTS } from "./achievements.js";
 import { startApp } from "./app.js";
 import { startTunnel } from "./tunnel.js";
 import { addSecret, installSafeConsole } from "./log.js";
+import { statsReport } from "./stats.js";
 
 installSafeConsole();
 
@@ -23,7 +24,9 @@ const app = await startApp({
       .sendMessage(userId, "Новые достижения!\n" + list.map((a) => `${a.icon} ${a.title}: ${a.text}`).join("\n"))
       .catch(() => {}),
 });
-const { store } = app;
+const { store, tracker } = app;
+// Telegram id администраторов через запятую; пусто — команда /stats выключена.
+const admins = new Set((process.env.ADMIN_ID || "").split(",").map((s) => Number(s.trim())).filter(Number.isSafeInteger));
 const baseGameUrl = app.gameUrl;
 console.log(`Сервер очков слушает порт ${app.port}, коммит ${app.commit}`);
 
@@ -79,7 +82,7 @@ const withBot = (url) => {
 };
 const gameUrl = withBot(withApi(baseGameUrl));
 
-// Приглашение в «Танкодром»: t.me/<бот>?start=tanks_123456 открывает комнату 123456.
+// Приглашение в «Танкодром»: t.me/<бот>?start=room_123456 (и старое tanks_) открывает комнату 123456.
 const tanksRoomUrl = (code) => {
   const u = new URL(withBot(withApi(new URL("tanks/", baseGameUrl).toString())));
   u.searchParams.set("room", code);
@@ -92,7 +95,8 @@ const playKeyboard = () => new InlineKeyboard().webApp("🎮 Играть", game
 const medal = (place) => ["🥇", "🥈", "🥉"][place - 1] || `${place}.`;
 
 bot.command("start", (ctx) => {
-  const room = /^tanks_(\d{4,6})$/.exec(ctx.match || "");
+  if (ctx.from) tracker.arrive(ctx.from.id, ctx.match);
+  const room = /^(?:tanks|room)_(\d{4,6})$/.exec(ctx.match || "");
   if (room) {
     return ctx.reply(`Тебя позвали в «Танкодром», комната ${room[1]}.`, {
       reply_markup: new InlineKeyboard().webApp("🛡 В бой", tanksRoomUrl(room[1])),
@@ -127,10 +131,26 @@ bot.command("me", (ctx) => {
   );
 });
 
+// Личная ссылка-приглашение: кто придёт по ней, засчитывается в K-фактор.
+bot.command("invite", (ctx) => {
+  const link = `https://t.me/${bot.botInfo.username}?start=ref_${ctx.from.id}`;
+  tracker.event(ctx.from.id, "invite_created");
+  const share = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("Сыграем? Тут ретро-игры прямо в Telegram.")}`;
+  return ctx.reply(`Позови друга по этой ссылке:\n${link}`, {
+    reply_markup: new InlineKeyboard().url("📨 Отправить другу", share),
+  });
+});
+
+// Статистика только для администраторов (ADMIN_ID); остальным команда как будто не существует.
+bot.command("stats", (ctx, next) => {
+  if (!admins.has(ctx.from?.id)) return next();
+  return ctx.reply(statsReport(store.db));
+});
+
 bot.command("help", (ctx) =>
   ctx.reply(
     "Управление: кнопки на экране или клавиатура (← →, прыжок Z/пробел, бег X/Shift).\n" +
-      "/play — открыть игру\n/top — таблица рекордов\n/me — мои достижения",
+      "/play — открыть игру\n/top — таблица рекордов\n/me — мои достижения\n/invite — позвать друга",
   ),
 );
 
@@ -146,6 +166,7 @@ await bot.api.setMyCommands([
   { command: "play", description: "Открыть игру" },
   { command: "top", description: "Таблица рекордов" },
   { command: "me", description: "Мои достижения" },
+  { command: "invite", description: "Позвать друга" },
   { command: "help", description: "Как играть" },
 ]);
 
