@@ -661,6 +661,7 @@ function openLook() {
   window.Looks.open({
     key: LOOK_KEY,
     title: T('look_title'),
+    doneText: T('look_done'),
     groups: LOOK_GROUPS,
     onChange: (sel) => {
       Object.assign(look, sel);
