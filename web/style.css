@@ -88,7 +88,7 @@ html, body {
 #dpad .left { grid-area: left; }
 #dpad .right { grid-area: right; }
 
-/* Dendy-style 2x2 block: turbo buttons above, B and A below */
+/* Retro pad 2x2 block: turbo buttons above, B and A below */
 #actions { display: grid; grid-template-columns: repeat(2, auto); gap: 10px; }
 .btn.on { background: rgba(255, 255, 255, 0.45); }
 

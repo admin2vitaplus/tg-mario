@@ -195,7 +195,7 @@ function bindTouch() {
     dpad.addEventListener(name, (e) => { pointers.delete(e.pointerId); refresh(); });
   }
 
-  // Dendy pad: A and B both fire; the turbo buttons keep firing while held.
+  // Two-button retro pad: A and B both fire; the turbo buttons keep firing while held.
   const hold = (id, onDown, onUp) => {
     const el = document.getElementById(id);
     el.addEventListener('pointerdown', (e) => {
