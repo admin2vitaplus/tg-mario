@@ -44,6 +44,11 @@ export const MIGRATIONS = [
     );
     CREATE INDEX IF NOT EXISTS players_best ON players(best_score DESC);
   `,
+  // 2: быстрый поиск отчётов текущей игры для проверки правдоподобия.
+  `
+    CREATE INDEX IF NOT EXISTS level_results_player ON level_results(player_id, created_at);
+    CREATE INDEX IF NOT EXISTS runs_player ON runs(player_id, created_at);
+  `,
 ];
 
 export function migrate(db) {
@@ -88,6 +93,9 @@ export function openDb(file) {
     earn: db.prepare("INSERT OR IGNORE INTO achievements (player_id, code, earned_at) VALUES (?, ?, ?)"),
     top: db.prepare(`SELECT id, name, username, best_score FROM players WHERE best_score > 0
       ORDER BY best_score DESC, best_at ASC LIMIT ?`),
+    lastRunAt: db.prepare("SELECT MAX(created_at) AS at FROM runs WHERE player_id = ?"),
+    levelsSince: db.prepare(`SELECT level, score, time_left AS timeLeft, created_at AS at FROM level_results
+      WHERE player_id = ? AND created_at > ? ORDER BY id`),
     rank: db.prepare(`SELECT COUNT(*) + 1 AS rank FROM players
       WHERE best_score > ? OR (best_score = ? AND best_at < ?)`),
   };
@@ -102,12 +110,13 @@ export function openDb(file) {
       return q.getPlayer.get(user.id);
     },
     getPlayer: (id) => q.getPlayer.get(id),
-    addRun(id, r) {
-      const now = Date.now();
+    addRun(id, r, now = Date.now()) {
       q.addRun.run(id, r.score, r.coins, r.levels, r.deaths, r.completed ? 1 : 0, r.bossFire ? 1 : 0, now);
       q.bumpPlayer.run(r.coins, r.score, now, r.score, id);
     },
-    addLevel: (id, l) => q.addLevel.run(id, l.level, l.score, l.timeLeft, l.deaths, Date.now()),
+    addLevel: (id, l, at = Date.now()) => q.addLevel.run(id, l.level, l.score, l.timeLeft, l.deaths, at),
+    lastRunAt: (id) => q.lastRunAt.get(id).at ?? 0,
+    levelsSince: (id, since) => q.levelsSince.all(id, since),
     earned: (id) => q.earned.all(id),
     earn: (id, code) => q.earn.run(id, code, Date.now()).changes > 0,
     top: (limit = 20) => q.top.all(limit),
