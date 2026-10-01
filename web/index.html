@@ -3,10 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>Прыг-Скок</title>
+  <title>Жёлтый картридж</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="scores.css">
-  <link rel="stylesheet" href="lib/looks.css">
   <!-- Local copy: telegram.org is slow to reach from some networks and would block the page. -->
   <script src="lib/telegram-web-app.js"></script>
 </head>
@@ -48,11 +47,11 @@
       <p class="hint" id="ovHint">Клавиатура: стрелки, A — Z/пробел, B (бег и огонь) — X/Shift, турбо A — A, турбо B — S</p>
     </div>
   </div>
-  <!-- The engine loads after the markup so the start screen shows right away. -->
+  <!-- Only the menu loads up front; a game's own files (the engine too) load
+       when it is chosen, see config.js. -->
+  <script src="config.js"></script>
   <script src="menu.js"></script>
-  <script src="lib/phaser.min.js"></script>
   <script src="api.js"></script>
-  <script src="lib/looks.js"></script>
-  <script src="game.js"></script>
+  <script src="sw-register.js"></script>
 </body>
 </html>

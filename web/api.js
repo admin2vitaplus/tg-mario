@@ -27,6 +27,7 @@ const botName = (() => {
     if (name) localStorage.setItem('prygskok_bot', name);
     else name = localStorage.getItem('prygskok_bot');
   } catch (e) { /* ignore */ }
+  if (!name && window.CARTRIDGE) name = window.CARTRIDGE.bot;
   return (name || '').replace(/[^A-Za-z0-9_]/g, '');
 })();
 
