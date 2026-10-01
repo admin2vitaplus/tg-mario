@@ -195,7 +195,7 @@ function bindTouch() {
     dpad.addEventListener(name, (e) => { pointers.delete(e.pointerId); refresh(); });
   }
 
-  // Dendy pad: A and B both fire; the turbo buttons keep firing while held.
+  // Two-button retro pad: A and B both fire; the turbo buttons keep firing while held.
   const hold = (id, onDown, onUp) => {
     const el = document.getElementById(id);
     el.addEventListener('pointerdown', (e) => {
@@ -728,7 +728,7 @@ function render(s) {
   for (const b of s.booms) drawBoom(b);
   s.baseCenter = [104, 200];
   drawWeather(s, FIELD, FIELD);
-  if (s.bonus && (s.frame % 32) < 24) ctx.drawImage(BONUS[s.bonus.type], s.bonus.x, s.bonus.y);
+  if ((s.frame % 32) < 24) for (const b of s.bonuses) ctx.drawImage(BONUS[b.type], b.x, b.y);
   // Stage curtain
   if (s.phase === 'intro') {
     const k = s.phaseT < 25 ? 1 - s.phaseT / 25 : s.phaseT > 75 ? (s.phaseT - 75) / 25 : 0;
@@ -1041,7 +1041,7 @@ function sendSnapshot(s) {
     bu: s.bullets.map((b) => [b.x, b.y]),
     bo: s.booms.map((b) => [b.x, b.y, b.big ? 1 : 0, b.t]),
     sp: s.spawns.map((x) => [x.x, x.y, x.t]),
-    bn: s.bonus ? [s.bonus.x, s.bonus.y, s.bonus.type, s.bonus.t] : 0,
+    bn: s.bonuses.map((b) => [b.x, b.y, b.type, b.t]),
     ev: net.events,
     sk: skins,
   };
@@ -1061,7 +1061,7 @@ function applySnapshot(m) {
     bullets: m.bu.map(([x, y]) => ({ x, y })),
     booms: m.bo.map(([x, y, big, t]) => ({ x, y, big: !!big, t })),
     spawns: m.sp.map(([x, y, t]) => ({ x, y, t })),
-    bonus: m.bn ? { x: m.bn[0], y: m.bn[1], type: m.bn[2], t: m.bn[3] } : null,
+    bonuses: (Array.isArray(m.bn) ? m.bn : []).map(([x, y, type, t]) => ({ x, y, type, t })),
   });
   if (m.c) {
     const raw = atob(m.c);

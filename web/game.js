@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-// NES-like resolution: 16 tiles wide, 15 tiles high.
+// Retro 8-bit resolution: 16 tiles wide, 15 tiles high.
 const TILE = 16;
 const VIEW_W = 256;
 const VIEW_H = 240;
@@ -122,7 +122,7 @@ function bindControls() {
     dpad.addEventListener(name, (e) => { pointers.delete(e.pointerId); refresh(); });
   }
 
-  // Dendy pad: A jumps, B runs while held and fires on each press.
+  // Two-button retro pad: A jumps, B runs while held and fires on each press.
   // Turbo buttons act as A/B pressed and released many times a second.
   const hold = (id, key, onPress) => {
     const el = document.getElementById(id);
@@ -1789,7 +1789,7 @@ class Play extends Phaser.Scene {
     if (this.crouch) target = 0;
     else if (left && !right) target = -maxV;
     else if (right && !left) target = maxV;
-    // Rates follow the NES game (per-frame values x 60 x 60): slow build-up,
+    // Rates follow classic 8-bit platformers (per-frame values x 60 x 60): slow build-up,
     // a long slide on release and a sharper skid when reversing.
     let acc;
     if (target === 0) acc = onGround ? 183 : 0;
@@ -1800,7 +1800,7 @@ class Play extends Phaser.Scene {
     if (target !== 0) p.setFlipX(target < 0);
 
     // Jump: higher when running, shorter when the button is released early.
-    // Jump strength and gravity depend on the speed at take-off, as on the NES:
+    // Jump strength and gravity depend on the speed at take-off, as in classic 8-bit platformers:
     // low gravity while A is held on the way up, heavy gravity otherwise.
     if (jump && !this.prevJump && onGround) {
       const speed = Math.abs(b.velocity.x);
