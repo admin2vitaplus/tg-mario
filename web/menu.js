@@ -18,6 +18,27 @@ if (tg) {
   } catch (e) { /* not inside Telegram */ }
 }
 
+// A t.me/<bot>?startapp=<label> link opens this menu with start_param, but
+// without ?api=: the label may carry the server's tunnel name after «__»
+// (room_123456__abc-def means the server abc-def.trycloudflare.com), and an invite
+// to a «Танкодром» room goes straight to that room.
+(() => {
+  if (typeof URLSearchParams === 'undefined') return;
+  const start = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param)
+    || new URLSearchParams(location.search).get('tgWebAppStartParam') || '';
+  const m = /^(\w+?)(?:__([a-z0-9-]{1,63}))?$/.exec(start);
+  if (!m) return;
+  const params = new URLSearchParams(location.search);
+  if (m[2] && !params.get('api')) {
+    try { localStorage.setItem('prygskok_api', 'https://' + m[2] + '.trycloudflare.com'); } catch (e) { /* ignore */ }
+  }
+  const room = /^(?:room|tanks)_(\d{4,8})$/.exec(m[1]);
+  if (room && window.CARTRIDGE && window.CARTRIDGE.isEnabled('tanks')) {
+    params.set('room', room[1]);
+    location.replace('tanks/?' + params + location.hash);
+  }
+})();
+
 const cfg = window.CARTRIDGE || { games: [], enabledGames: () => [], slots: 0 };
 const games = cfg.enabledGames();
 const lines = games.concat(Array(Math.max(0, cfg.slots - games.length)).fill({ title: 'СКОРО' }));

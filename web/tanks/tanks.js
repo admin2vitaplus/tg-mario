@@ -663,6 +663,7 @@ function openLook() {
   window.Looks.open({
     key: LOOK_KEY,
     title: T('look_title'),
+    doneText: T('look_done'),
     groups: LOOK_GROUPS,
     onChange: (sel) => {
       Object.assign(look, sel);
@@ -896,7 +897,7 @@ $('ovShare').addEventListener('click', () => {
   track('share_clicked');
   // ref_<id> lets the bot count who came by this player's link.
   const me = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
-  const link = 'https://t.me/' + BOT_NAME + '?start=' + (me && me.id ? 'ref_' + me.id : 'src_tanks');
+  const link = appLink(me && me.id ? 'ref_' + me.id : 'src_tanks');
   try {
     if (tg && tg.openTelegramLink) {
       tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(shareText));
@@ -947,6 +948,17 @@ const BOT_NAME = (() => {
   name = (name || '').replace(/[^A-Za-z0-9_]/g, '');
   return name || (window.CARTRIDGE && window.CARTRIDGE.bot) || 'yellow_cartridge_bot';
 })();
+
+// A link that opens the collection straight away (the bot's Main Mini App), with
+// a label for the bot's statistics. The menu cannot know the server's address,
+// which changes with every restart of the bot's tunnel, so its name rides along
+// after «__» (see ../menu.js).
+function appLink(label) {
+  let host = '';
+  try { host = new URL(API).hostname; } catch (e) { /* no server */ }
+  const m = /^([a-z0-9-]{1,63})\.trycloudflare\.com$/.exec(host);
+  return 'https://t.me/' + BOT_NAME + '?startapp=' + label + (m ? '__' + m[1] : '');
+}
 
 let mode = 'local'; // local | host | guest
 let view = null;    // what the guest draws
@@ -1244,7 +1256,7 @@ $('btnJoin').addEventListener('click', () => { audio(); joinRoom($('code').value
 $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($('code').value); });
 $('btnInvite').addEventListener('click', () => {
   // The bot answers /start tanks_<code> with a button that opens the game inside Telegram.
-  const link = 'https://t.me/' + BOT_NAME + '?start=room_' + net.code;
+  const link = appLink('room_' + net.code);
   const text = T('invite_text', { code: net.code });
   track('invite_created', net.code);
   try {

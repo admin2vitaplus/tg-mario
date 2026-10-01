@@ -9,7 +9,11 @@ import { createEconomy, loadEconomy } from "./economy.js";
 // Вынесено отдельно, чтобы запуск и остановку можно было проверить тестом без сети и токена.
 // notify(userId, text, { offText }) — сообщение игроку от бота (итоги недели); без него сообщений нет.
 export async function startApp({ env = process.env, botToken, onAchievements, notify = null, port, tanksLimits } = {}) {
-  const gameUrl = env.WEBAPP_URL || "https://admin2vitaplus.github.io/tg-mario/";
+  // Адрес игры не вшит в код: он задаётся в .env, чтобы переезд сайта не требовал правки бота.
+  const gameUrl = env.WEBAPP_URL;
+  if (!gameUrl || !/^https?:\/\//.test(gameUrl)) {
+    throw new Error("Не задан WEBAPP_URL — адрес игры (Mini App). Впишите его в .env, например WEBAPP_URL=https://<сайт игры>/");
+  }
   const allowedOrigins = (env.ALLOWED_ORIGINS || new URL(gameUrl).origin).split(",").map((s) => s.trim()).filter(Boolean);
   const dbFile = env.DB_FILE || "scores.db";
 

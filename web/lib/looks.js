@@ -11,7 +11,8 @@
 // shown before the shop list has loaded.
 //
 //   Looks.load(key, groups)             -> { groupId: itemId }
-//   Looks.open({ key, title, groups, onChange(sel, groupId), onClose(sel, changed) })
+//   Looks.open({ key, title, doneText, groups, onChange(sel, groupId), onClose(sel, changed) })
+//   title and doneText default to «ВНЕШНИЙ ВИД» and «Готово».
 //   group: { id, title, items: [{ id, name, stars, draw(ctx, size) }] }
 (() => {
 'use strict';
@@ -65,8 +66,9 @@ function open(opts) {
   panel = document.createElement('div');
   const mine = panel;
   panel.className = 'looks';
-  panel.innerHTML = `<h1>${opts.title || 'ВНЕШНИЙ ВИД'}</h1><div class="looksBody"></div>` +
-    '<button class="looksDone">Готово</button>';
+  panel.innerHTML = '<h1></h1><div class="looksBody"></div><button class="looksDone"></button>';
+  panel.querySelector('h1').textContent = opts.title || 'ВНЕШНИЙ ВИД';
+  panel.querySelector('.looksDone').textContent = opts.doneText || 'Готово';
   const body = panel.querySelector('.looksBody');
   // Previews can depend on other choices (a backdrop at night), so all are redrawn on a change.
   const previews = [];

@@ -16,7 +16,8 @@ const MATCH_DEDUP_MS = 60_000;
 // Метка источника из ?start= бота или startapp= Mini App:
 // src_<метка> — реклама/площадка, ref_<id> — личное приглашение, room_<код> (и старое tanks_<код>) — комната.
 export function parseStart(payload) {
-  const p = String(payload || "").trim();
+  // Ссылки startapp из игр несут после «__» имя туннеля сервера — для статистики оно не нужно.
+  const p = String(payload || "").trim().replace(/__[a-z0-9-]{1,63}$/, "");
   let m;
   if ((m = /^src_([A-Za-z0-9-]{1,32})$/.exec(p))) return { source: `src_${m[1].toLowerCase()}`, ref: null };
   if ((m = /^ref_(\d{1,15})$/.exec(p))) return { source: "ref", ref: m[1] };
