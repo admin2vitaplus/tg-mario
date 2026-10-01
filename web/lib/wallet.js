@@ -24,6 +24,8 @@ const STR = {
     close: 'Закрыть', loading: 'Загрузка…',
     offline: 'Сервер сейчас недоступен. Попробуйте позже.',
     moved: 'сервер переехал — открыть заново',
+    not_ready: 'Жетоны появятся, когда сервер обновится до новой версии.',
+    expired: 'Игра открыта слишком давно, и Telegram больше не подтверждает вход. Откройте её заново.',
     moved_long: 'Сервер перезапустился и сменил адрес, а игра открыта по старой ссылке.',
     reopen: 'Открыть игру заново',
     balance: 'Баланс: {n}',
@@ -55,6 +57,8 @@ const STR = {
     close: 'Close', loading: 'Loading…',
     offline: 'The server is not reachable right now. Try again later.',
     moved: 'server moved — reopen',
+    not_ready: 'Tickets will appear once the server is updated.',
+    expired: 'The game has been open too long and Telegram no longer confirms who you are. Open it again.',
     moved_long: 'The server restarted at a new address, and the game was opened by an old link.',
     reopen: 'Open the game again',
     balance: 'Balance: {n}',
@@ -233,11 +237,16 @@ function show(tab) {
   if (me && info) render(body);
   else body.innerHTML = `<p class="wNote">${esc(T('loading'))}</p>`;
   refresh().then(() => { if (panel && current === tab) render(body); })
-    .catch(() => {
+    .catch((e) => {
       if (!panel || me) return;
-      body.innerHTML = server.online === false && botName
-        ? `<p class="wNote">${esc(T('moved_long'))}</p><button class="wAct" data-act="reopen">${esc(T('reopen'))}</button>`
-        : `<p class="wNote">${esc(T('offline'))}</p>`;
+      // Which of the failures it was, so the player (and whoever reads the report) can tell.
+      let html = `<p class="wNote">${esc(T('offline'))}</p>`;
+      if (server.online === false && botName) {
+        html = `<p class="wNote">${esc(T('moved_long'))}</p><button class="wAct" data-act="reopen">${esc(T('reopen'))}</button>`;
+      } else if (e && e.status === 404) html = `<p class="wNote">${esc(T('not_ready'))}</p>`;
+      else if (e && e.status === 401) html = `<p class="wNote">${esc(T('expired'))}</p>` +
+        (botName ? `<button class="wAct" data-act="reopen">${esc(T('reopen'))}</button>` : '');
+      body.innerHTML = html + `<p class="wNote wCode">${esc(e && e.status ? 'HTTP ' + e.status : (e && e.message) || '')}</p>`;
     });
 }
 
