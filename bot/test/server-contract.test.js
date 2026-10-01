@@ -139,3 +139,14 @@ test("logs never contain the token or Telegram signatures", () => {
   assert.ok(!line.includes("%7B%22id"), line);
   assert.ok(!line.includes("auth_date%3D1"), line);
 });
+
+test("rate limiter memory stays bounded and expires old keys", async () => {
+  const { createRateLimiter } = await import("../ratelimit.js");
+  const clock = { t: 0 };
+  const rl = createRateLimiter({ limit: 1, windowMs: 1000, maxKeys: 100, now: () => clock.t });
+  for (let i = 0; i < 10_000; i++) rl.take(`ip${i}`);
+  assert.ok(rl.size <= 100);
+  clock.t += 1001;
+  rl.take("fresh");
+  assert.equal(rl.size, 1);
+});
