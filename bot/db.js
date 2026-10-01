@@ -1,9 +1,11 @@
 import { DatabaseSync } from "node:sqlite";
 
-export function openDb(file) {
-  const db = new DatabaseSync(file);
-  db.exec(`
-    PRAGMA journal_mode = WAL;
+// Миграции только вперёд: каждая выполняется один раз, номер последней хранится
+// в PRAGMA user_version. Старые миграции не меняются, новые добавляются в конец.
+// Версия 1 — исходная схема; базы, созданные до появления миграций, имеют user_version 0
+// и те же таблицы, поэтому версия 1 написана через IF NOT EXISTS.
+export const MIGRATIONS = [
+  `
     CREATE TABLE IF NOT EXISTS players (
       id INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
@@ -41,7 +43,32 @@ export function openDb(file) {
       PRIMARY KEY (player_id, code)
     );
     CREATE INDEX IF NOT EXISTS players_best ON players(best_score DESC);
-  `);
+  `,
+];
+
+export function migrate(db) {
+  const from = db.prepare("PRAGMA user_version").get().user_version;
+  if (from > MIGRATIONS.length) {
+    throw new Error(`База новее кода (версия ${from}, код знает ${MIGRATIONS.length}). Обновите бота.`);
+  }
+  for (let v = from; v < MIGRATIONS.length; v++) {
+    db.exec("BEGIN");
+    try {
+      db.exec(MIGRATIONS[v]);
+      db.exec(`PRAGMA user_version = ${v + 1}`);
+      db.exec("COMMIT");
+    } catch (err) {
+      db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+  return { from, to: MIGRATIONS.length };
+}
+
+export function openDb(file) {
+  const db = new DatabaseSync(file);
+  db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
+  const version = migrate(db);
 
   const q = {
     upsertPlayer: db.prepare(`
@@ -67,6 +94,8 @@ export function openDb(file) {
 
   return {
     db,
+    version,
+    close: () => db.close(),
     touchPlayer(user) {
       const name = [user.first_name, user.last_name].filter(Boolean).join(" ").slice(0, 64) || "Игрок";
       q.upsertPlayer.run(user.id, name, user.username ?? null, Date.now());

@@ -1,42 +1,39 @@
 import { Bot, InlineKeyboard } from "grammy";
-import { openDb } from "./db.js";
 import { ACHIEVEMENTS } from "./achievements.js";
-import { createApiServer } from "./server.js";
-import { attachTanksRooms } from "./tanks-rooms.js";
+import { startApp } from "./app.js";
 import { startTunnel } from "./tunnel.js";
+import { addSecret, installSafeConsole } from "./log.js";
+
+installSafeConsole();
 
 const token = process.env.BOT_TOKEN;
 if (!token) {
   console.error("Не задан BOT_TOKEN. Скопируйте .env.example в .env и впишите токен.");
   process.exit(1);
 }
-
-const baseGameUrl = process.env.WEBAPP_URL || "https://admin2vitaplus.github.io/tg-mario/";
-const port = Number(process.env.API_PORT) || 8080;
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || new URL(baseGameUrl).origin).split(",").map((s) => s.trim());
+addSecret(token);
 
 const bot = new Bot(token);
-const store = openDb(process.env.DB_FILE || "scores.db");
 
 // ---------- Сервер очков ----------
-const server = createApiServer({
-  store,
+const app = await startApp({
   botToken: token,
-  allowedOrigins,
   onAchievements: (userId, list) =>
     bot.api
       .sendMessage(userId, "Новые достижения!\n" + list.map((a) => `${a.icon} ${a.title}: ${a.text}`).join("\n"))
       .catch(() => {}),
 });
-attachTanksRooms(server, { allowedOrigins });
-await new Promise((ok) => server.listen(port, ok));
-console.log(`Сервер очков слушает порт ${port}`);
+const { store } = app;
+const baseGameUrl = app.gameUrl;
+console.log(`Сервер очков слушает порт ${app.port}, коммит ${app.commit}`);
 
 // Публичный https-адрес сервера: свой домен (PUBLIC_API_URL) или бесплатный туннель.
 let apiUrl = process.env.PUBLIC_API_URL || "";
+let tunnel = null;
 if (!apiUrl && process.env.TUNNEL !== "off") {
   try {
-    apiUrl = await startTunnel(port, process.env.CLOUDFLARED || "cloudflared");
+    tunnel = await startTunnel(app.port, process.env.CLOUDFLARED || "cloudflared");
+    apiUrl = tunnel.url;
     console.log(`Туннель: ${apiUrl}`);
   } catch (err) {
     console.warn(`Туннель не запущен: ${err.message}.`);
@@ -49,6 +46,23 @@ if (!apiUrl) {
       "!!! Установите cloudflared (см. bot/README.md) или впишите PUBLIC_API_URL в .env и перезапустите бота.\n",
   );
 }
+
+// Штатная остановка (systemd шлёт SIGTERM): бот, HTTP и WebSocket, туннель, база.
+let stopping = false;
+async function shutdown(signal) {
+  if (stopping) return;
+  stopping = true;
+  console.log(`Получен ${signal}, останавливаюсь…`);
+  const force = setTimeout(() => process.exit(1), 10_000);
+  force.unref();
+  try {
+    await Promise.allSettled([bot.isRunning() ? bot.stop() : null, app.close(), tunnel?.stop()]);
+  } finally {
+    process.exit(0);
+  }
+}
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => shutdown("SIGINT"));
 
 // Адрес сервера передаётся игре в ссылке, поэтому при смене туннеля ничего не надо перенастраивать.
 const withApi = (url) => {
