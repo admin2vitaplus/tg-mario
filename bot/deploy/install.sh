@@ -10,7 +10,7 @@
 #   sudo bash install.sh
 # Повторный запуск обновляет код этой же установки; токен спрашивается только в первый раз.
 #
-# Переменные: BRANCH (по умолчанию main), BOT_TOKEN, WEBAPP_URL,
+# Переменные: BRANCH (по умолчанию main), BOT_TOKEN, WEBAPP_URL, CPU_QUOTA (по умолчанию 50%),
 #   PUBLIC_API_URL — свой https-адрес сервера (если есть домен); без него ставится
 #   бесплатный туннель Cloudflare, и адрес выдаётся автоматически при каждом запуске.
 set -euo pipefail
@@ -67,13 +67,19 @@ if ! node_ok; then
   curl -fsSL -o "$TMP/SHASUMS256.txt" "$base/SHASUMS256.txt"
   file="$(grep -oE "node-v[0-9.]+-linux-${NODE_ARCH}\.tar\.xz" "$TMP/SHASUMS256.txt" | head -1)"
   [ -n "$file" ] || die "не нашёл сборку Node.js для linux-${NODE_ARCH}."
-  echo "Устанавливаю ${file%.tar.xz}…"
-  curl -fsSL -o "$TMP/$file" "$base/$file"
-  (cd "$TMP" && grep " $file\$" SHASUMS256.txt | sha256sum -c --quiet -) || die "контрольная сумма Node.js не совпала."
-  rm -rf /opt/node && mkdir -p /opt/node
-  tar -xJf "$TMP/$file" -C /opt/node --strip-components=1
-  ln -sf /opt/node/bin/node /usr/local/bin/node
-  ln -sf /opt/node/bin/npm /usr/local/bin/npm
+  dir="/opt/${file%.tar.xz}"
+  if [ ! -x "$dir/bin/node" ]; then
+    echo "Устанавливаю ${file%.tar.xz}…"
+    curl -fsSL -o "$TMP/$file" "$base/$file"
+    (cd "$TMP" && grep " $file\$" SHASUMS256.txt | sha256sum -c --quiet -) || die "контрольная сумма Node.js не совпала."
+    mkdir -p "$dir.tmp"
+    tar -xJf "$TMP/$file" -C "$dir.tmp" --strip-components=1
+    mv "$dir.tmp" "$dir"
+  fi
+  # Каждая версия в своей папке; переключаем только ссылки, чужие файлы не трогаем.
+  ln -sfn "$dir" /opt/node-current
+  ln -sf /opt/node-current/bin/node /usr/local/bin/node
+  ln -sf /opt/node-current/bin/npm /usr/local/bin/npm
   hash -r
 fi
 node_ok || die "не удалось поставить Node.js 22.13+."
@@ -116,6 +122,7 @@ fi
 
 cd "$APP_DIR/src/bot"
 # Без root и без скриптов пакетов: зависимостям бота они не нужны.
+# Тесты ниже идут от пользователя службы, но вне песочницы systemd: это наш код из репозитория.
 as_app env PATH="$(dirname "$NODE_BIN"):$PATH" npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 as_app env PATH="$(dirname "$NODE_BIN"):$PATH" npm test >/dev/null || die "тесты бота не прошли, служба не перезапущена."
 
@@ -158,6 +165,7 @@ Restart=always
 RestartSec=5
 
 MemoryMax=300M
+CPUQuota=${CPU_QUOTA:-50%}
 TasksMax=64
 NoNewPrivileges=yes
 PrivateTmp=yes
@@ -174,6 +182,8 @@ LockPersonality=yes
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 CapabilityBoundingSet=
 SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
 
 [Install]
 WantedBy=multi-user.target
