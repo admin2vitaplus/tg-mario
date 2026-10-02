@@ -26,6 +26,8 @@ function grid(W) {
     plants: [],
     // Text painted on the level: center tile x, row, text.
     signs: [],
+    // Castle maze: crossing x with the feet outside rows sends the hero back to (back, backY).
+    loops: [],
     pipe(x, h) {
       const top = 13 - h;
       put(x, top, '['); put(x + 1, top, ']');
@@ -61,7 +63,7 @@ function grid(W) {
     },
     area(x0, x1, tiles, sky, scenery = 'none') { L.areas.push({ x0, x1, tiles, sky, scenery }); },
     done(extra) {
-      return Object.assign({ grid: g, W, H, areas: L.areas, pipes: L.pipes, lifts: L.lifts, plants: L.plants, signs: L.signs }, extra);
+      return Object.assign({ grid: g, W, H, areas: L.areas, pipes: L.pipes, lifts: L.lifts, plants: L.plants, signs: L.signs, loops: L.loops }, extra);
     },
   };
   return L;
@@ -350,5 +352,6 @@ const LEVELS = [
   { name: 'ЗАМОК', build: levelCastle, time: 300 },
 ];
 
-window.PrygLevels = { LEVELS, grid };
+// World 1; worlds.js adds worlds 2-4.
+window.PrygLevels = { LEVELS, WORLDS: [LEVELS], grid };
 })();

@@ -503,6 +503,84 @@ function makeTextures(scene) {
     '.......NG.......',
     ...STEM,
   ]);
+  // Worlds 2-4: fish, springboard, bolt thrower and its bolts, cloud rider, spiky eggs and spikies.
+  const FISH = [
+    '.......RRR......',
+    '....RRRRRRRR....',
+    '..RRWWRRRRRRR.RR',
+    '.RRWKWRRRRRRRRRR',
+    'RRRWWRRRRRRRRRR.',
+    'RRRRRRRRRRRRRR..',
+    '.YYRRRRRRRRRRRRR',
+    '..YYYYRRRRRR..RR',
+    '....YYYYY.......',
+  ];
+  pix(scene, 'fish0', FISH);
+  pix(scene, 'fish1', FISH.map((r, i) => (i === 2 || i === 7 ? r.slice(0, 13) + '...' : i === 3 || i === 6 ? r.slice(0, 14) + 'RR' : r)));
+  const coil = ['..KKKKKKKKKKKK..', '...WWWWWWWWWW...'];
+  const plate = ['RRRRRRRRRRRRRRRR', 'RFFFFFFFFFFFFFFR', 'RRRRRRRRRRRRRRRR'];
+  const base = ['.KKKKKKKKKKKKKK.', 'KKKKKKKKKKKKKKKK'];
+  pix(scene, 'spring0', [...plate, ...coil, ...coil, ...coil, ...coil, ...coil, '..KKKKKKKKKKKK..', ...base]);
+  pix(scene, 'spring1', [...Array(8).fill('................'), ...plate, ...coil, '..KKKKKKKKKKKK..', ...base]);
+  const grey = Object.assign({}, PAL, { A: '#a8a8b0', I: '#f0f0f8' });
+  const THROWER = [
+    '.....GGGGGG.....',
+    '....GLLGGLLG....',
+    '...GGGGGGGGGG...',
+    '...GWKGGGGWKG...',
+    '...SSSSSSSSSS...',
+    '....SSKKKKSS....',
+    '....GGGGGGGG....',
+    '...GGLLGGLLGG...',
+    '..GGGGGGGGGGGG..',
+    '..GYYYYYYYYYYG..',
+    '..GYYYYYYYYYYG..',
+    '..GGGGGGGGGGGG..',
+    '...YYY....YYY...',
+    '..KKKK....KKKK..',
+  ];
+  pix(scene, 'thrower0', [
+    '..............AA', '.............AIA', '............SAA.', '...........SS...', ...THROWER,
+  ], 1, grey);
+  pix(scene, 'thrower1', [
+    '................', '................', '................', '................',
+    ...THROWER.map((r, i) => (i === 7 || i === 8 ? r.slice(0, 13) + 'SSA' : r)),
+  ], 1, grey);
+  pix(scene, 'bolt', ['..AAAA..', '.AIIIAA.', 'AIAKKAAA', 'AIK..KAA', 'AAK..KAA', 'AAAKKAAA', '.AAAAAA.', '..AAAA..'], 1, grey);
+  pix(scene, 'rider', [
+    '.....LLLLLL.....',
+    '....LLGGGGLL....',
+    '...LLWWLLWWLL...',
+    '...LWKKLLKKWL...',
+    '...LLWWLLWWLL...',
+    '....LLLLLLLL....',
+    '....LYYYYYYL....',
+    '..WWWLYYYYLWWW..',
+    '.WWWWWWWWWWWWWW.',
+    'WWWWWWWWWWWWWWWW',
+    'WWWKWWWWWWWWKWWW',
+    'WWWWKKKKKKKKWWWW',
+    '.WWWWWWWWWWWWWW.',
+    '..WWW..WW..WWW..',
+  ]);
+  pix(scene, 'egg', ['................', '................', '................', '................',
+    '......W.W.......', '.....RRRRR......', '...WRRWRRRRW....', '....RRRRRRR.....', '...WRRRRRRRRW...',
+    '....RRRRRRRR....', '...WRRRRRRRW....', '.....RRRRR......', '......W.W.......', '................', '................', '................']);
+  const SPIKY = [
+    '...W...W...W....',
+    '..WRW.WRW.WRW...',
+    '..RRRRRRRRRRR...',
+    '.RRWRRRRWRRRRR..',
+    '.RRRRRRRRRRRRRR.',
+    'WRRRRWRRRRRWRRRW',
+    '.RRRRRRRRRRRRRR.',
+    '.SSSSSSSSSSSSSS.',
+    'SSKWSSSSSSSSSSSS',
+    'SSKKSSSSSSSSSSS.',
+    '.SSSSSSSSSSSSS..',
+  ];
+  pix(scene, 'spiky0', ['................', '................', '................', ...SPIKY, '..KK.......KK...', '.KKK......KKK...']);
+  pix(scene, 'spiky1', ['................', '................', '................', ...SPIKY, '...KK.....KK....', '...KKK....KKK...']);
   pix(scene, 'arrow', ['.WWWWW.', '.WWWWW.', 'WWWWWWW', '.WWWWW.', '..WWW..', '...W...']);
 
   for (const [key, colors] of Object.entries(TILESETS)) drawTiles(scene, key, colors);
@@ -513,14 +591,15 @@ function makeTextures(scene) {
 const T = {
   GROUND: 0, BRICK: 1, BONUS: 2, USED: 3, HARD: 4, PIPE_TL: 5, PIPE_TR: 6, PIPE_L: 7, PIPE_R: 8, POLE: 9, POLE_TOP: 10,
   LAVA_TOP: 11, LAVA: 12, TREE_L: 13, TREE_M: 14, TREE_R: 15, TRUNK: 16, BRIDGE: 17,
-  SIDE_LIP_T: 18, SIDE_LIP_B: 19, SIDE_T: 20, SIDE_B: 21,
+  SIDE_LIP_T: 18, SIDE_LIP_B: 19, SIDE_T: 20, SIDE_B: 21, WATER_TOP: 22, WATER: 23,
 };
 const SOLID = [0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 17, 18, 19, 20, 21];
-const TILE_COUNT = 22;
+const TILE_COUNT = 24;
 // Draw order: scenery, items rising out of blocks, tiles, items, enemies, hero.
 const DEPTH = { SCENERY: -10, SPROUT: -5, TILES: 0, ITEM: 5, ENEMY: 6, HERO: 10 };
 
-// Ground, brick and hard block colors per theme; the rest of the tiles are shared.
+// Ground, brick and hard block colors per theme; the rest of the tiles are shared,
+// except treetops (t: outline, cap, rim, spots; k: trunk, trunk lines) where a theme sets them.
 const TILESETS = {
   tiles: {
     g: ['#c0601c', '#f0a060', '#6b2a08'],
@@ -536,6 +615,20 @@ const TILESETS = {
     g: ['#8c8c8c', '#d8d8d8', '#3c3c3c'],
     b: ['#7c7c7c', '#c8c8c8', '#282828'],
     h: ['#6c6c6c', '#bcbcbc', '#303030', '#848484'],
+  },
+  // Sea floor: sand, and coral for hard blocks.
+  tilesSea: {
+    g: ['#d8b860', '#f8e8a0', '#806020'],
+    b: ['#30a0a0', '#80e0d8', '#105050'],
+    h: ['#e06080', '#f8b0c0', '#801838', '#f08098'],
+  },
+  // Giant mushrooms instead of treetops.
+  tilesMush: {
+    g: ['#c0601c', '#f0a060', '#6b2a08'],
+    b: ['#b85418', '#e89060', '#301000'],
+    h: ['#8a4a20', '#e0a070', '#402008', '#a05a28'],
+    t: ['#401000', '#d84020', '#f8a070', '#f8f0e0'],
+    k: ['#f0d8a0', '#a08050'],
   },
 };
 
@@ -619,21 +712,23 @@ function drawTiles(scene, key, colors) {
   r(12, 11, 11, 2, 1, '#f08030');
 
   // treetop caps (left, middle, right) and the trunk under them
+  const t = colors.t || ['#0a300a', '#30a030', '#80e060', '#107010'];
+  const k = colors.k || ['#b07830', '#603808'];
   for (const i of [13, 14, 15]) {
-    r(i, 0, 0, 16, 16, '#0a300a');
-    r(i, 0, 1, 16, 15, '#30a030');
-    r(i, 0, 1, 16, 2, '#80e060');
-    r(i, 3, 7, 2, 2, '#107010');
-    r(i, 10, 10, 2, 2, '#107010');
+    r(i, 0, 0, 16, 16, t[0]);
+    r(i, 0, 1, 16, 15, t[1]);
+    r(i, 0, 1, 16, 2, t[2]);
+    r(i, 3, 7, 2, 2, t[3]);
+    r(i, 10, 10, 2, 2, t[3]);
   }
   ctx.clearRect(13 * TILE, 0, 3, 3);
   ctx.clearRect(15 * TILE + 13, 0, 3, 3);
-  r(13, 0, 3, 1, 13, '#0a300a');
-  r(15, 15, 3, 1, 13, '#0a300a');
-  r(16, 2, 0, 12, 16, '#b07830');
-  r(16, 2, 0, 1, 16, '#603808');
-  r(16, 13, 0, 1, 16, '#603808');
-  for (const [x, y] of [[5, 2], [9, 7], [6, 12]]) r(16, x, y, 1, 3, '#603808');
+  r(13, 0, 3, 1, 13, t[0]);
+  r(15, 15, 3, 1, 13, t[0]);
+  r(16, 2, 0, 12, 16, k[0]);
+  r(16, 2, 0, 1, 16, k[1]);
+  r(16, 13, 0, 1, 16, k[1]);
+  for (const [x, y] of [[5, 2], [9, 7], [6, 12]]) r(16, x, y, 1, 3, k[1]);
 
   // castle bridge
   r(17, 0, 0, 16, 5, '#e0a070');
@@ -655,6 +750,14 @@ function drawTiles(scene, key, colors) {
   r(21, 0, 0, 16, 13, p[1]);
   r(21, 0, 13, 16, 1, p[0]);
   r(21, 0, 8, 16, 3, p[3]);
+
+  // water surface and water (not solid, drawn over by nothing: the hero sinks through)
+  r(22, 0, 6, 16, 10, '#2050d0');
+  r(22, 0, 4, 16, 2, '#80b0f8');
+  for (const x of [0, 8]) r(22, x + 2, 2, 4, 2, '#80b0f8');
+  r(23, 0, 0, 16, 16, '#2050d0');
+  r(23, 4, 5, 3, 1, '#4078e8');
+  r(23, 10, 11, 3, 1, '#4078e8');
 
   c.refresh();
   for (let i = 0; i < count; i++) c.add(i, 0, i * TILE, 0, TILE, TILE);
@@ -701,20 +804,21 @@ function drawScenery(scene) {
 // H hard block, [ ] pipe lip, { } pipe body, o coin, e enemy, | pole, T pole top,
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
 // ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
-// h hidden block with an extra life, k hidden block with a coin (invisible until hit from below).
+// h hidden block with an extra life, k hidden block with a coin (invisible until hit from below),
+// v water surface, y water, s fish, p springboard, t bolt thrower, n spiky.
 const TILE_OF = {
   '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'L': T.BONUS, 'H': T.HARD, 'r': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
   '~': T.LAVA_TOP, '=': T.LAVA, 'f': T.LAVA_TOP,
   '(': T.TREE_L, '-': T.TREE_M, ')': T.TREE_R, 'i': T.TRUNK, '_': T.BRIDGE,
   'q': T.SIDE_LIP_T, 'w': T.SIDE_LIP_B, 'z': T.SIDE_T, 'x': T.SIDE_B,
+  'v': T.WATER_TOP, 'y': T.WATER,
 };
 
-// Level maps live in levels.js (loaded before this file).
-const LEVELS = window.PrygLevels.LEVELS;
-// Worlds 2-4 replay the same maps with faster enemies, until they get maps of their own.
-const WORLDS = 4;
-const worldSpeed = (w) => 1 + 0.2 * (w - 1);
+// Level maps live in levels.js and worlds.js (loaded before this file): four worlds of four levels.
+const WORLD_MAPS = window.PrygLevels.WORLDS;
+const WORLDS = WORLD_MAPS.length;
+const LEVELS = WORLD_MAPS[0];
 
 // ---------- Looks («Внешний вид») ----------
 // Each item has a stars price for later; everything is free for now.
@@ -964,7 +1068,7 @@ class Play extends Phaser.Scene {
     // Past the checkpoint the hero restarts from it after losing a life.
     this.fromCheckpoint = this.s.checkpoint === this.s.level;
     delete this.s.checkpoint;
-    this.def = LEVELS[this.s.level];
+    this.def = WORLD_MAPS[this.s.world - 1][this.s.level];
     this.s.timeLeft = this.def.time;
     this.big = !!this.s.big;
     delete this.s.big;
@@ -995,6 +1099,10 @@ class Play extends Phaser.Scene {
     const enemySpots = [];
     const ballSpots = [];
     const barSpots = [];
+    const fishSpots = [];
+    const springSpots = [];
+    const throwerSpots = [];
+    const spikySpots = [];
     for (let y = 0; y < lvl.H; y++) {
       for (let x = 0; x < lvl.W; x++) {
         const ch = lvl.grid[y][x];
@@ -1008,6 +1116,10 @@ class Play extends Phaser.Scene {
         if (ch === 'e') enemySpots.push([x, y]);
         if (ch === 'f') ballSpots.push([x, y]);
         if (ch === 'r') barSpots.push([x, y]);
+        if (ch === 's') fishSpots.push([x, y]);
+        if (ch === 'p') springSpots.push([x, y]);
+        if (ch === 't') throwerSpots.push([x, y]);
+        if (ch === 'n') spikySpots.push([x, y]);
       }
     }
 
@@ -1016,19 +1128,23 @@ class Play extends Phaser.Scene {
       const box = [];
       // With scroll factor f an image at X shows at X - f * scrollX, so cover the area's scroll range.
       const span = (f) => [Math.floor(f * ar.x0 * TILE), f * (ar.x1 * TILE - VIEW_W) + VIEW_W];
+      // Night levels of world 3 are dark whatever the «Время суток» look says.
+      const dark = night() || ar.night;
       if (ar.scenery !== 'none') {
-        if (night()) box.push(this.add.image(0, 0, 'stars').setOrigin(0).setScrollFactor(0).setDepth(DEPTH.SCENERY - 1));
+        if (dark) box.push(this.add.image(0, 0, 'stars').setOrigin(0).setScrollFactor(0).setDepth(DEPTH.SCENERY - 1));
         const [a, b] = span(0.5);
         for (let x = a; x < b; x += 190) {
           const cloud = this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5).setDepth(DEPTH.SCENERY);
-          if (night()) cloud.setTint(0x5a6488);
+          if (dark) cloud.setTint(0x5a6488);
           box.push(cloud);
         }
       }
       if (ar.scenery === 'field') {
         const [a, b] = span(0.8);
         for (let x = a; x < b; x += 300) {
-          box.push(this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8).setDepth(DEPTH.SCENERY));
+          const hill = this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8).setDepth(DEPTH.SCENERY);
+          if (ar.night && !night()) hill.setTint(0x6070a0);
+          box.push(hill);
         }
       }
       return box;
@@ -1082,7 +1198,20 @@ class Play extends Phaser.Scene {
       const e = this.enemies.create(x * TILE + 8, y * TILE + 8, 'bug0').setDepth(DEPTH.ENEMY);
       e.body.setSize(14, 14).setOffset(1, 2);
       e.setData('state', 'idle');
+      e.setData('kind', 'bug');
     }
+    for (const [x, y] of throwerSpots) this.addThrower(x, y);
+    for (const [x, y] of spikySpots) this.addSpiky(x * TILE + 8, y * TILE + 8, false);
+
+    // Creatures that fly or swim through walls: fish, bolts, the cloud rider.
+    this.foes = this.physics.add.group();
+    for (const [x, y] of fishSpots) this.addFish(x, y);
+    this.rider = null;
+    this.riderBack = 0;
+    this.leapNext = 0;
+
+    this.springs = this.physics.add.staticGroup();
+    for (const [x, y] of springSpots) this.springs.create(x * TILE + 8, (y + 1) * TILE, 'spring0').setOrigin(0.5, 1).refreshBody();
 
     this.items = this.physics.add.group();
     this.fireballs = this.physics.add.group();
@@ -1100,6 +1229,14 @@ class Play extends Phaser.Scene {
       this.flipEnemy(e);
     });
     this.physics.add.overlap(this.player, this.enemies, (p, e) => this.touchEnemy(e));
+    this.physics.add.collider(this.player, this.springs, (p, sp) => this.bounceSpring(sp));
+    this.physics.add.collider(this.enemies, this.springs);
+    this.physics.add.overlap(this.player, this.foes, (p, f) => this.touchFoe(f));
+    this.physics.add.overlap(this.fireballs, this.foes, (fb, f) => {
+      if (!f.getData('burns') || f.getData('state') === 'dead') return;
+      fb.destroy();
+      this.killFoe(f);
+    });
     this.physics.add.overlap(this.player, this.coinItems, (p, c) => { c.destroy(); this.gainCoin(); });
     this.physics.add.overlap(this.player, this.items, (p, it) => {
       if (!it.body.enable) return;
@@ -1143,6 +1280,7 @@ class Play extends Phaser.Scene {
     this.setArea(startArea);
     const ar0 = lvl.areas[startArea];
     cam.scrollX = Phaser.Math.Clamp(this.player.x - VIEW_W * 0.42, ar0.x0 * TILE, ar0.x1 * TILE - VIEW_W);
+    this.prevX = this.player.x;
 
     // The physics world outlives scene restarts, so its paused flag does too.
     this.physics.pause();
@@ -1159,7 +1297,8 @@ class Play extends Phaser.Scene {
   setArea(i) {
     this.area = i;
     const ar = this.lvl.areas[i];
-    this.cameras.main.setBackgroundColor(ar.sky === DAY_SKY && night() ? NIGHT_SKY : ar.sky);
+    this.cameras.main.setBackgroundColor(ar.night || (ar.sky === DAY_SKY && night()) ? NIGHT_SKY : ar.sky);
+    this.inWater = !!ar.water;
     this.scenery.forEach((box, j) => box.forEach((img) => img.setVisible(i === j)));
   }
 
@@ -1524,6 +1663,7 @@ class Play extends Phaser.Scene {
     this.updateBoss(time, delta);
     this.updateHazards(delta);
     this.updatePlants(time);
+    this.updateFoes(time, cam);
 
     if (this.dead || this.inPipe) return;
 
@@ -1544,6 +1684,15 @@ class Play extends Phaser.Scene {
       const next = this.lvl.areas.findIndex((ar) => p.x >= ar.x0 * TILE && p.x < ar.x1 * TILE);
       if (next >= 0) { this.setArea(next); cam.scrollX = this.lvl.areas[next].x0 * TILE; }
     }
+    // Castle maze: going on at the wrong height leads back to the last fork.
+    for (const lp of this.lvl.loops || []) {
+      const lx = lp.x * TILE;
+      if (p.x >= lx && this.prevX < lx) {
+        const row = Math.floor((b.bottom - 1) / TILE);
+        if (row < lp.rows[0] || row > lp.rows[1]) { this.loopBack(lp); return; }
+      }
+    }
+    this.prevX = p.x;
     const under = this.layerAt(Math.floor(p.x / TILE)).getTileAtWorldXY(p.x, b.bottom - 4);
     if (under && under.index === T.LAVA_TOP && b.bottom > under.pixelY + 6) { this.die(true); return; }
 
@@ -1564,6 +1713,10 @@ class Play extends Phaser.Scene {
     const up = k.UP.isDown || touch.up;
     const down = k.DOWN.isDown || touch.down;
     const onGround = b.blocked.down || b.touching.down;
+    if (onGround && this.springUntil && time > this.springUntil) {
+      this.springUntil = 0;
+      b.setMaxVelocity(300, 270);
+    }
     if (this.updatePipes(time, down, right && !left, onGround)) return;
     const dt = delta / 1000;
 
@@ -1575,7 +1728,7 @@ class Play extends Phaser.Scene {
     }
 
     // Horizontal movement with inertia.
-    const maxV = run ? 150 : 90;
+    const maxV = this.inWater ? 70 : run ? 150 : 90;
     let target = 0;
     if (this.crouch) target = 0;
     else if (left && !right) target = -maxV;
@@ -1593,16 +1746,30 @@ class Play extends Phaser.Scene {
     // Jump: higher when running, shorter when the button is released early.
     // Jump strength and gravity depend on the speed at take-off, as in classic 8-bit platformers:
     // low gravity while A is held on the way up, heavy gravity otherwise.
-    if (jump && !this.prevJump && onGround) {
-      const speed = Math.abs(b.velocity.x);
-      this.jumpKind = speed < 60 ? 0 : speed < 139 ? 1 : 2;
-      b.setVelocityY(this.jumpKind === 2 ? -300 : -240);
-      SFX.jump();
+    if (this.inWater) {
+      // Under water every press of A is a stroke up; the hero sinks slowly and stays below the surface.
+      if (jump && !this.prevJump) {
+        b.setVelocityY(-150);
+        tone(520, 700, 0.06, 'square', 0.05);
+      }
+      b.setGravityY(260 - WORLD_GRAVITY);
+      if (b.velocity.y > 70) b.setVelocityY(70);
+      if (b.top < 2 * TILE && b.velocity.y < 0) {
+        b.setVelocityY(0);
+        p.y += 2 * TILE - b.top;
+      }
+    } else {
+      if (jump && !this.prevJump && onGround) {
+        const speed = Math.abs(b.velocity.x);
+        this.jumpKind = speed < 60 ? 0 : speed < 139 ? 1 : 2;
+        b.setVelocityY(this.jumpKind === 2 ? -300 : -240);
+        SFX.jump();
+      }
+      const [holdG, fallG] = JUMP_GRAVITY[this.jumpKind || 0];
+      const g = b.velocity.y < 0 && jump ? holdG : fallG;
+      b.setGravityY(g - WORLD_GRAVITY);
     }
     this.prevJump = jump;
-    const [holdG, fallG] = JUMP_GRAVITY[this.jumpKind || 0];
-    const g = b.velocity.y < 0 && jump ? holdG : fallG;
-    b.setGravityY(g - WORLD_GRAVITY);
 
     this.checkHidden(b);
 
@@ -1642,17 +1809,215 @@ class Play extends Phaser.Scene {
 
   updateEnemies(time, cam) {
     for (const e of this.enemies.getChildren().slice()) {
+      if (e.y > VIEW_H + 32) { e.destroy(); continue; }
       const st = e.getData('state');
+      const kind = e.getData('kind');
+      if (kind === 'thrower') { this.updateThrower(e, time, cam); continue; }
       if (st === 'idle' && e.x < cam.scrollX + VIEW_W + 24 && e.x > cam.scrollX - 24) {
         e.setData('state', 'walk');
-        e.body.setVelocityX(-30 * worldSpeed(this.s.world));
+        e.body.setVelocityX(kind === 'spiky' && this.player.x > e.x ? 30 : -30);
       } else if (st === 'walk') {
-        if (e.body.blocked.left) e.body.setVelocityX(30 * worldSpeed(this.s.world));
-        else if (e.body.blocked.right) e.body.setVelocityX(-30 * worldSpeed(this.s.world));
-        e.setTexture('bug' + (Math.floor(time / 200) % 2));
+        const b = e.body;
+        if (kind === 'spiky' && e.getData('egg')) {
+          // An egg from the cloud rider hatches when it lands and walks toward the hero.
+          if (!b.blocked.down) continue;
+          e.setData('egg', false);
+          b.setVelocityX(this.player.x < e.x ? -30 : 30);
+        }
+        if (b.blocked.left) b.setVelocityX(30);
+        else if (b.blocked.right) b.setVelocityX(-30);
+        const frame = Math.floor(time / 200) % 2;
+        if (kind === 'spiky') {
+          e.setTexture('spiky' + frame);
+          e.setFlipX(b.velocity.x > 0);
+        } else e.setTexture('bug' + frame);
       }
-      if (e.y > VIEW_H + 32) e.destroy();
     }
+  }
+
+  // ---------- Worlds 2-4: springboards, bolt throwers, spikies, fish, cloud rider ----------
+  bounceSpring(sp) {
+    const b = this.player.body;
+    if (!b.touching.down || this.dead) return;
+    sp.setTexture('spring1');
+    this.time.delayedCall(160, () => sp.setTexture('spring0'));
+    // Holding A on landing throws the hero very high.
+    const high = this.holdingA();
+    // Faster than the usual cap on vertical speed, until the hero lands again.
+    b.setMaxVelocity(300, 480);
+    this.springUntil = this.time.now + 300;
+    b.setVelocityY(high ? -470 : -300);
+    this.jumpKind = 2;
+    tone(300, 900, 0.2, 'square', 0.07);
+  }
+
+  addThrower(x, y) {
+    const e = this.enemies.create(x * TILE + 8, y * TILE + 8, 'thrower1').setDepth(DEPTH.ENEMY);
+    e.body.setSize(12, 14).setOffset(2, 4);
+    e.setData('kind', 'thrower');
+    e.setData('state', 'idle');
+    e.setData('home', e.x);
+    e.setData('jumpAt', 0);
+    e.setData('next', 0);
+  }
+
+  updateThrower(e, time, cam) {
+    const st = e.getData('state');
+    if (st === 'dead') return;
+    const b = e.body;
+    if (st === 'idle') {
+      if (e.x > cam.scrollX + VIEW_W + 24) return;
+      e.setData('state', 'walk');
+      e.setData('next', time + 900);
+      e.setData('jumpAt', time + 2500);
+      b.setVelocityX(-25);
+    }
+    // Paces a step back and forth around its spot, hops now and then, and throws bolts.
+    const home = e.getData('home');
+    if (e.x < home - 20) b.setVelocityX(25);
+    else if (e.x > home + 20 || b.blocked.right) b.setVelocityX(-25);
+    else if (b.blocked.left) b.setVelocityX(25);
+    e.setFlipX(this.player.x < e.x);
+    if (b.blocked.down && time > e.getData('jumpAt')) {
+      e.setData('jumpAt', time + 2500 + Math.random() * 2500);
+      b.setVelocityY(-330);
+    }
+    if (time > e.getData('next')) {
+      e.setData('next', time + 1000 + Math.random() * 1000);
+      e.setTexture('thrower0');
+      this.time.delayedCall(220, () => {
+        if (!e.active || e.getData('state') === 'dead') return;
+        e.setTexture('thrower1');
+        const dir = this.player.x < e.x ? -1 : 1;
+        const f = this.foes.create(e.x + dir * 6, e.y - 12, 'bolt').setDepth(DEPTH.ENEMY);
+        f.body.setSize(6, 6).setOffset(1, 1);
+        f.body.setVelocity(dir * 85, -330);
+        f.setData('kind', 'bolt');
+        f.setData('dir', dir);
+      });
+    }
+  }
+
+  addSpiky(x, y, egg) {
+    const e = this.enemies.create(x, y, egg ? 'egg' : 'spiky0').setDepth(DEPTH.ENEMY);
+    e.body.setSize(14, 14).setOffset(1, 2);
+    e.setData('kind', 'spiky');
+    e.setData('egg', egg);
+    e.setData('state', egg ? 'walk' : 'idle');
+    if (egg) e.body.setVelocity(0, -180);
+    return e;
+  }
+
+  addFish(x, y) {
+    const f = this.foes.create(x * TILE + 8, y * TILE + 8, 'fish0').setDepth(DEPTH.ENEMY);
+    f.body.allowGravity = false;
+    f.body.setSize(14, 8).setOffset(1, 1);
+    f.setData('kind', 'fish');
+    f.setData('state', 'idle');
+    f.setData('burns', true);
+    f.setData('speed', 18 + (x % 3) * 10);
+    f.setData('phase', x);
+  }
+
+  touchFoe(f) {
+    if (this.dead || this.won || f.getData('state') === 'dead') return;
+    const b = this.player.body;
+    if (f.getData('stomp') && !this.inWater && b.velocity.y > 0 && b.bottom <= f.body.top + 8) {
+      this.killFoe(f);
+      b.setVelocityY(-240);
+      this.jumpKind = 0;
+      haptic('light');
+      return;
+    }
+    this.hurt();
+  }
+
+  killFoe(f) {
+    f.setData('state', 'dead');
+    f.setFlipY(true);
+    f.body.checkCollision.none = true;
+    f.body.allowGravity = true;
+    f.body.setVelocity(20, -150);
+    this.addScore(f.getData('kind') === 'rider' ? 1000 : 200);
+    SFX.stomp();
+    if (f === this.rider) {
+      this.rider = null;
+      this.riderBack = this.time.now + 10000;
+    }
+    this.time.delayedCall(1500, () => f.destroy());
+  }
+
+  updateFoes(time, cam) {
+    const lvl = this.lvl;
+    const tx = cam.scrollX / TILE;
+    // Fish leaping out of the water below the bridges.
+    const leap = lvl.leapFish;
+    if (leap && !this.dead && !this.won && tx >= leap.x0 && tx < leap.x1 && time > this.leapNext) {
+      this.leapNext = time + 700 + Math.random() * 1000;
+      const live = this.foes.getChildren().filter((f) => f.getData('kind') === 'leap').length;
+      if (live < 3) {
+        const dir = Math.random() < 0.75 ? 1 : -1;
+        const f = this.foes.create(cam.scrollX + 24 + Math.random() * (VIEW_W - 48), VIEW_H + 8, 'fish0').setDepth(DEPTH.ENEMY);
+        f.body.setSize(14, 8).setOffset(1, 1);
+        f.body.setVelocity(dir * (40 + Math.random() * 50), -(500 + Math.random() * 80));
+        f.setFlipX(dir > 0);
+        f.setData('kind', 'leap');
+        f.setData('burns', true);
+        f.setData('stomp', true);
+      }
+    }
+    // The cloud rider follows the hero and drops spiky eggs; it comes back a while after a hit.
+    const ride = lvl.rider;
+    if (ride && !this.rider && !this.dead && time > this.riderBack && tx >= ride.x0 && tx < ride.x1) {
+      const r = this.foes.create(cam.scrollX + VIEW_W + 16, 40, 'rider').setDepth(DEPTH.ENEMY);
+      r.body.allowGravity = false;
+      r.body.setSize(12, 12).setOffset(2, 1);
+      r.setData('kind', 'rider');
+      r.setData('burns', true);
+      r.setData('stomp', true);
+      r.setData('next', time + 1500);
+      this.rider = r;
+    }
+    for (const f of this.foes.getChildren().slice()) {
+      const kind = f.getData('kind');
+      if (f.y > VIEW_H + 48 || f.x < cam.scrollX - 64 || (kind !== 'fish' && f.x > cam.scrollX + VIEW_W + 64)) {
+        if (f === this.rider) this.rider = null;
+        f.destroy();
+        continue;
+      }
+      if (f.getData('state') === 'dead') continue;
+      if (kind === 'fish') {
+        if (f.getData('state') === 'idle') {
+          if (f.x > cam.scrollX + VIEW_W + 16) continue;
+          f.setData('state', 'swim');
+        }
+        f.body.setVelocity(-f.getData('speed'), Math.cos(time / 500 + f.getData('phase')) * 12);
+        f.setTexture('fish' + (Math.floor(time / 250) % 2));
+      } else if (kind === 'leap') {
+        f.setTexture('fish' + (Math.floor(time / 150) % 2));
+      } else if (kind === 'bolt') {
+        f.angle += f.getData('dir') * 15;
+      } else if (kind === 'rider') {
+        if (tx >= ride.x1) { f.body.setVelocity(-140, 0); continue; }
+        const want = this.player.x + Math.sin(time / 900) * 70;
+        f.body.setVelocity(Phaser.Math.Clamp((want - f.x) * 2, -130, 130), 0);
+        if (time > f.getData('next')) {
+          f.setData('next', time + 2400 + Math.random() * 1600);
+          const eggs = this.enemies.getChildren().filter((e) => e.getData('kind') === 'spiky').length;
+          if (eggs < 5) this.addSpiky(f.x, f.y + 8, true);
+        }
+      }
+    }
+  }
+
+  loopBack(lp) {
+    const p = this.player;
+    const cam = this.cameras.main;
+    const ar = this.lvl.areas[this.area];
+    p.body.reset(lp.back * TILE + 8, lp.backY * TILE);
+    this.prevX = p.x;
+    cam.scrollX = Phaser.Math.Clamp(p.x - VIEW_W * 0.42, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
+    notes([392, 330, 262], 0.09, 0.12);
   }
 
   updateItems() {
@@ -1781,7 +2146,17 @@ class Play extends Phaser.Scene {
   touchEnemy(e) {
     if (this.dead || this.won || e.getData('state') === 'dead') return;
     const b = this.player.body;
-    if (b.velocity.y > 0 && b.bottom <= e.body.top + 8) {
+    const kind = e.getData('kind');
+    // Spikies can't be stomped, and under water nothing can.
+    if (kind !== 'spiky' && !this.inWater && b.velocity.y > 0 && b.bottom <= e.body.top + 8) {
+      if (kind === 'thrower') {
+        this.flipEnemy(e);
+        this.addScore(900);
+        b.setVelocityY(-240);
+        this.jumpKind = 0;
+        haptic('light');
+        return;
+      }
       e.setData('state', 'dead');
       e.setTexture('bugFlat');
       e.body.enable = false;
@@ -1935,7 +2310,7 @@ class Play extends Phaser.Scene {
     this.addScore(this.s.timeLeft * 50);
     let next = this.s.level + 1;
     let world = this.s.world;
-    if (next >= LEVELS.length) { next = 0; world++; }
+    if (next >= WORLD_MAPS[world - 1].length) { next = 0; world++; }
     if (world <= WORLDS) {
       this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, world, big: this.big, fire: this.fire });
     } else {
