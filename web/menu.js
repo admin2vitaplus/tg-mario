@@ -28,6 +28,8 @@ if (tg) {
     || new URLSearchParams(location.search).get('tgWebAppStartParam') || '';
   const m = /^(\w+?)(?:__([a-z0-9-]{1,63}))?$/.exec(start);
   if (!m) return;
+  // Coming back from a game (lib/back.js) the launch link has been followed already.
+  try { if (sessionStorage.getItem('cartridge_start_done')) return; } catch (e) { /* ignore */ }
   const params = new URLSearchParams(location.search);
   const room = /^(?:room|tanks)_(\d{4,8})$/.exec(m[1]);
   if (room && window.CARTRIDGE && window.CARTRIDGE.isEnabled('tanks')) {
@@ -36,6 +38,7 @@ if (tg) {
     // the room page gets the one that answered.
     const server = window.Server;
     const go = () => {
+      try { sessionStorage.setItem('cartridge_start_done', '1'); } catch (e) { /* ignore */ }
       if (server && server.online) params.set('api', server.base);
       location.replace('tanks/?' + params + location.hash);
     };
