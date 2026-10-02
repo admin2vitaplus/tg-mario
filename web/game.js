@@ -166,7 +166,7 @@ function hud(s) {
   $('coins').textContent = '×' + String(s.coins).padStart(2, '0');
   $('lives').textContent = String(s.lives);
   $('time').textContent = String(Math.max(0, s.timeLeft)).padStart(3, '0');
-  $('world').textContent = '1-' + (s.level + 1);
+  $('world').textContent = (s.world || 1) + '-' + (s.level + 1);
 }
 
 function loadBest() {
@@ -456,6 +456,131 @@ function makeTextures(scene) {
     '..UQQQQQQQQU....',
     '..UUUUUUUUUU....',
   ]);
+  // Biting plant in a pipe: a violet bud on a stem; the bud opens and shuts.
+  const STEM = [
+    '.......NG.......',
+    '..LL...NG...LL..',
+    '.LNNL..NG..LNNL.',
+    '.LNNNL.NG.LNNNL.',
+    '..LNNNLNGLNNNL..',
+    '...LNNNNGNNNL...',
+    '....GGNNGNGG....',
+    '.......NG.......',
+    '.......NG.......',
+    '.......NG.......',
+  ];
+  pix(scene, 'plant0', [
+    '....VVVVVVVV....',
+    '...VWVVVVVVWV...',
+    '..VWWVVVVVVWWV..',
+    '..VVVVVVVVVVVV..',
+    '..DWDWDWDWDWDD..',
+    '..KKKKKKKKKKKK..',
+    '..KKKKKKKKKKKK..',
+    '..DWDWDWDWDWDD..',
+    '..VVVVVVVVVVVV..',
+    '...VVVVVVVVVV...',
+    '....VVVVVVVV....',
+    '......VVVV......',
+    '.......NG.......',
+    '.......NG.......',
+    ...STEM,
+  ]);
+  pix(scene, 'plant1', [
+    '................',
+    '................',
+    '....VVVVVVVV....',
+    '...VWVVVVVVWV...',
+    '..VWWVVVVVVWWV..',
+    '..VVVVVVVVVVVV..',
+    '..DWDWDWDWDWDD..',
+    '..VVVVVVVVVVVV..',
+    '...VVVVVVVVVV...',
+    '....VVVVVVVV....',
+    '......VVVV......',
+    '.......NG.......',
+    '.......NG.......',
+    '.......NG.......',
+    ...STEM,
+  ]);
+  // Worlds 2-4: fish, springboard, bolt thrower and its bolts, cloud rider, spiky eggs and spikies.
+  const FISH = [
+    '.......RRR......',
+    '....RRRRRRRR....',
+    '..RRWWRRRRRRR.RR',
+    '.RRWKWRRRRRRRRRR',
+    'RRRWWRRRRRRRRRR.',
+    'RRRRRRRRRRRRRR..',
+    '.YYRRRRRRRRRRRRR',
+    '..YYYYRRRRRR..RR',
+    '....YYYYY.......',
+  ];
+  pix(scene, 'fish0', FISH);
+  pix(scene, 'fish1', FISH.map((r, i) => (i === 2 || i === 7 ? r.slice(0, 13) + '...' : i === 3 || i === 6 ? r.slice(0, 14) + 'RR' : r)));
+  const coil = ['..KKKKKKKKKKKK..', '...WWWWWWWWWW...'];
+  const plate = ['RRRRRRRRRRRRRRRR', 'RFFFFFFFFFFFFFFR', 'RRRRRRRRRRRRRRRR'];
+  const base = ['.KKKKKKKKKKKKKK.', 'KKKKKKKKKKKKKKKK'];
+  pix(scene, 'spring0', [...plate, ...coil, ...coil, ...coil, ...coil, ...coil, '..KKKKKKKKKKKK..', ...base]);
+  pix(scene, 'spring1', [...Array(8).fill('................'), ...plate, ...coil, '..KKKKKKKKKKKK..', ...base]);
+  const grey = Object.assign({}, PAL, { A: '#a8a8b0', I: '#f0f0f8' });
+  const THROWER = [
+    '.....GGGGGG.....',
+    '....GLLGGLLG....',
+    '...GGGGGGGGGG...',
+    '...GWKGGGGWKG...',
+    '...SSSSSSSSSS...',
+    '....SSKKKKSS....',
+    '....GGGGGGGG....',
+    '...GGLLGGLLGG...',
+    '..GGGGGGGGGGGG..',
+    '..GYYYYYYYYYYG..',
+    '..GYYYYYYYYYYG..',
+    '..GGGGGGGGGGGG..',
+    '...YYY....YYY...',
+    '..KKKK....KKKK..',
+  ];
+  pix(scene, 'thrower0', [
+    '..............AA', '.............AIA', '............SAA.', '...........SS...', ...THROWER,
+  ], 1, grey);
+  pix(scene, 'thrower1', [
+    '................', '................', '................', '................',
+    ...THROWER.map((r, i) => (i === 7 || i === 8 ? r.slice(0, 13) + 'SSA' : r)),
+  ], 1, grey);
+  pix(scene, 'bolt', ['..AAAA..', '.AIIIAA.', 'AIAKKAAA', 'AIK..KAA', 'AAK..KAA', 'AAAKKAAA', '.AAAAAA.', '..AAAA..'], 1, grey);
+  pix(scene, 'rider', [
+    '.....LLLLLL.....',
+    '....LLGGGGLL....',
+    '...LLWWLLWWLL...',
+    '...LWKKLLKKWL...',
+    '...LLWWLLWWLL...',
+    '....LLLLLLLL....',
+    '....LYYYYYYL....',
+    '..WWWLYYYYLWWW..',
+    '.WWWWWWWWWWWWWW.',
+    'WWWWWWWWWWWWWWWW',
+    'WWWKWWWWWWWWKWWW',
+    'WWWWKKKKKKKKWWWW',
+    '.WWWWWWWWWWWWWW.',
+    '..WWW..WW..WWW..',
+  ]);
+  pix(scene, 'egg', ['................', '................', '................', '................',
+    '......W.W.......', '.....RRRRR......', '...WRRWRRRRW....', '....RRRRRRR.....', '...WRRRRRRRRW...',
+    '....RRRRRRRR....', '...WRRRRRRRW....', '.....RRRRR......', '......W.W.......', '................', '................', '................']);
+  const SPIKY = [
+    '...W...W...W....',
+    '..WRW.WRW.WRW...',
+    '..RRRRRRRRRRR...',
+    '.RRWRRRRWRRRRR..',
+    '.RRRRRRRRRRRRRR.',
+    'WRRRRWRRRRRWRRRW',
+    '.RRRRRRRRRRRRRR.',
+    '.SSSSSSSSSSSSSS.',
+    'SSKWSSSSSSSSSSSS',
+    'SSKKSSSSSSSSSSS.',
+    '.SSSSSSSSSSSSS..',
+  ];
+  pix(scene, 'spiky0', ['................', '................', '................', ...SPIKY, '..KK.......KK...', '.KKK......KKK...']);
+  pix(scene, 'spiky1', ['................', '................', '................', ...SPIKY, '...KK.....KK....', '...KKK....KKK...']);
   pix(scene, 'arrow', ['.WWWWW.', '.WWWWW.', 'WWWWWWW', '.WWWWW.', '..WWW..', '...W...']);
 
   for (const [key, colors] of Object.entries(TILESETS)) drawTiles(scene, key, colors);
@@ -466,14 +591,15 @@ function makeTextures(scene) {
 const T = {
   GROUND: 0, BRICK: 1, BONUS: 2, USED: 3, HARD: 4, PIPE_TL: 5, PIPE_TR: 6, PIPE_L: 7, PIPE_R: 8, POLE: 9, POLE_TOP: 10,
   LAVA_TOP: 11, LAVA: 12, TREE_L: 13, TREE_M: 14, TREE_R: 15, TRUNK: 16, BRIDGE: 17,
-  SIDE_LIP_T: 18, SIDE_LIP_B: 19, SIDE_T: 20, SIDE_B: 21,
+  SIDE_LIP_T: 18, SIDE_LIP_B: 19, SIDE_T: 20, SIDE_B: 21, WATER_TOP: 22, WATER: 23,
 };
 const SOLID = [0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 17, 18, 19, 20, 21];
-const TILE_COUNT = 22;
+const TILE_COUNT = 24;
 // Draw order: scenery, items rising out of blocks, tiles, items, enemies, hero.
 const DEPTH = { SCENERY: -10, SPROUT: -5, TILES: 0, ITEM: 5, ENEMY: 6, HERO: 10 };
 
-// Ground, brick and hard block colors per theme; the rest of the tiles are shared.
+// Ground, brick and hard block colors per theme; the rest of the tiles are shared,
+// except treetops (t: outline, cap, rim, spots; k: trunk, trunk lines) where a theme sets them.
 const TILESETS = {
   tiles: {
     g: ['#c0601c', '#f0a060', '#6b2a08'],
@@ -489,6 +615,20 @@ const TILESETS = {
     g: ['#8c8c8c', '#d8d8d8', '#3c3c3c'],
     b: ['#7c7c7c', '#c8c8c8', '#282828'],
     h: ['#6c6c6c', '#bcbcbc', '#303030', '#848484'],
+  },
+  // Sea floor: sand, and coral for hard blocks.
+  tilesSea: {
+    g: ['#d8b860', '#f8e8a0', '#806020'],
+    b: ['#30a0a0', '#80e0d8', '#105050'],
+    h: ['#e06080', '#f8b0c0', '#801838', '#f08098'],
+  },
+  // Giant mushrooms instead of treetops.
+  tilesMush: {
+    g: ['#c0601c', '#f0a060', '#6b2a08'],
+    b: ['#b85418', '#e89060', '#301000'],
+    h: ['#8a4a20', '#e0a070', '#402008', '#a05a28'],
+    t: ['#401000', '#d84020', '#f8a070', '#f8f0e0'],
+    k: ['#f0d8a0', '#a08050'],
   },
 };
 
@@ -572,21 +712,23 @@ function drawTiles(scene, key, colors) {
   r(12, 11, 11, 2, 1, '#f08030');
 
   // treetop caps (left, middle, right) and the trunk under them
+  const t = colors.t || ['#0a300a', '#30a030', '#80e060', '#107010'];
+  const k = colors.k || ['#b07830', '#603808'];
   for (const i of [13, 14, 15]) {
-    r(i, 0, 0, 16, 16, '#0a300a');
-    r(i, 0, 1, 16, 15, '#30a030');
-    r(i, 0, 1, 16, 2, '#80e060');
-    r(i, 3, 7, 2, 2, '#107010');
-    r(i, 10, 10, 2, 2, '#107010');
+    r(i, 0, 0, 16, 16, t[0]);
+    r(i, 0, 1, 16, 15, t[1]);
+    r(i, 0, 1, 16, 2, t[2]);
+    r(i, 3, 7, 2, 2, t[3]);
+    r(i, 10, 10, 2, 2, t[3]);
   }
   ctx.clearRect(13 * TILE, 0, 3, 3);
   ctx.clearRect(15 * TILE + 13, 0, 3, 3);
-  r(13, 0, 3, 1, 13, '#0a300a');
-  r(15, 15, 3, 1, 13, '#0a300a');
-  r(16, 2, 0, 12, 16, '#b07830');
-  r(16, 2, 0, 1, 16, '#603808');
-  r(16, 13, 0, 1, 16, '#603808');
-  for (const [x, y] of [[5, 2], [9, 7], [6, 12]]) r(16, x, y, 1, 3, '#603808');
+  r(13, 0, 3, 1, 13, t[0]);
+  r(15, 15, 3, 1, 13, t[0]);
+  r(16, 2, 0, 12, 16, k[0]);
+  r(16, 2, 0, 1, 16, k[1]);
+  r(16, 13, 0, 1, 16, k[1]);
+  for (const [x, y] of [[5, 2], [9, 7], [6, 12]]) r(16, x, y, 1, 3, k[1]);
 
   // castle bridge
   r(17, 0, 0, 16, 5, '#e0a070');
@@ -608,6 +750,14 @@ function drawTiles(scene, key, colors) {
   r(21, 0, 0, 16, 13, p[1]);
   r(21, 0, 13, 16, 1, p[0]);
   r(21, 0, 8, 16, 3, p[3]);
+
+  // water surface and water (not solid, drawn over by nothing: the hero sinks through)
+  r(22, 0, 6, 16, 10, '#2050d0');
+  r(22, 0, 4, 16, 2, '#80b0f8');
+  for (const x of [0, 8]) r(22, x + 2, 2, 4, 2, '#80b0f8');
+  r(23, 0, 0, 16, 16, '#2050d0');
+  r(23, 4, 5, 3, 1, '#4078e8');
+  r(23, 10, 11, 3, 1, '#4078e8');
 
   c.refresh();
   for (let i = 0; i < count; i++) c.add(i, 0, i * TILE, 0, TILE, TILE);
@@ -654,316 +804,21 @@ function drawScenery(scene) {
 // H hard block, [ ] pipe lip, { } pipe body, o coin, e enemy, | pole, T pole top,
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
 // ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
-// h hidden block with an extra life, k hidden block with a coin (invisible until hit from below).
+// h hidden block with an extra life, k hidden block with a coin (invisible until hit from below),
+// v water surface, y water, s fish, p springboard, t bolt thrower, n spiky.
 const TILE_OF = {
   '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'L': T.BONUS, 'H': T.HARD, 'r': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
   '~': T.LAVA_TOP, '=': T.LAVA, 'f': T.LAVA_TOP,
   '(': T.TREE_L, '-': T.TREE_M, ')': T.TREE_R, 'i': T.TRUNK, '_': T.BRIDGE,
   'q': T.SIDE_LIP_T, 'w': T.SIDE_LIP_B, 'z': T.SIDE_T, 'x': T.SIDE_B,
+  'v': T.WATER_TOP, 'y': T.WATER,
 };
 
-// A level is one wide grid split into areas (the main course, a bonus room, an exit
-// outside). Each area has its own colors and camera limits; pipes move the hero between them.
-function grid(W) {
-  const H = 15;
-  const g = Array.from({ length: H }, () => Array(W).fill('.'));
-  const put = (x, y, ch) => { if (x >= 0 && x < W && y >= 0 && y < H) g[y][x] = ch; };
-  const row = (x, y, s) => { [...s].forEach((ch, i) => { if (ch !== ' ') put(x + i, y, ch); }); };
-  const fill = (x0, x1, y0, y1, ch) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(x, y, ch); };
-  const L = {
-    g, W, H, put, row, fill,
-    areas: [],
-    pipes: [],
-    lifts: [],
-    pipe(x, h) {
-      const top = 13 - h;
-      put(x, top, '['); put(x + 1, top, ']');
-      for (let y = top + 1; y < 13; y++) { put(x, y, '{'); put(x + 1, y, '}'); }
-    },
-    // Pipe lying on its side with the mouth at (x, y..y+1), turning up into the ceiling.
-    sidePipe(x, y, top) {
-      put(x, y, 'q'); put(x, y + 1, 'w');
-      put(x + 1, y, 'z'); put(x + 1, y + 1, 'x');
-      for (let yy = top; yy <= y + 1; yy++) { put(x + 2, yy, '{'); put(x + 3, yy, '}'); }
-    },
-    column(x, h) { for (let y = 13 - h; y < 13; y++) put(x, y, 'H'); },
-    stairsUp(x, n) { for (let i = 0; i < n; i++) L.column(x + i, i + 1); },
-    stairsDown(x, n) { for (let i = 0; i < n; i++) L.column(x + i, n - i); },
-    floor(ch = '#', x0 = 0, x1 = W - 1) { fill(x0, x1, 13, 14, ch); },
-    gap(a, b, lava) {
-      fill(a, b, 13, 14, '.');
-      if (lava) { fill(a, b, 13, 13, '~'); fill(a, b, 14, 14, '='); }
-    },
-    tree(x, w, top) {
-      put(x, top, '(');
-      for (let i = 1; i < w - 1; i++) put(x + i, top, '-');
-      put(x + w - 1, top, ')');
-      const t0 = x + Math.floor((w - 1) / 2);
-      const t1 = w >= 6 ? t0 + 1 : t0;
-      fill(t0, t1, top + 1, 14, 'i');
-    },
-    enemies(xs, y = 12) { for (const x of xs) put(x, y, 'e'); },
-    flagpole(x) {
-      put(x, 3, 'T');
-      for (let y = 4; y < 12; y++) put(x, y, '|');
-      put(x, 12, 'H');
-    },
-    area(x0, x1, tiles, sky, scenery = 'none') { L.areas.push({ x0, x1, tiles, sky, scenery }); },
-    done(extra) { return Object.assign({ grid: g, W, H, areas: L.areas, pipes: L.pipes, lifts: L.lifts }, extra); },
-  };
-  return L;
-}
-
-// 1-1 follows the classic rhythm: first blocks and a berry, four pipes of growing height
-// (the last one leads down to a coin room), a hidden extra life, brick rows high up,
-// block clusters, two pairs of staircases (the second over a pit) and a big staircase to the flag.
-function levelField() {
-  const L = grid(230);
-  const { row, fill, pipe, column, stairsUp, stairsDown, put } = L;
-  L.area(0, 212, 'tiles', '#6b8cff', 'field');
-  L.area(214, 230, 'tilesCave', '#000000');
-  L.floor('#', 0, 211);
-  L.gap(69, 70);
-  L.gap(86, 88);
-  L.gap(153, 154);
-
-  row(16, 9, '?');
-  row(20, 9, 'BMB?B');
-  row(22, 5, '?');
-  pipe(28, 2);
-  pipe(38, 3);
-  pipe(46, 4);
-  pipe(57, 4);
-  put(64, 8, 'h');
-  row(77, 9, 'BMB');
-  row(80, 5, 'BBBBBBBB');
-  row(91, 5, 'BBB?');
-  row(94, 9, 'C');
-  row(100, 9, 'BB');
-  row(106, 9, '?  ?  ?');
-  row(109, 5, 'M');
-  row(118, 9, 'B');
-  row(121, 5, 'BBB');
-  row(128, 5, 'B??B');
-  row(129, 9, 'BB');
-  stairsUp(134, 4);
-  stairsDown(140, 4);
-  stairsUp(148, 4);
-  column(152, 4);
-  stairsDown(155, 4);
-  pipe(163, 2);
-  row(168, 9, 'BB?B');
-  pipe(179, 2);
-  stairsUp(181, 8);
-  column(189, 8);
-  L.flagpole(198);
-
-  L.enemies([22, 40, 51, 53, 97, 99, 107, 114, 116, 124, 126, 128, 130, 174, 176]);
-  L.enemies([81, 83], 4);
-
-  // Coin room under the last tall pipe; its side pipe leads back up through the pipe near the end.
-  L.floor('#', 214, 229);
-  fill(214, 214, 2, 12, 'B');
-  fill(214, 229, 1, 1, 'B');
-  fill(217, 223, 10, 12, 'B');
-  row(217, 9, 'ooooooo');
-  row(217, 8, 'ooooooo');
-  row(218, 6, 'ooooo');
-  L.sidePipe(226, 11, 2);
-  L.pipes.push({ type: 'down', x: 57, y: 9, to: { area: 1, x: 216, y: 3 } });
-  L.pipes.push({ type: 'side', x: 226, y: 11, to: { area: 0, pipeX: 163, pipeY: 11 } });
-
-  return L.done({ goal: 'pole', goalX: 198 });
-}
-
-// Underground: brick ceiling, low passages, lots of coins, lifts over a pit,
-// then a side pipe up to the surface where the flag is.
-function levelCave() {
-  const L = grid(212);
-  const { row, fill, pipe, column, stairsUp } = L;
-  L.area(0, 178, 'tilesCave', '#000000');
-  L.area(180, 212, 'tiles', '#6b8cff', 'field');
-  L.floor('#', 0, 177);
-  fill(0, 0, 1, 12, 'B');
-  fill(6, 175, 1, 1, 'B');
-  L.gap(46, 48);
-  L.gap(98, 100);
-  L.gap(122, 123);
-
-  row(10, 9, 'M?????');
-  row(18, 11, 'oo');
-  stairsUp(27, 4);
-  column(31, 4);
-  column(32, 3);
-  row(28, 6, 'oooo');
-  fill(38, 43, 5, 6, 'B');
-  row(38, 8, 'oooooo');
-  row(39, 6, 'C');
-  row(45, 9, 'BBBBB');
-  fill(52, 53, 2, 8, 'B');
-  row(52, 9, 'CB');
-  row(56, 11, 'oooooo');
-  fill(56, 63, 9, 9, 'B');
-  row(56, 8, 'oooooooo');
-  fill(66, 71, 2, 9, 'B');
-  fill(66, 71, 5, 7, '.');
-  row(66, 6, 'oooooo');
-  row(73, 9, 'B?B');
-  pipe(80, 3);
-  row(84, 6, 'oooo');
-  pipe(88, 4);
-  row(92, 9, 'BMB');
-  fill(94, 97, 3, 3, 'B');
-  row(101, 9, 'BBB');
-  row(101, 8, 'ooo');
-  pipe(106, 2);
-  row(110, 5, 'BBBBBBBBBB');
-  row(110, 9, 'B?BCB?B');
-  row(110, 8, 'ooooooo');
-  column(118, 2);
-  row(125, 9, 'oooo');
-  fill(126, 129, 10, 10, 'H');
-  stairsUp(136, 6);
-  fill(142, 145, 7, 12, 'H');
-  row(142, 6, 'oooo');
-
-  // Pit with two lifts going up and down.
-  L.gap(146, 157);
-  L.lifts.push({ x: 148, y: 8, w: 3, axis: 'y', dist: 4, period: 4, phase: 0 });
-  L.lifts.push({ x: 153, y: 8, w: 3, axis: 'y', dist: 4, period: 4, phase: 0.5 });
-  row(160, 9, 'BB?BB');
-  row(160, 8, 'ooooo');
-  L.sidePipe(170, 11, 2);
-  fill(174, 177, 1, 12, 'H');
-  L.pipes.push({ type: 'side', x: 170, y: 11, to: { area: 1, pipeX: 182, pipeY: 11 } });
-
-  // Outside: exit pipe, stairs and the flag.
-  L.floor('#', 180, 211);
-  pipe(182, 2);
-  stairsUp(188, 8);
-  column(196, 8);
-  L.flagpole(204);
-
-  L.enemies([16, 20, 35, 37, 58, 60, 62, 76, 84, 86, 96, 112, 114, 120, 131, 133, 163, 166]);
-  return L.done({ goal: 'pole', goalX: 204 });
-}
-
-// Treetops: platforms high above a bottomless drop, with lifts between them.
-function levelTrees() {
-  const L = grid(180);
-  const { row, tree } = L;
-  L.area(0, 180, 'tiles', '#6b8cff', 'sky');
-  L.floor('#', 0, 15);
-  tree(17, 4, 11);
-  tree(23, 6, 8);
-  row(24, 5, 'oooo');
-  tree(31, 3, 10);
-  tree(36, 5, 7);
-  tree(44, 7, 9);
-  row(46, 5, '?M?');
-  L.lifts.push({ x: 53, y: 9, w: 3, axis: 'x', dist: 5, period: 4, phase: 0 });
-  tree(61, 5, 7);
-  row(62, 4, 'ooo');
-  tree(69, 4, 10);
-  tree(76, 8, 7);
-  row(77, 4, 'oooooo');
-  L.lifts.push({ x: 87, y: 6, w: 3, axis: 'y', dist: 5, period: 3.5, phase: 0.25 });
-  tree(92, 4, 8);
-  row(93, 6, 'oo');
-  tree(99, 6, 11);
-  row(100, 8, '?  ?');
-  L.lifts.push({ x: 107, y: 9, w: 3, axis: 'x', dist: 4, period: 3.5, phase: 0 });
-  tree(115, 5, 7);
-  row(116, 4, 'ooo');
-  tree(122, 3, 9);
-  tree(128, 6, 7);
-  row(129, 4, 'oooo');
-  L.lifts.push({ x: 136, y: 5, w: 3, axis: 'y', dist: 5, period: 3.5, phase: 0.75 });
-  tree(141, 5, 9);
-  L.floor('#', 148, 179);
-  L.stairsUp(152, 4);
-  L.flagpole(166);
-
-  L.enemies([25], 7);
-  L.enemies([38], 6);
-  L.enemies([46, 48], 8);
-  L.enemies([79, 81], 6);
-  L.enemies([101], 10);
-  L.enemies([130], 6);
-  L.enemies([158, 161]);
-  return L.done({ goal: 'pole', goalX: 166 });
-}
-
-// Castle: lava pits with jumping lava balls, rotating fire bars, and a bridge
-// guarded by a big beetle. Pulling the lever at the far end drops the bridge.
-function levelCastle() {
-  const L = grid(200);
-  const { row, fill, column, put } = L;
-  L.area(0, 200, 'tilesCastle', '#000000');
-  L.floor();
-  fill(0, 145, 0, 2, 'H');
-  fill(0, 5, 8, 12, 'H');
-  fill(6, 15, 9, 12, 'H');
-  L.gap(16, 19, true);
-  put(18, 13, 'f');
-  fill(20, 26, 9, 12, 'H');
-  fill(27, 45, 3, 4, 'H');
-  put(34, 8, 'r');
-  put(30, 9, 'M');
-  L.gap(46, 49, true);
-  put(48, 13, 'f');
-  fill(50, 54, 11, 12, 'H');
-  row(58, 9, '? ? ?');
-  L.gap(66, 69, true);
-  put(67, 13, 'f');
-  fill(70, 73, 10, 12, 'H');
-  put(72, 10, 'r');
-  fill(74, 90, 3, 5, 'H');
-  row(78, 10, 'oooooo');
-  put(86, 12, 'r');
-  L.gap(92, 99, true);
-  fill(95, 96, 10, 14, 'H');
-  put(93, 13, 'f');
-  put(98, 13, 'f');
-  fill(100, 104, 8, 12, 'H');
-  put(104, 8, 'r');
-  row(108, 9, '?M?');
-  column(115, 3);
-  put(115, 10, 'r');
-  L.gap(120, 132, true);
-  fill(123, 125, 11, 14, 'H');
-  fill(128, 130, 9, 14, 'H');
-  put(121, 13, 'f');
-  put(126, 13, 'f');
-  put(131, 13, 'f');
-  fill(133, 145, 3, 4, 'H');
-  fill(133, 135, 10, 12, 'H');
-  put(134, 10, 'r');
-
-  // Boss room: a bridge over lava, the lever behind it.
-  fill(146, 199, 0, 3, 'H');
-  fill(146, 149, 9, 12, 'H');
-  L.gap(150, 165, true);
-  fill(150, 165, 9, 9, '_');
-  fill(166, 172, 9, 14, 'H');
-  fill(173, 199, 4, 12, 'H');
-
-  L.enemies([12, 24], 8);
-  L.enemies([40, 42, 56, 64, 80, 84, 110, 112, 140, 144]);
-  return L.done({
-    goal: 'lever', goalX: 167, start: [3, 8],
-    bridge: { x0: 150, x1: 165, y: 9 },
-    boss: { x: 161, min: 153, max: 164 },
-  });
-}
-
-const LEVELS = [
-  { name: 'ПОЛЕ', build: levelField, time: 400 },
-  { name: 'ПОДЗЕМЕЛЬЕ', build: levelCave, time: 400 },
-  { name: 'ВЕРХУШКИ ДЕРЕВЬЕВ', build: levelTrees, time: 300 },
-  { name: 'ЗАМОК', build: levelCastle, time: 300 },
-];
+// Level maps live in levels.js and worlds.js (loaded before this file): four worlds of four levels.
+const WORLD_MAPS = window.PrygLevels.WORLDS;
+const WORLDS = WORLD_MAPS.length;
+const LEVELS = WORLD_MAPS[0];
 
 // ---------- Looks («Внешний вид») ----------
 // Each item has a stars price for later; everything is free for now.
@@ -1209,8 +1064,11 @@ class Play extends Phaser.Scene {
   constructor() { super('play'); }
 
   init(data) {
-    this.s = Object.assign({ lives: 3, score: 0, coins: 0, level: 0 }, data || {});
-    this.def = LEVELS[this.s.level];
+    this.s = Object.assign({ lives: 3, score: 0, coins: 0, level: 0, world: 1 }, data || {});
+    // Past the checkpoint the hero restarts from it after losing a life.
+    this.fromCheckpoint = this.s.checkpoint === this.s.level;
+    delete this.s.checkpoint;
+    this.def = WORLD_MAPS[this.s.world - 1][this.s.level];
     this.s.timeLeft = this.def.time;
     this.big = !!this.s.big;
     delete this.s.big;
@@ -1241,6 +1099,10 @@ class Play extends Phaser.Scene {
     const enemySpots = [];
     const ballSpots = [];
     const barSpots = [];
+    const fishSpots = [];
+    const springSpots = [];
+    const throwerSpots = [];
+    const spikySpots = [];
     for (let y = 0; y < lvl.H; y++) {
       for (let x = 0; x < lvl.W; x++) {
         const ch = lvl.grid[y][x];
@@ -1254,6 +1116,10 @@ class Play extends Phaser.Scene {
         if (ch === 'e') enemySpots.push([x, y]);
         if (ch === 'f') ballSpots.push([x, y]);
         if (ch === 'r') barSpots.push([x, y]);
+        if (ch === 's') fishSpots.push([x, y]);
+        if (ch === 'p') springSpots.push([x, y]);
+        if (ch === 't') throwerSpots.push([x, y]);
+        if (ch === 'n') spikySpots.push([x, y]);
       }
     }
 
@@ -1262,19 +1128,23 @@ class Play extends Phaser.Scene {
       const box = [];
       // With scroll factor f an image at X shows at X - f * scrollX, so cover the area's scroll range.
       const span = (f) => [Math.floor(f * ar.x0 * TILE), f * (ar.x1 * TILE - VIEW_W) + VIEW_W];
+      // Night levels of world 3 are dark whatever the «Время суток» look says.
+      const dark = night() || ar.night;
       if (ar.scenery !== 'none') {
-        if (night()) box.push(this.add.image(0, 0, 'stars').setOrigin(0).setScrollFactor(0).setDepth(DEPTH.SCENERY - 1));
+        if (dark) box.push(this.add.image(0, 0, 'stars').setOrigin(0).setScrollFactor(0).setDepth(DEPTH.SCENERY - 1));
         const [a, b] = span(0.5);
         for (let x = a; x < b; x += 190) {
           const cloud = this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5).setDepth(DEPTH.SCENERY);
-          if (night()) cloud.setTint(0x5a6488);
+          if (dark) cloud.setTint(0x5a6488);
           box.push(cloud);
         }
       }
       if (ar.scenery === 'field') {
         const [a, b] = span(0.8);
         for (let x = a; x < b; x += 300) {
-          box.push(this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8).setDepth(DEPTH.SCENERY));
+          const hill = this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8).setDepth(DEPTH.SCENERY);
+          if (ar.night && !night()) hill.setTint(0x6070a0);
+          box.push(hill);
         }
       }
       return box;
@@ -1312,7 +1182,7 @@ class Play extends Phaser.Scene {
     else this.lever = this.add.image(goalX, lvl.bridge.y * TILE, 'lever').setOrigin(0.5, 1);
 
     // Hero.
-    const [sx, sy] = lvl.start || [3, 13];
+    const [sx, sy] = this.fromCheckpoint ? lvl.checkpoint.start : lvl.start || [3, 13];
     this.player = this.physics.add.sprite(sx * TILE + 8, sy * TILE, this.heroTex() + '0').setOrigin(0.5, 1).setDepth(DEPTH.HERO);
     this.player.body.setMaxVelocity(300, 270);
     this.applyBody();
@@ -1328,7 +1198,20 @@ class Play extends Phaser.Scene {
       const e = this.enemies.create(x * TILE + 8, y * TILE + 8, 'bug0').setDepth(DEPTH.ENEMY);
       e.body.setSize(14, 14).setOffset(1, 2);
       e.setData('state', 'idle');
+      e.setData('kind', 'bug');
     }
+    for (const [x, y] of throwerSpots) this.addThrower(x, y);
+    for (const [x, y] of spikySpots) this.addSpiky(x * TILE + 8, y * TILE + 8, false);
+
+    // Creatures that fly or swim through walls: fish, bolts, the cloud rider.
+    this.foes = this.physics.add.group();
+    for (const [x, y] of fishSpots) this.addFish(x, y);
+    this.rider = null;
+    this.riderBack = 0;
+    this.leapNext = 0;
+
+    this.springs = this.physics.add.staticGroup();
+    for (const [x, y] of springSpots) this.springs.create(x * TILE + 8, (y + 1) * TILE, 'spring0').setOrigin(0.5, 1).refreshBody();
 
     this.items = this.physics.add.group();
     this.fireballs = this.physics.add.group();
@@ -1346,6 +1229,14 @@ class Play extends Phaser.Scene {
       this.flipEnemy(e);
     });
     this.physics.add.overlap(this.player, this.enemies, (p, e) => this.touchEnemy(e));
+    this.physics.add.collider(this.player, this.springs, (p, sp) => this.bounceSpring(sp));
+    this.physics.add.collider(this.enemies, this.springs);
+    this.physics.add.overlap(this.player, this.foes, (p, f) => this.touchFoe(f));
+    this.physics.add.overlap(this.fireballs, this.foes, (fb, f) => {
+      if (!f.getData('burns') || f.getData('state') === 'dead') return;
+      fb.destroy();
+      this.killFoe(f);
+    });
     this.physics.add.overlap(this.player, this.coinItems, (p, c) => { c.destroy(); this.gainCoin(); });
     this.physics.add.overlap(this.player, this.items, (p, it) => {
       if (!it.body.enable) return;
@@ -1365,6 +1256,11 @@ class Play extends Phaser.Scene {
       this.physics.add.overlap(this.player, zone, () => this.pullLever());
     }
     if (lvl.boss) this.addBoss(lvl.boss);
+    this.plants = (lvl.plants || []).map((pl) => this.addPlant(pl));
+    for (const sg of lvl.signs || []) {
+      this.add.text(sg.x * TILE, sg.y * TILE, sg.text, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 })
+        .setOrigin(0.5).setDepth(DEPTH.TILES + 1);
+    }
 
     const kb = this.input.keyboard;
     this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,Z,X,A,S,SPACE,SHIFT');
@@ -1380,8 +1276,11 @@ class Play extends Phaser.Scene {
       },
     });
 
-    this.setArea(0);
-    cam.scrollX = 0;
+    const startArea = Math.max(0, lvl.areas.findIndex((ar) => sx >= ar.x0 && sx < ar.x1));
+    this.setArea(startArea);
+    const ar0 = lvl.areas[startArea];
+    cam.scrollX = Phaser.Math.Clamp(this.player.x - VIEW_W * 0.42, ar0.x0 * TILE, ar0.x1 * TILE - VIEW_W);
+    this.prevX = this.player.x;
 
     // The physics world outlives scene restarts, so its paused flag does too.
     this.physics.pause();
@@ -1398,7 +1297,8 @@ class Play extends Phaser.Scene {
   setArea(i) {
     this.area = i;
     const ar = this.lvl.areas[i];
-    this.cameras.main.setBackgroundColor(ar.sky === DAY_SKY && night() ? NIGHT_SKY : ar.sky);
+    this.cameras.main.setBackgroundColor(ar.night || (ar.sky === DAY_SKY && night()) ? NIGHT_SKY : ar.sky);
+    this.inWater = !!ar.water;
     this.scenery.forEach((box, j) => box.forEach((img) => img.setVisible(i === j)));
   }
 
@@ -1460,6 +1360,7 @@ class Play extends Phaser.Scene {
   }
 
   leavePipe(to) {
+    if (to.world) { this.warp(to.world); return; }
     const p = this.player;
     const b = p.body;
     const cam = this.cameras.main;
@@ -1645,7 +1546,7 @@ class Play extends Phaser.Scene {
     this.physics.pause();
     const items = [
       this.add.rectangle(0, 0, VIEW_W, VIEW_H, 0x000000).setOrigin(0),
-      this.add.text(VIEW_W / 2, 92, `МИР 1-${this.s.level + 1}`, { fontFamily: 'Courier New, monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0.5),
+      this.add.text(VIEW_W / 2, 92, `МИР ${this.s.world}-${this.s.level + 1}`, { fontFamily: 'Courier New, monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0.5),
       this.add.text(VIEW_W / 2, 116, this.def.name, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#f8d020', resolution: 4 }).setOrigin(0.5),
       this.add.image(VIEW_W / 2 - 14, 150, this.heroTex() + '0').setOrigin(0.5, 1),
       this.add.text(VIEW_W / 2 + 2, 142, `× ${this.s.lives}`, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0, 0.5),
@@ -1761,6 +1662,8 @@ class Play extends Phaser.Scene {
     this.updateFireballs();
     this.updateBoss(time, delta);
     this.updateHazards(delta);
+    this.updatePlants(time);
+    this.updateFoes(time, cam);
 
     if (this.dead || this.inPipe) return;
 
@@ -1773,6 +1676,23 @@ class Play extends Phaser.Scene {
     }
 
     if (p.y > VIEW_H + 24) { this.die(true); return; }
+    const cp = this.lvl.checkpoint;
+    if (cp && p.x > cp.x * TILE) this.passedCheckpoint = true;
+    // Walking (or running over the ceiling) into the next area moves the camera there.
+    const here = this.lvl.areas[this.area];
+    if (p.x >= here.x1 * TILE) {
+      const next = this.lvl.areas.findIndex((ar) => p.x >= ar.x0 * TILE && p.x < ar.x1 * TILE);
+      if (next >= 0) { this.setArea(next); cam.scrollX = this.lvl.areas[next].x0 * TILE; }
+    }
+    // Castle maze: going on at the wrong height leads back to the last fork.
+    for (const lp of this.lvl.loops || []) {
+      const lx = lp.x * TILE;
+      if (p.x >= lx && this.prevX < lx) {
+        const row = Math.floor((b.bottom - 1) / TILE);
+        if (row < lp.rows[0] || row > lp.rows[1]) { this.loopBack(lp); return; }
+      }
+    }
+    this.prevX = p.x;
     const under = this.layerAt(Math.floor(p.x / TILE)).getTileAtWorldXY(p.x, b.bottom - 4);
     if (under && under.index === T.LAVA_TOP && b.bottom > under.pixelY + 6) { this.die(true); return; }
 
@@ -1793,6 +1713,10 @@ class Play extends Phaser.Scene {
     const up = k.UP.isDown || touch.up;
     const down = k.DOWN.isDown || touch.down;
     const onGround = b.blocked.down || b.touching.down;
+    if (onGround && this.springUntil && time > this.springUntil) {
+      this.springUntil = 0;
+      b.setMaxVelocity(300, 270);
+    }
     if (this.updatePipes(time, down, right && !left, onGround)) return;
     const dt = delta / 1000;
 
@@ -1804,7 +1728,7 @@ class Play extends Phaser.Scene {
     }
 
     // Horizontal movement with inertia.
-    const maxV = run ? 150 : 90;
+    const maxV = this.inWater ? 70 : run ? 150 : 90;
     let target = 0;
     if (this.crouch) target = 0;
     else if (left && !right) target = -maxV;
@@ -1822,16 +1746,30 @@ class Play extends Phaser.Scene {
     // Jump: higher when running, shorter when the button is released early.
     // Jump strength and gravity depend on the speed at take-off, as in classic 8-bit platformers:
     // low gravity while A is held on the way up, heavy gravity otherwise.
-    if (jump && !this.prevJump && onGround) {
-      const speed = Math.abs(b.velocity.x);
-      this.jumpKind = speed < 60 ? 0 : speed < 139 ? 1 : 2;
-      b.setVelocityY(this.jumpKind === 2 ? -300 : -240);
-      SFX.jump();
+    if (this.inWater) {
+      // Under water every press of A is a stroke up; the hero sinks slowly and stays below the surface.
+      if (jump && !this.prevJump) {
+        b.setVelocityY(-150);
+        tone(520, 700, 0.06, 'square', 0.05);
+      }
+      b.setGravityY(260 - WORLD_GRAVITY);
+      if (b.velocity.y > 70) b.setVelocityY(70);
+      if (b.top < 2 * TILE && b.velocity.y < 0) {
+        b.setVelocityY(0);
+        p.y += 2 * TILE - b.top;
+      }
+    } else {
+      if (jump && !this.prevJump && onGround) {
+        const speed = Math.abs(b.velocity.x);
+        this.jumpKind = speed < 60 ? 0 : speed < 139 ? 1 : 2;
+        b.setVelocityY(this.jumpKind === 2 ? -300 : -240);
+        SFX.jump();
+      }
+      const [holdG, fallG] = JUMP_GRAVITY[this.jumpKind || 0];
+      const g = b.velocity.y < 0 && jump ? holdG : fallG;
+      b.setGravityY(g - WORLD_GRAVITY);
     }
     this.prevJump = jump;
-    const [holdG, fallG] = JUMP_GRAVITY[this.jumpKind || 0];
-    const g = b.velocity.y < 0 && jump ? holdG : fallG;
-    b.setGravityY(g - WORLD_GRAVITY);
 
     this.checkHidden(b);
 
@@ -1871,17 +1809,215 @@ class Play extends Phaser.Scene {
 
   updateEnemies(time, cam) {
     for (const e of this.enemies.getChildren().slice()) {
+      if (e.y > VIEW_H + 32) { e.destroy(); continue; }
       const st = e.getData('state');
+      const kind = e.getData('kind');
+      if (kind === 'thrower') { this.updateThrower(e, time, cam); continue; }
       if (st === 'idle' && e.x < cam.scrollX + VIEW_W + 24 && e.x > cam.scrollX - 24) {
         e.setData('state', 'walk');
-        e.body.setVelocityX(-30);
+        e.body.setVelocityX(kind === 'spiky' && this.player.x > e.x ? 30 : -30);
       } else if (st === 'walk') {
-        if (e.body.blocked.left) e.body.setVelocityX(30);
-        else if (e.body.blocked.right) e.body.setVelocityX(-30);
-        e.setTexture('bug' + (Math.floor(time / 200) % 2));
+        const b = e.body;
+        if (kind === 'spiky' && e.getData('egg')) {
+          // An egg from the cloud rider hatches when it lands and walks toward the hero.
+          if (!b.blocked.down) continue;
+          e.setData('egg', false);
+          b.setVelocityX(this.player.x < e.x ? -30 : 30);
+        }
+        if (b.blocked.left) b.setVelocityX(30);
+        else if (b.blocked.right) b.setVelocityX(-30);
+        const frame = Math.floor(time / 200) % 2;
+        if (kind === 'spiky') {
+          e.setTexture('spiky' + frame);
+          e.setFlipX(b.velocity.x > 0);
+        } else e.setTexture('bug' + frame);
       }
-      if (e.y > VIEW_H + 32) e.destroy();
     }
+  }
+
+  // ---------- Worlds 2-4: springboards, bolt throwers, spikies, fish, cloud rider ----------
+  bounceSpring(sp) {
+    const b = this.player.body;
+    if (!b.touching.down || this.dead) return;
+    sp.setTexture('spring1');
+    this.time.delayedCall(160, () => sp.setTexture('spring0'));
+    // Holding A on landing throws the hero very high.
+    const high = this.holdingA();
+    // Faster than the usual cap on vertical speed, until the hero lands again.
+    b.setMaxVelocity(300, 480);
+    this.springUntil = this.time.now + 300;
+    b.setVelocityY(high ? -470 : -300);
+    this.jumpKind = 2;
+    tone(300, 900, 0.2, 'square', 0.07);
+  }
+
+  addThrower(x, y) {
+    const e = this.enemies.create(x * TILE + 8, y * TILE + 8, 'thrower1').setDepth(DEPTH.ENEMY);
+    e.body.setSize(12, 14).setOffset(2, 4);
+    e.setData('kind', 'thrower');
+    e.setData('state', 'idle');
+    e.setData('home', e.x);
+    e.setData('jumpAt', 0);
+    e.setData('next', 0);
+  }
+
+  updateThrower(e, time, cam) {
+    const st = e.getData('state');
+    if (st === 'dead') return;
+    const b = e.body;
+    if (st === 'idle') {
+      if (e.x > cam.scrollX + VIEW_W + 24) return;
+      e.setData('state', 'walk');
+      e.setData('next', time + 900);
+      e.setData('jumpAt', time + 2500);
+      b.setVelocityX(-25);
+    }
+    // Paces a step back and forth around its spot, hops now and then, and throws bolts.
+    const home = e.getData('home');
+    if (e.x < home - 20) b.setVelocityX(25);
+    else if (e.x > home + 20 || b.blocked.right) b.setVelocityX(-25);
+    else if (b.blocked.left) b.setVelocityX(25);
+    e.setFlipX(this.player.x < e.x);
+    if (b.blocked.down && time > e.getData('jumpAt')) {
+      e.setData('jumpAt', time + 2500 + Math.random() * 2500);
+      b.setVelocityY(-330);
+    }
+    if (time > e.getData('next')) {
+      e.setData('next', time + 1000 + Math.random() * 1000);
+      e.setTexture('thrower0');
+      this.time.delayedCall(220, () => {
+        if (!e.active || e.getData('state') === 'dead') return;
+        e.setTexture('thrower1');
+        const dir = this.player.x < e.x ? -1 : 1;
+        const f = this.foes.create(e.x + dir * 6, e.y - 12, 'bolt').setDepth(DEPTH.ENEMY);
+        f.body.setSize(6, 6).setOffset(1, 1);
+        f.body.setVelocity(dir * 85, -330);
+        f.setData('kind', 'bolt');
+        f.setData('dir', dir);
+      });
+    }
+  }
+
+  addSpiky(x, y, egg) {
+    const e = this.enemies.create(x, y, egg ? 'egg' : 'spiky0').setDepth(DEPTH.ENEMY);
+    e.body.setSize(14, 14).setOffset(1, 2);
+    e.setData('kind', 'spiky');
+    e.setData('egg', egg);
+    e.setData('state', egg ? 'walk' : 'idle');
+    if (egg) e.body.setVelocity(0, -180);
+    return e;
+  }
+
+  addFish(x, y) {
+    const f = this.foes.create(x * TILE + 8, y * TILE + 8, 'fish0').setDepth(DEPTH.ENEMY);
+    f.body.allowGravity = false;
+    f.body.setSize(14, 8).setOffset(1, 1);
+    f.setData('kind', 'fish');
+    f.setData('state', 'idle');
+    f.setData('burns', true);
+    f.setData('speed', 18 + (x % 3) * 10);
+    f.setData('phase', x);
+  }
+
+  touchFoe(f) {
+    if (this.dead || this.won || f.getData('state') === 'dead') return;
+    const b = this.player.body;
+    if (f.getData('stomp') && !this.inWater && b.velocity.y > 0 && b.bottom <= f.body.top + 8) {
+      this.killFoe(f);
+      b.setVelocityY(-240);
+      this.jumpKind = 0;
+      haptic('light');
+      return;
+    }
+    this.hurt();
+  }
+
+  killFoe(f) {
+    f.setData('state', 'dead');
+    f.setFlipY(true);
+    f.body.checkCollision.none = true;
+    f.body.allowGravity = true;
+    f.body.setVelocity(20, -150);
+    this.addScore(f.getData('kind') === 'rider' ? 1000 : 200);
+    SFX.stomp();
+    if (f === this.rider) {
+      this.rider = null;
+      this.riderBack = this.time.now + 10000;
+    }
+    this.time.delayedCall(1500, () => f.destroy());
+  }
+
+  updateFoes(time, cam) {
+    const lvl = this.lvl;
+    const tx = cam.scrollX / TILE;
+    // Fish leaping out of the water below the bridges.
+    const leap = lvl.leapFish;
+    if (leap && !this.dead && !this.won && tx >= leap.x0 && tx < leap.x1 && time > this.leapNext) {
+      this.leapNext = time + 700 + Math.random() * 1000;
+      const live = this.foes.getChildren().filter((f) => f.getData('kind') === 'leap').length;
+      if (live < 3) {
+        const dir = Math.random() < 0.75 ? 1 : -1;
+        const f = this.foes.create(cam.scrollX + 24 + Math.random() * (VIEW_W - 48), VIEW_H + 8, 'fish0').setDepth(DEPTH.ENEMY);
+        f.body.setSize(14, 8).setOffset(1, 1);
+        f.body.setVelocity(dir * (40 + Math.random() * 50), -(500 + Math.random() * 80));
+        f.setFlipX(dir > 0);
+        f.setData('kind', 'leap');
+        f.setData('burns', true);
+        f.setData('stomp', true);
+      }
+    }
+    // The cloud rider follows the hero and drops spiky eggs; it comes back a while after a hit.
+    const ride = lvl.rider;
+    if (ride && !this.rider && !this.dead && time > this.riderBack && tx >= ride.x0 && tx < ride.x1) {
+      const r = this.foes.create(cam.scrollX + VIEW_W + 16, 40, 'rider').setDepth(DEPTH.ENEMY);
+      r.body.allowGravity = false;
+      r.body.setSize(12, 12).setOffset(2, 1);
+      r.setData('kind', 'rider');
+      r.setData('burns', true);
+      r.setData('stomp', true);
+      r.setData('next', time + 1500);
+      this.rider = r;
+    }
+    for (const f of this.foes.getChildren().slice()) {
+      const kind = f.getData('kind');
+      if (f.y > VIEW_H + 48 || f.x < cam.scrollX - 64 || (kind !== 'fish' && f.x > cam.scrollX + VIEW_W + 64)) {
+        if (f === this.rider) this.rider = null;
+        f.destroy();
+        continue;
+      }
+      if (f.getData('state') === 'dead') continue;
+      if (kind === 'fish') {
+        if (f.getData('state') === 'idle') {
+          if (f.x > cam.scrollX + VIEW_W + 16) continue;
+          f.setData('state', 'swim');
+        }
+        f.body.setVelocity(-f.getData('speed'), Math.cos(time / 500 + f.getData('phase')) * 12);
+        f.setTexture('fish' + (Math.floor(time / 250) % 2));
+      } else if (kind === 'leap') {
+        f.setTexture('fish' + (Math.floor(time / 150) % 2));
+      } else if (kind === 'bolt') {
+        f.angle += f.getData('dir') * 15;
+      } else if (kind === 'rider') {
+        if (tx >= ride.x1) { f.body.setVelocity(-140, 0); continue; }
+        const want = this.player.x + Math.sin(time / 900) * 70;
+        f.body.setVelocity(Phaser.Math.Clamp((want - f.x) * 2, -130, 130), 0);
+        if (time > f.getData('next')) {
+          f.setData('next', time + 2400 + Math.random() * 1600);
+          const eggs = this.enemies.getChildren().filter((e) => e.getData('kind') === 'spiky').length;
+          if (eggs < 5) this.addSpiky(f.x, f.y + 8, true);
+        }
+      }
+    }
+  }
+
+  loopBack(lp) {
+    const p = this.player;
+    const cam = this.cameras.main;
+    const ar = this.lvl.areas[this.area];
+    p.body.reset(lp.back * TILE + 8, lp.backY * TILE);
+    this.prevX = p.x;
+    cam.scrollX = Phaser.Math.Clamp(p.x - VIEW_W * 0.42, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
+    notes([392, 330, 262], 0.09, 0.12);
   }
 
   updateItems() {
@@ -2010,7 +2146,17 @@ class Play extends Phaser.Scene {
   touchEnemy(e) {
     if (this.dead || this.won || e.getData('state') === 'dead') return;
     const b = this.player.body;
-    if (b.velocity.y > 0 && b.bottom <= e.body.top + 8) {
+    const kind = e.getData('kind');
+    // Spikies can't be stomped, and under water nothing can.
+    if (kind !== 'spiky' && !this.inWater && b.velocity.y > 0 && b.bottom <= e.body.top + 8) {
+      if (kind === 'thrower') {
+        this.flipEnemy(e);
+        this.addScore(900);
+        b.setVelocityY(-240);
+        this.jumpKind = 0;
+        haptic('light');
+        return;
+      }
       e.setData('state', 'dead');
       e.setTexture('bugFlat');
       e.body.enable = false;
@@ -2096,7 +2242,10 @@ class Play extends Phaser.Scene {
     this.time.delayedCall(2500, () => {
       this.s.lives--;
       if (this.s.lives > 0) {
-        this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: this.s.level });
+        this.scene.restart({
+          lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: this.s.level, world: this.s.world,
+          checkpoint: this.passedCheckpoint ? this.s.level : undefined,
+        });
       } else {
         this.gameOver('ИГРА ОКОНЧЕНА');
       }
@@ -2106,9 +2255,12 @@ class Play extends Phaser.Scene {
   gameOver(title, completed) {
     const best = saveBest(this.s.score);
     this.physics.pause();
-    const levels = completed ? LEVELS.length : this.s.level;
-    showOverlay(title, `Счёт: ${this.s.score}<br>Рекорд: ${best}`, 'Играть снова', () => {
-      this.scene.restart({});
+    // The score server counts the levels of one world (0..4).
+    const levels = completed ? LEVELS.length : Math.min(LEVELS.length - 1, this.s.level);
+    // As on the console, a lost game continues from the start of the current world.
+    const world = completed ? 1 : this.s.world;
+    showOverlay(title, `Счёт: ${this.s.score}<br>Рекорд: ${best}`, world > 1 ? `Продолжить с мира ${world}` : 'Играть снова', () => {
+      this.scene.restart({ world });
     });
     api.runDone(this.s.score, levels, !!completed).then((r) => {
       if (!r) return;
@@ -2156,11 +2308,73 @@ class Play extends Phaser.Scene {
   finishLevel() {
     api.levelDone(this.s.level, this.s.score, this.s.timeLeft);
     this.addScore(this.s.timeLeft * 50);
-    const next = this.s.level + 1;
-    if (next < LEVELS.length) {
-      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, big: this.big, fire: this.fire });
+    let next = this.s.level + 1;
+    let world = this.s.world;
+    if (next >= WORLD_MAPS[world - 1].length) { next = 0; world++; }
+    if (world <= WORLDS) {
+      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, world, big: this.big, fire: this.fire });
     } else {
-      this.gameOver('МИР 1 ПРОЙДЕН!', true);
+      this.gameOver('ВСЕ МИРЫ ПРОЙДЕНЫ!', true);
+    }
+  }
+
+  // Warp zone pipe: straight to the first level of another world.
+  warp(world) {
+    this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: 0, world, big: this.big, fire: this.fire });
+  }
+
+  // ---------- Biting plants in pipes ----------
+  addPlant(pl) {
+    const x = pl.x * TILE + TILE;
+    const top = pl.y * TILE;
+    // Sits behind the pipe tiles, so it is hidden while down.
+    const plant = this.add.image(x, top + 24, 'plant0').setOrigin(0.5, 1).setDepth(DEPTH.SPROUT);
+    plant.setData('top', top);
+    plant.setData('alive', true);
+    plant.setData('next', 0);
+    plant.setData('phase', 'down');
+    return plant;
+  }
+
+  updatePlants(time) {
+    const pb = this.player.body;
+    for (const plant of this.plants) {
+      if (!plant.getData('alive')) continue;
+      const top = plant.getData('top');
+      plant.setTexture('plant' + (Math.floor(time / 180) % 2));
+      if (plant.getData('phase') === 'down' && time > plant.getData('next')) {
+        // Like on the console, it stays in the pipe while the hero is right next to it.
+        if (Math.abs(this.player.x - plant.x) < 28) { plant.setData('next', time + 300); continue; }
+        plant.setData('phase', 'up');
+        this.tweens.add({
+          targets: plant, y: top, duration: 700,
+          onComplete: () => this.time.delayedCall(1400, () => {
+            if (!plant.getData('alive')) return;
+            this.tweens.add({ targets: plant, y: top + 24, duration: 700, onComplete: () => {
+              plant.setData('phase', 'down');
+              plant.setData('next', this.time.now + 1500);
+            } });
+          }),
+        });
+      }
+      const out = top - (plant.y - 24);
+      if (out <= 2) continue;
+      const left = plant.x - 6;
+      const right = plant.x + 6;
+      const ptop = top - out + 2;
+      for (const f of this.fireballs.getChildren()) {
+        if (f.active && f.x > left - 3 && f.x < right + 3 && f.y > ptop && f.y < top) {
+          f.destroy();
+          plant.setData('alive', false);
+          this.tweens.killTweensOf(plant);
+          plant.destroy();
+          this.addScore(200);
+          SFX.stomp();
+          break;
+        }
+      }
+      if (!plant.active) continue;
+      if (!this.dead && !this.won && pb.right > left && pb.left < right && pb.bottom > ptop && pb.top < top) this.hurt();
     }
   }
 }
