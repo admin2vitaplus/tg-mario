@@ -46,6 +46,13 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
   const rooms = new Map(); // code -> { code, seats: [{ ws, token }, { ws, token } | null], created, gone }
   const conns = new Map(); // ключ (игрок или адрес) -> число соединений
   const tries = new Map(); // адрес -> { n, until }
+  // Кто играл в комнате (Telegram id хозяина и гостя): по нему сервер засчитывает обоим итог
+  // онлайн-матча, который присылает хозяин (см. tanks-results.js). Хранится час.
+  const players = new Map(); // code -> { host, guest, at }
+  const remember = (room) => {
+    const [h, g] = room.seats;
+    players.set(room.code, { host: h?.ws?.userId ?? h?.userId ?? null, guest: g?.ws?.userId ?? g?.userId ?? null, at: Date.now() });
+  };
 
   const clientIp = (req) =>
     String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "")
@@ -72,6 +79,7 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.keys = keys;
       ws.ip = ip;
+      ws.userId = user ? user.id : null;
       for (const k of keys) conns.set(k, (conns.get(k) || 0) + 1);
       wss.emit("connection", ws, req);
     });
@@ -154,7 +162,7 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
         const code = newCode();
         if (!code) return send(ws, { t: "error", code: "create", msg: "Не удалось создать комнату" });
         const token = newToken();
-        rooms.set(code, { code, ip: ws.ip, seats: [{ ws, token, gone: 0 }, null], created: Date.now() });
+        rooms.set(code, { code, ip: ws.ip, seats: [{ ws, token, gone: 0, userId: ws.userId }, null], created: Date.now() });
         ws.room = code;
         send(ws, { t: "room", code, token });
       } else if (msg.t === "join" || msg.t === "rejoin") {
@@ -183,7 +191,8 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
         }
         if (room.seats[1]) return send(ws, { t: "error", code: "full", msg: "В комнате уже двое" });
         const token = newToken();
-        room.seats[1] = { ws, token, gone: 0 };
+        room.seats[1] = { ws, token, gone: 0, userId: ws.userId };
+        remember(room);
         ws.room = code;
         send(ws, { t: "joined", code, token });
         if (room.seats[0].ws) { room.met = true; send(room.seats[0].ws, { t: "peer" }); }
@@ -224,6 +233,8 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
       if (room.seats.some(away) || room.seats.every((s) => !s.ws)) closeRoom(room, { t: "left" });
     }
     for (const [ip, t] of tries) if (t.until < now) tries.delete(ip);
+    for (const room of rooms.values()) { const p = players.get(room.code); if (p) p.at = now; }
+    for (const [code, p] of players) if (now - p.at > 3600_000) players.delete(code);
   };
   const sweepTimer = setInterval(sweep, L.sweepMs);
   sweepTimer.unref();
@@ -246,5 +257,11 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
   };
   server.on("close", close);
 
-  return { wss, rooms, conns, tries, close, sweep };
+  // { host, guest } — Telegram id игроков комнаты (null, если игрок вошёл без подписи Telegram).
+  const members = (code) => {
+    const p = players.get(String(code));
+    return p ? { host: p.host, guest: p.guest } : null;
+  };
+
+  return { wss, rooms, conns, tries, close, sweep, members };
 }

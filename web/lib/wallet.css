@@ -70,7 +70,9 @@
   font-size: 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
-.wShop .wAct { margin: 0; flex: 0 0 auto; }
+.wShop .wAct { margin: 0; flex: 0 0 auto; padding: 8px 10px; }
+.wPay { display: flex; gap: 6px; flex: 0 0 auto; }
+.wAct.wStars { background: #c8901c; }
 .wShop i { flex: 0 0 auto; font-style: normal; color: #7fe8ec; }
 
 #walletToasts {

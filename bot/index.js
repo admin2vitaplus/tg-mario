@@ -5,7 +5,7 @@ import { startTunnel } from "./tunnel.js";
 import { addSecret, installSafeConsole } from "./log.js";
 import { statsReport } from "./stats.js";
 import { economyReport } from "./economy.js";
-import { installWalletCommands, walletNotifier } from "./wallet-bot.js";
+import { installWalletCommands, starsInvoice, walletNotifier } from "./wallet-bot.js";
 
 installSafeConsole();
 
@@ -30,6 +30,7 @@ const app = await startApp({
       .sendMessage(userId, "Новые достижения!\n" + list.map((a) => `${a.icon} ${a.title}: ${a.text}`).join("\n"))
       .catch(() => {}),
   notify: walletNotifier(bot),
+  createInvoice: starsInvoice(bot),
 });
 const { store, tracker } = app;
 // Telegram id администраторов через запятую; пусто — команда /stats выключена.
@@ -180,6 +181,7 @@ await bot.api.setMyCommands([
   { command: "me", description: "Мои достижения" },
   { command: "invite", description: "Позвать друга" },
   { command: "help", description: "Как играть" },
+  { command: "paysupport", description: "Помощь с оплатой" },
 ]);
 
 bot.start({ onStart: (me) => console.log(`Бот @${me.username} запущен, игра: ${gameUrl}`) });

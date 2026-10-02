@@ -4,11 +4,15 @@ import { attachTanksRooms } from "./tanks-rooms.js";
 import { createTracker } from "./stats.js";
 import { currentCommit } from "./version.js";
 import { createEconomy, loadEconomy } from "./economy.js";
+import { createTanksResults } from "./tanks-results.js";
 
 // Всё, кроме самого бота Telegram и туннеля: база, HTTP API и комнаты «Танкодрома».
 // Вынесено отдельно, чтобы запуск и остановку можно было проверить тестом без сети и токена.
 // notify(userId, text, { offText }) — сообщение игроку от бота (итоги недели); без него сообщений нет.
-export async function startApp({ env = process.env, botToken, onAchievements, notify = null, port, tanksLimits } = {}) {
+// createInvoice(item, user) — ссылка на счёт в Telegram Stars (bot.api.createInvoiceLink); без неё покупок за звёзды нет.
+export async function startApp({
+  env = process.env, botToken, onAchievements, notify = null, createInvoice = null, port, tanksLimits,
+} = {}) {
   // Адрес игры не вшит в код: он задаётся в .env, чтобы переезд сайта не требовал правки бота.
   const gameUrl = env.WEBAPP_URL;
   if (!gameUrl || !/^https?:\/\//.test(gameUrl)) {
@@ -39,8 +43,13 @@ export async function startApp({ env = process.env, botToken, onAchievements, no
   closeSeasons();
   const seasonTimer = setInterval(closeSeasons, 10 * 60 * 1000);
   seasonTimer.unref();
-  const server = createApiServer({ store, botToken, allowedOrigins, onAchievements, commit, tracker, economy });
-  const tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
+  // Онлайн-матч засчитывается обоим игрокам комнаты, поэтому итоги танков знают состав комнат.
+  let tanks = null;
+  const tanksResults = createTanksResults(store, { members: (code) => tanks?.members(code) ?? null });
+  const server = createApiServer({
+    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, createInvoice,
+  });
+  tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
 
   // Соединения держим в списке, чтобы при остановке закрыть и «живые» keep-alive.
   const sockets = new Set();

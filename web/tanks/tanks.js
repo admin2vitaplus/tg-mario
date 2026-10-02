@@ -487,6 +487,9 @@ const WALL_SKINS = [
   { id: 'bags', name: 'Мешки', stars: 0, rows: [
     'obbbobbb', 'bhbbbhbb', 'bbbbbbbb', 'oooooooo', 'bbobbbob', 'bbbhbbbb', 'bbbbbbbb', 'oooooooo',
   ], pal: { b: '#c8b078', h: '#f0dca8', o: '#7a6438' } },
+  { id: 'gold', name: 'Золото', stars: 0, shop: 'tanks-walls-gold', tokens: 150, rows: [
+    'hggmhggg', 'gggmgggg', 'ggdmgggd', 'mmmmmmmm', 'ghgggmhg', 'gggggmgg', 'gdgggmgd', 'mmmmmmmm',
+  ], pal: { g: '#d8a820', h: '#fff0a0', d: '#a07810', m: '#5a4008' } },
 ];
 
 const GROUNDS = [
@@ -864,6 +867,7 @@ function showMenu() {
   view = null;
   netClose();
   showOverlay(T('title'), T('intro') + '<br>' + T('best', { n: loadBest() }), null, null);
+  fetchTicket();
 }
 
 $('btnLook').addEventListener('click', () => { audio(); openLook(); });
@@ -1343,9 +1347,70 @@ function guestTick() {
 
 function remotePad() {
   const r = net.remote;
-  const out = { dir: r.dir, fire: r.fire };
+  // The guest's buttons come from the network: only known directions are taken.
+  const out = { dir: Number.isInteger(r.dir) && r.dir >= -1 && r.dir <= 3 ? r.dir : -1, fire: !!r.fire };
   r.fire = false;
   return out;
+}
+
+// ---------- Checked results: жетоны ----------
+// The server deals the game's seed (a ticket) and replays the recorded buttons
+// itself (bot/tanks-replay.js), so only a game that really happened counts.
+// Without a ticket, the game is played as before, just without жетоны.
+// Log: steps joined by «,»; a step is the buttons' code in base36, «codexN»
+// when repeated N times (N in base36 too); «n» is the move to the next stage.
+// Code: (direction + 1) × 2 + fire; for two players code1 × 10 + code2.
+const MAX_REC_FRAMES = 60 * 60 * 60; // the server takes up to an hour of play
+const ticket = { next: null, asking: false };
+const rec = { seed: 0, players: 1, out: [], prev: -1, n: 0, frames: 0 };
+const canCheck = () => !!(window.Server && window.Server.hasServer && tg && tg.initData);
+
+function fetchTicket() {
+  if (ticket.next && Date.now() - ticket.next.at > 5 * 3600000) ticket.next = null; // the server keeps it 6 hours
+  if (!canCheck() || ticket.next || ticket.asking) return;
+  ticket.asking = true;
+  window.Server.request('POST', '/api/tanks/ticket')
+    .then((r) => { if (r && Number.isSafeInteger(r.seed) && r.seed > 0) ticket.next = { seed: r.seed, at: Date.now() }; })
+    .catch(() => {})
+    .then(() => { ticket.asking = false; });
+}
+
+function recFlush() {
+  if (rec.prev < 0) return;
+  rec.out.push(rec.n > 1 ? rec.prev.toString(36) + 'x' + rec.n.toString(36) : rec.prev.toString(36));
+  rec.prev = -1;
+  rec.n = 0;
+}
+
+function recStep(inputs) {
+  if (!rec.seed) return;
+  if (++rec.frames > MAX_REC_FRAMES) { rec.seed = 0; return; }
+  const code = (i) => (i.dir + 1) * 2 + (i.fire ? 1 : 0);
+  const c = rec.players === 1 ? code(inputs[0]) : code(inputs[0]) * 10 + code(inputs[1]);
+  if (c === rec.prev) { rec.n++; return; }
+  recFlush();
+  rec.prev = c;
+  rec.n = 1;
+}
+
+function recNext() {
+  if (!rec.seed) return;
+  recFlush();
+  rec.out.push('n');
+}
+
+// Only the one who runs the game sends it: alone, two on one phone, or the
+// online host (the server credits the guest by the room).
+function sendRun(s) {
+  if (!rec.seed || mode === 'guest') return;
+  recFlush();
+  const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(',') };
+  if (mode === 'host' && /^\d{4,8}$/.test(net.code)) body.room = net.code;
+  rec.seed = 0;
+  rec.out = [];
+  window.Server.request('POST', '/api/tanks/run', body)
+    .then((r) => { if (window.Wallet && r) window.Wallet.grants(r.wallet); })
+    .catch(() => {});
 }
 
 // ---------- Game flow ----------
@@ -1361,7 +1426,11 @@ function begin(players) {
   net.cellsKey = '';
   net.events = [];
   clearPads();
-  state = S.newGame(players, (Date.now() & 0x7fffffff) || 1);
+  const t = mode !== 'guest' && ticket.next;
+  ticket.next = null;
+  Object.assign(rec, { seed: t ? t.seed : 0, players, out: [], prev: -1, n: 0, frames: 0 });
+  state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1);
+  fetchTicket();
   track('game_start');
   lastHud = '';
   $('overlay').classList.add('hidden');
@@ -1374,6 +1443,7 @@ function afterStep(s) {
     const score = s.players.reduce((a, p) => a + p.score, 0);
     haptic('success');
     showOverlay(T('stage_clear', { n: s.stage + 1 }), T('kills') + '<br>' + killsTable(s) + '<br><br>' + T('score_line', { n: score }), T('btn_next'), () => {
+      recNext();
       S.startStage(s, s.stage + 1);
       clearPads();
       $('overlay').classList.add('hidden');
@@ -1383,6 +1453,7 @@ function afterStep(s) {
     running = false;
     const score = s.players.reduce((a, p) => a + p.score, 0);
     const best = saveBest(score);
+    sendRun(s);
     if (mode === 'local') track('game_finish');
     if (mode === 'host') {
       track('match_finished', net.code);
@@ -1410,7 +1481,9 @@ function frame(now) {
     acc += Math.min(dt, 100);
     while (acc >= STEP && running) {
       acc -= STEP;
-      S.step(state, [readPad(pads[0]), mode === 'host' ? remotePad() : readPad(pads[1])]);
+      const inputs = [readPad(pads[0]), mode === 'host' ? remotePad() : readPad(pads[1])];
+      recStep(inputs);
+      S.step(state, inputs);
       for (const ev of state.events) if (SFX[ev]) SFX[ev]();
       if (mode === 'host') net.events.push(...state.events);
       state.events.length = 0;
