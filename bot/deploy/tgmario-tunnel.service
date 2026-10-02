@@ -1,0 +1,36 @@
+# Бесплатный туннель Cloudflare отдельной службой: его адрес не меняется,
+# когда бот перезапускается или обновляется. В .env бота: TUNNEL_METRICS=127.0.0.1:20241
+# Установка: скопировать в /etc/systemd/system/, затем
+#   systemctl daemon-reload && systemctl enable --now tgmario-tunnel && systemctl restart tgmario
+[Unit]
+Description=Cloudflare quick tunnel for the tgmario bot
+After=network-online.target
+Wants=network-online.target
+Before=tgmario.service
+
+[Service]
+DynamicUser=yes
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --metrics 127.0.0.1:20241 --url http://localhost:8080
+Restart=always
+RestartSec=5
+
+MemoryMax=128M
+CPUQuota=20%
+TasksMax=64
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
