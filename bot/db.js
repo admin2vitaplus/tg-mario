@@ -150,6 +150,41 @@ export const MIGRATIONS = [
       value INTEGER NOT NULL
     );
   `,
+  // 5: «Танкодром» с проверкой повтором (tanks-replay.js) и покупки за Telegram Stars.
+  // tanks_tickets — зерно игры, выданное сервером (нельзя подобрать удобное и нельзя сыграть
+  // быстрее реального времени); tanks_runs — принятые игры; purchases — оплаты звёздами,
+  // одна оплата — одна запись (UNIQUE charge_id), возврат отмечается refunded_at.
+  `
+    CREATE TABLE tanks_tickets (
+      seed INTEGER PRIMARY KEY,
+      player_id INTEGER NOT NULL,
+      issued_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
+    CREATE INDEX tanks_tickets_player ON tanks_tickets(player_id, issued_at);
+    CREATE TABLE tanks_runs (
+      id INTEGER PRIMARY KEY,
+      player_id INTEGER NOT NULL,
+      seed INTEGER NOT NULL,
+      score INTEGER NOT NULL,
+      stages INTEGER NOT NULL,
+      frames INTEGER NOT NULL,
+      players INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE (player_id, seed)
+    );
+    CREATE INDEX tanks_runs_time ON tanks_runs(created_at);
+    CREATE TABLE purchases (
+      id INTEGER PRIMARY KEY,
+      player_id INTEGER NOT NULL,
+      item TEXT NOT NULL,
+      stars INTEGER NOT NULL,
+      charge_id TEXT NOT NULL UNIQUE,
+      at INTEGER NOT NULL,
+      refunded_at INTEGER
+    );
+    CREATE INDEX purchases_player ON purchases(player_id);
+  `,
 ];
 
 export function migrate(db) {

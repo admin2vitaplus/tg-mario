@@ -7,7 +7,7 @@
 // bought, see Looks.setStars / Looks.unlock.
 //
 // An item with `shop: '<id>'` is sold for жетоны (lib/wallet.js, docs/TZ.md P1-7): it stays
-// locked until Wallet says it is bought; tapping it offers to buy it. `tokens` is the price
+// locked until Wallet says it is bought; tapping it offers to buy it for жетоны or Telegram Stars. `tokens` is the price
 // shown before the shop list has loaded.
 //
 //   Looks.load(key, groups)             -> { groupId: itemId }
@@ -97,7 +97,8 @@ function open(opts) {
       b.append(cv, name);
       if (!open) {
         const price = document.createElement('i');
-        price.textContent = it.shop ? '◆ ' + ((window.Wallet && window.Wallet.price(it.shop)) || it.tokens || '')
+        const st = it.shop && window.Wallet && window.Wallet.stars(it.shop);
+        price.textContent = it.shop ? '◆ ' + ((window.Wallet && window.Wallet.price(it.shop)) || it.tokens || '') + (st ? '\n⭐ ' + st : '')
           : '★ ' + it.stars;
         b.append(price);
       }

@@ -29,13 +29,16 @@ class HttpError extends Error {
   constructor(status, msg) { super(msg); this.status = status; }
 }
 
-async function readJson(req) {
-  if (Number(req.headers["content-length"]) > MAX_BODY) throw new HttpError(413, "too large");
+// Запись игры «Танкодрома» (tanks-replay.js) длиннее обычного запроса.
+export const MAX_REPLAY_BODY = 512 * 1024;
+
+async function readJson(req, limit = MAX_BODY) {
+  if (Number(req.headers["content-length"]) > limit) throw new HttpError(413, "too large");
   let size = 0;
   const chunks = [];
   for await (const c of req) {
     size += c.length;
-    if (size > MAX_BODY) throw new HttpError(413, "too large");
+    if (size > limit) throw new HttpError(413, "too large");
     chunks.push(c);
   }
   try {
@@ -62,6 +65,7 @@ export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
   store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
+  tanks = null, createInvoice = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -202,6 +206,58 @@ export function createApiServer({
     };
   }
 
+  // Покупка за Telegram Stars: сервер создаёт счёт, игра открывает его (Telegram.WebApp.openInvoice),
+  // а товар выдаёт бот, когда Telegram сообщит об оплате (successful_payment, wallet-bot.js).
+  if (economy && createInvoice) {
+    routes["POST /api/wallet/invoice"] = async (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      if (typeof body.item !== "string") return [400, { error: "bad data" }];
+      const check = economy.starsCheck(user.id, body.item);
+      if (!check.ok) return [check.error === "unknown item" ? 404 : 409, { error: check.error }];
+      store.touchPlayer(user);
+      economy.setLang(user.id, user.language_code);
+      const link = await createInvoice(check.item, user);
+      return [200, { link }];
+    };
+  }
+
+  // «Танкодром»: билет (зерно игры от сервера) и итог игры с записью нажатий (tanks-results.js).
+  if (tanks) {
+    routes["POST /api/tanks/ticket"] = (_body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      store.touchPlayer(user);
+      const t = tanks.ticket(user.id);
+      return t.error ? [429, t] : [200, t];
+    };
+    routes["POST /api/tanks/run"] = (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const seed = Number(body.seed);
+      const players = Number(body.players);
+      const room = body.room == null ? null : String(body.room);
+      if (typeof body.log !== "string" || (room && !/^\d{4,8}$/.test(room))) return [400, { error: "bad data" }];
+      store.touchPlayer(user);
+      const r = tanks.submit(user.id, { seed, players, log: body.log, room });
+      if (r.status !== 200) {
+        if (r.status === 422) {
+          console.warn(`Отклонена игра «Танкодрома»: ${r.why}`);
+          economy?.rejected(user.id);
+        }
+        return [r.status, { error: r.error }];
+      }
+      const grants = [];
+      let mine = null;
+      for (const res of r.results) {
+        const out = res.playerId === user.id ? grants : [];
+        economy?.run(res.playerId, { newRecord: res.newRecord, game: "tanks" }, out);
+        tracker?.event(res.playerId, "game_finish", "tanks");
+        if (res.playerId === user.id) mine = res;
+      }
+      economy?.setLang(user.id, user.language_code);
+      return [200, { score: mine?.score ?? 0, best: mine?.best ?? tanks.best(user.id), newRecord: !!mine?.newRecord,
+        ...walletBody(user.id, grants) }];
+    };
+  }
+
   // Статистика (ТЗ P0-5): { type, game, ref? }. Ответ всегда 204 — игре не нужно ничего с ним делать.
   routes["POST /api/events"] = (body, user) => {
     if (!user) return [401, { error: "unauthorized" }];
@@ -238,13 +294,13 @@ export function createApiServer({
       return send(res, 429, { error: "too many requests" });
     }
     try {
-      const body = req.method === "POST" ? await readJson(req) : null;
+      const body = req.method === "POST" ? await readJson(req, path === "/api/tanks/run" ? MAX_REPLAY_BODY : MAX_BODY) : null;
       const user = userFrom(req);
       if (req.method === "POST" && user && !byUser.take(user.id)) {
         res.setHeader("Retry-After", String(byUser.retryAfter(user.id)));
         return send(res, 429, { error: "too many requests" });
       }
-      const [status, out] = handler(body, user);
+      const [status, out] = await handler(body, user);
       send(res, status, out);
     } catch (err) {
       if (err instanceof HttpError) {

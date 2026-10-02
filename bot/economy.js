@@ -32,8 +32,10 @@ export const REASONS = ["achievement", "record", "daily", "invite", "prize", "sh
 // Начисления с дневным потолком на игрока. Призы недели ограничены своим фондом.
 const CAPPED = ["achievement", "record", "daily", "invite"];
 const CAPPED_SQL = CAPPED.map((r) => `'${r}'`).join(", ");
-// Таблицы недели: рекорд «Прыг-Скока» за неделю и общий зачёт (жетоны за неделю без призов и покупок).
-export const BOARDS = ["mario", "overall"];
+// Таблицы недели: рекорды игр за неделю и общий зачёт (жетоны за неделю без призов и покупок).
+export const BOARDS = ["mario", "tanks", "overall"];
+// Таблица принятых игр для каждой игры: у «Прыг-Скока» runs, у «Танкодрома» tanks_runs.
+const RUN_TABLES = { mario: "runs", tanks: "tanks_runs" };
 
 const isInt = (v) => Number.isSafeInteger(v) && v >= 0;
 
@@ -62,6 +64,7 @@ export function validateEconomy(cfg) {
     need(!ids.has(it.id), `shop: повтор ${it.id}`);
     ids.add(it.id);
     need(isInt(it.price) && it.price > 0, `shop ${it.id}: price`);
+    need(isInt(it.stars) && it.stars > 0, `shop ${it.id}: stars`);
     need(typeof it.ru === "string" && typeof it.en === "string", `shop ${it.id}: ru/en`);
   }
   need(ids.size >= 1, "shop пуст");
@@ -85,7 +88,7 @@ export const publicRules = (cfg) => ({
   daily: { ...cfg.daily },
   invite: { inviter: cfg.invite.inviter, newcomer: cfg.invite.newcomer, gamesNeeded: cfg.invite.gamesNeeded },
   season: { pool: cfg.season.pool, boards: cfg.season.boards },
-  shop: cfg.shop.map(({ id, game, price, ru, en }) => ({ id, game, price, ru, en })),
+  shop: cfg.shop.map(({ id, game, price, stars, ru, en }) => ({ id, game, price, stars, ru, en })),
 });
 
 // Текст сообщения с итогами недели.
@@ -93,14 +96,14 @@ const SEASON_TEXT = {
   ru: {
     head: (label) => `🏁 Неделя ${label} закончилась.`,
     gained: (n) => `Жетонов за неделю: ${n}.`,
-    place: (board, place, prize) => `${board === "mario" ? "Прыг-Скок" : "Общий зачёт"}: ${place} место, приз ${prize}.`,
+    place: (board, place, prize) => `${{ mario: "Прыг-Скок", tanks: "Танкодром" }[board] || "Общий зачёт"}: ${place} место, приз ${prize}.`,
     balance: (n) => `Баланс: ${n}.`,
     off: "Не присылать итоги",
   },
   en: {
     head: (label) => `🏁 The week ${label} is over.`,
     gained: (n) => `Tickets this week: ${n}.`,
-    place: (board, place, prize) => `${board === "mario" ? "Hop-Skip" : "Overall"}: place ${place}, prize ${prize}.`,
+    place: (board, place, prize) => `${{ mario: "Hop-Skip", tanks: "Tank Field" }[board] || "Overall"}: place ${place}, prize ${prize}.`,
     balance: (n) => `Balance: ${n}.`,
     off: "Stop weekly results",
   },
@@ -130,7 +133,14 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       WHERE player_id = ? AND reason = 'invite' AND season = ? AND event LIKE 'friend:%'`),
     history: db.prepare(`SELECT id, amount, reason, event, at FROM ledger WHERE player_id = ?
       ORDER BY id DESC LIMIT ?`),
-    owned: db.prepare("SELECT event FROM ledger WHERE player_id = ? AND reason = 'shop'"),
+    owned: db.prepare(`SELECT event AS item FROM ledger WHERE player_id = ? AND reason = 'shop'
+      UNION SELECT item FROM purchases WHERE player_id = ? AND refunded_at IS NULL`),
+    paid: db.prepare("SELECT 1 FROM purchases WHERE player_id = ? AND item = ? AND refunded_at IS NULL"),
+    addPurchase: db.prepare(`INSERT OR IGNORE INTO purchases (player_id, item, stars, charge_id, at)
+      VALUES (?, ?, ?, ?, ?)`),
+    purchase: db.prepare("SELECT * FROM purchases WHERE charge_id = ?"),
+    refund: db.prepare("UPDATE purchases SET refunded_at = ? WHERE charge_id = ? AND refunded_at IS NULL"),
+    tanksGames: db.prepare("SELECT COUNT(*) AS n FROM tanks_runs WHERE player_id = ?"),
     sum: db.prepare("SELECT COALESCE(SUM(amount), 0) AS n FROM ledger WHERE player_id = ?"),
     meta: db.prepare("SELECT value FROM economy_meta WHERE key = ?"),
     setMeta: db.prepare("INSERT OR IGNORE INTO economy_meta (key, value) VALUES (?, ?)"),
@@ -192,9 +202,9 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       return out;
     },
 
-    // Принятый сервером итог игры «Прыг-Скока»: ежедневный бонус с серией, личный рекорд,
-    // награда за приглашение после gamesNeeded игр новичка.
-    run(playerId, { newRecord }, out = []) {
+    // Принятый сервером итог игры (game — mario или tanks): ежедневный бонус с серией
+    // (один на все игры), личный рекорд в этой игре, награда за приглашение.
+    run(playerId, { newRecord, game = "mario" }, out = []) {
       const at = now();
       const day = dayUtc(at);
       tx(() => {
@@ -207,7 +217,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
           grant(out, "daily", n);
         }
       });
-      if (newRecord) grant(out, "record", post(playerId, cfg.record, "record", `mario:${day}`, { at }));
+      if (newRecord) grant(out, "record", post(playerId, cfg.record, "record", `${game}:${day}`, { at }));
       this.inviteCheck(playerId, out, at);
       return out;
     },
@@ -217,9 +227,9 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     inviteCheck(playerId, out = [], at = now()) {
       const seen = store.getSeen(playerId);
       if (!seen || seen.source !== "ref" || !seen.inviter || seen.inviter === playerId) return out;
-      const me = store.getPlayer(playerId);
-      const inviter = store.getPlayer(seen.inviter);
-      if (!me || me.games < cfg.invite.gamesNeeded || !inviter || inviter.games < 1) return out;
+      // Игры, которые сервер проверил: «Прыг-Скок» и «Танкодром».
+      const games = (id) => (store.getPlayer(id)?.games ?? 0) + q.tanksGames.get(id).n;
+      if (games(playerId) < cfg.invite.gamesNeeded || games(seen.inviter) < 1) return out;
       tx(() => {
         if (q.invitesThisSeason.get(seen.inviter, seasonOf(at)).n < cfg.invite.perWeek) {
           post(seen.inviter, cfg.invite.inviter, "invite", `friend:${playerId}`, { at });
@@ -261,7 +271,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       const item = cfg.shop.find((it) => it.id === itemId);
       if (!item) return { ok: false, error: "unknown item" };
       return tx(() => {
-        if (q.has.get(playerId, "shop", item.id)) return { ok: true, already: true, balance: wallet(playerId).balance };
+        if (economy.owns(playerId, item.id)) return { ok: true, already: true, balance: wallet(playerId).balance };
         const w = wallet(playerId);
         if (w.balance < item.price) return { ok: false, error: "not enough", balance: w.balance };
         post(playerId, -item.price, "shop", item.id);
@@ -270,6 +280,25 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     },
 
     wallet,
+
+    owns: (playerId, itemId) => !!(q.has.get(playerId, "shop", itemId) || q.paid.get(playerId, itemId)),
+
+    // ---------- Telegram Stars ----------
+    // Можно ли продать товар за звёзды (проверка перед оплатой, pre_checkout_query).
+    starsCheck(playerId, itemId, amount) {
+      const item = cfg.shop.find((it) => it.id === itemId);
+      if (!item) return { ok: false, error: "unknown item" };
+      if (amount != null && amount !== item.stars) return { ok: false, error: "price changed" };
+      if (economy.owns(playerId, item.id)) return { ok: false, error: "already" };
+      return { ok: true, item };
+    },
+    // Оплата прошла (successful_payment). Повтор того же charge_id ничего не добавит.
+    starsPaid(playerId, itemId, stars, chargeId) {
+      return q.addPurchase.run(playerId, itemId, stars, String(chargeId), now()).changes > 0;
+    },
+    purchase: (chargeId) => q.purchase.get(String(chargeId)),
+    purchases: (playerId) => db.prepare("SELECT * FROM purchases WHERE player_id = ? ORDER BY id").all(playerId),
+    refunded: (chargeId) => q.refund.run(now(), String(chargeId)).changes > 0,
 
     setLang(playerId, code) { if (code) { wallet(playerId); q.setLang.run(String(code).slice(0, 8), playerId); } },
     setNotify(playerId, on) { wallet(playerId); q.setNotify.run(on ? 1 : 0, playerId); },
@@ -283,7 +312,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         today: q.today.get(playerId, day).n,
         dailyCap: cfg.dailyCap,
         streak: w.streak_day === day || w.streak_day === day - 1 ? w.streak : 0,
-        owned: q.owned.all(playerId).map((r) => r.event),
+        owned: q.owned.all(playerId, playerId).map((r) => r.item),
         history: q.history.all(playerId, 30).map(({ id, ...r }) => r),
         season: seasonOf(at),
         seasonEndsAt: seasonStart(seasonOf(at) + 1),
@@ -334,15 +363,18 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         SELECT ?, player_id, SUM(amount),
           SUM(CASE WHEN season = ? AND reason NOT IN ('prize', 'shop') THEN amount ELSE 0 END)
         FROM ledger WHERE season <= ? GROUP BY player_id`).run(season, season, season);
-      const boards = {
-        mario: db.prepare(`SELECT r.player_id, r.score AS value, MIN(r.created_at) AS first
-          FROM runs r JOIN (SELECT player_id, MAX(score) AS best FROM runs
+      // Лучший результат недели в игре; при равенстве выше тот, кто набрал его раньше.
+      const best = (game) => db.prepare(`SELECT r.player_id, r.score AS value, MIN(r.created_at) AS first
+          FROM ${RUN_TABLES[game]} r JOIN (SELECT player_id, MAX(score) AS best FROM ${RUN_TABLES[game]}
             WHERE created_at >= ? AND created_at < ? GROUP BY player_id) b
             ON b.player_id = r.player_id AND r.score = b.best
           LEFT JOIN wallets w ON w.player_id = r.player_id
           WHERE r.created_at >= ? AND r.created_at < ? AND r.score > 0 AND w.flagged IS NULL
           GROUP BY r.player_id ORDER BY value DESC, first ASC LIMIT ?`)
-          .all(from, to, from, to, cfg.season.boards.mario.length),
+        .all(from, to, from, to, cfg.season.boards[game].length);
+      const boards = {
+        mario: best("mario"),
+        tanks: best("tanks"),
         overall: db.prepare(`SELECT l.player_id, SUM(l.amount) AS value, MAX(l.id) AS first
           FROM ledger l LEFT JOIN wallets w ON w.player_id = l.player_id
           WHERE l.season = ? AND l.reason NOT IN ('prize', 'shop') AND w.flagged IS NULL
@@ -410,7 +442,9 @@ export function economyStats(db, season) {
     WHERE l.season = ? AND l.amount > 0 AND l.reason != 'shop' GROUP BY l.player_id ORDER BY n DESC LIMIT 5`).all(season);
   const players = db.prepare("SELECT COUNT(DISTINCT player_id) AS n FROM ledger WHERE season = ? AND amount > 0").get(season).n;
   const flagged = db.prepare("SELECT COUNT(*) AS n FROM wallets WHERE flagged IS NOT NULL").get().n;
-  return { season, byReason, issued, top, players, flagged };
+  const stars = db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(stars), 0) AS sum FROM purchases
+    WHERE at >= ? AND at < ? AND refunded_at IS NULL`).get(seasonStart(season), seasonStart(season + 1));
+  return { season, byReason, issued, top, players, flagged, stars };
 }
 
 export function economyReport(db, cfg, at = Date.now()) {
@@ -422,6 +456,7 @@ export function economyReport(db, cfg, at = Date.now()) {
     `💠 Жетоны, неделя ${seasonLabel(s.season)} (сезон ${s.season}, дни по UTC)`,
     `Выдано: ${s.issued} у ${s.players} игроков${share ? ` (${share})` : ""}`,
     `Потрачено в магазине: ${-of("shop")}, аннулировано: ${-of("annul")}`,
+    `Покупки за звёзды за неделю: ${s.stars.n} на ${s.stars.sum} ⭐`,
     `Предел недели: ${cfg.dailyCap} × 7 × игроков + фонд ${cfg.season.pool} = ` +
       `${maxWeeklyEmission(cfg, s.players)} при ${s.players} игроках`,
     `Топ получателей: ${s.top.length ? s.top.map((t) => `${t.name || "?"} (${t.player_id}) ${t.n}`).join(", ") : "нет"}`,

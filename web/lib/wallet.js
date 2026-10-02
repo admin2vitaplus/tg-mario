@@ -5,7 +5,9 @@
 //
 //   Wallet.owns(shopId)       -> true if bought (remembered on the phone for offline starts)
 //   Wallet.price(shopId)      -> price, or null before the shop list has loaded
-//   Wallet.buy(shopId)        -> Promise<boolean>, asks the player first
+//   Wallet.buy(shopId, via)   -> Promise<boolean>; via 'tokens' (жетоны) or 'stars' (Telegram
+//                                Stars); without it the player picks one
+//   Wallet.stars(shopId)      -> price in Telegram Stars, or null
 //   Wallet.grants(res.wallet) -> shows «+10» toasts after a game result
 //   Wallet.open(tab)          -> 'how' | 'history' | 'shop'
 (() => {
@@ -47,6 +49,9 @@ const STR = {
     shop_note: 'Купленное включается в «Внешнем виде» игры.',
     buy: 'Купить', bought: 'Куплено',
     confirm: 'Купить «{name}» за {n} {w}?',
+    choose: 'Как купить «{name}»?',
+    pay_tokens: '◆ {n} {w}', pay_stars: '⭐ {n}', cancel: 'Отмена',
+    paid_wait: 'Оплата прошла, товар появится через несколько секунд. Если нет — откройте игру заново.',
     not_enough: 'Не хватает жетонов: нужно {n}, есть {have}.',
     buy_failed: 'Не получилось купить. Проверьте связь и попробуйте ещё раз.',
     toast: '+{n} {w}', days: '{n} д.', hours: '{n} ч',
@@ -80,6 +85,9 @@ const STR = {
     shop_note: 'What you buy is switched on in the game\'s Looks.',
     buy: 'Buy', bought: 'Bought',
     confirm: 'Buy «{name}» for {n} {w}?',
+    choose: 'How to buy «{name}»?',
+    pay_tokens: '◆ {n} {w}', pay_stars: '⭐ {n}', cancel: 'Cancel',
+    paid_wait: 'Paid. The item will appear in a few seconds; if not, open the game again.',
     not_enough: 'Not enough tickets: {n} needed, you have {have}.',
     buy_failed: 'Could not buy. Check the connection and try again.',
     toast: '+{n} {w}', days: '{n} d', hours: '{n} h',
@@ -225,7 +233,9 @@ function render(body) {
       '<ul class="wShop">' + info.shop.map((it) => {
         const has = owned.includes(it.id);
         return `<li><span>${esc(it[lang])}</span>` + (has ? `<i>${esc(T('bought'))}</i>`
-          : `<button class="wAct" data-act="buy" data-id="${esc(it.id)}">◆ ${it.price}</button>`) + '</li>';
+          : `<span class="wPay"><button class="wAct" data-act="buy" data-via="tokens" data-id="${esc(it.id)}">◆ ${it.price}</button>` +
+            (canStars() ? `<button class="wAct wStars" data-act="buy" data-via="stars" data-id="${esc(it.id)}">⭐ ${it.stars}</button>` : '') +
+            '</span>') + '</li>';
       }).join('') + '</ul>';
   }
 }
@@ -279,7 +289,7 @@ function open(tab) {
   panel.querySelector('.wBody').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
-    if (b.dataset.act === 'buy') buy(b.dataset.id).then((ok) => { if (ok && panel) show('shop'); });
+    if (b.dataset.act === 'buy') buy(b.dataset.id, b.dataset.via).then((ok) => { if (ok && panel) show('shop'); });
     if (b.dataset.act === 'invite') invite();
     if (b.dataset.act === 'reopen') reopen();
   });
@@ -322,30 +332,82 @@ function tell(text) {
   window.alert(text);
 }
 
-function buy(id) {
+// Telegram Stars are paid inside Telegram only (6.1+ has openInvoice).
+const canStars = () => !!(tg && tg.openInvoice && tg.isVersionAtLeast && tg.isVersionAtLeast('6.1'));
+
+// A choice of how to pay: Telegram's own popup with up to three buttons.
+function choose(it) {
+  if (!canStars()) return Promise.resolve('tokens');
+  return new Promise((resolve) => {
+    try {
+      tg.showPopup({
+        message: T('choose', { name: it[lang] }),
+        buttons: [
+          { id: 'tokens', type: 'default', text: T('pay_tokens', { n: it.price }) },
+          { id: 'stars', type: 'default', text: T('pay_stars', { n: it.stars }) },
+          { type: 'cancel' },
+        ],
+      }, (id) => resolve(id || null));
+    } catch (e) { resolve('tokens'); }
+  });
+}
+
+function bought(id, r) {
+  keepOwned((r && r.owned) || owned.concat(id));
+  if (me && r && typeof r.balance === 'number') me.balance = r.balance;
+  badge();
+  try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch (e) { /* ignore */ }
+  return true;
+}
+
+function buyTokens(it) {
+  if (me.balance < it.price) { tell(T('not_enough', { n: it.price, have: me.balance })); return Promise.resolve(false); }
+  return ask(T('confirm', { name: it[lang], n: it.price })).then((yes) => {
+    if (!yes) return false;
+    return request('POST', '/buy', { item: it.id }).then((r) => bought(it.id, r));
+  });
+}
+
+// The server makes the invoice; the bot hands the item over once Telegram reports the
+// payment, so after «paid» the page waits for the item to show up.
+function buyStars(it) {
+  return request('POST', '/invoice', { item: it.id }).then((r) => new Promise((resolve) => {
+    tg.openInvoice(r.link, (status) => {
+      if (status !== 'paid') { resolve(false); return; }
+      let tries = 0;
+      const check = () => refresh().then(() => {
+        if (owned.includes(it.id)) resolve(bought(it.id));
+        else if (++tries < 8) setTimeout(check, 1500);
+        else { tell(T('paid_wait')); resolve(false); }
+      }, () => (++tries < 8 ? setTimeout(check, 1500) : resolve(false)));
+      check();
+    });
+  }));
+}
+
+function buy(id, via) {
   if (!enabled) return Promise.resolve(false);
   return (info && me ? Promise.resolve() : refresh()).then(() => {
     const it = info.shop.find((x) => x.id === id);
     if (!it) return false;
     if (owned.includes(id)) return true;
-    if (me.balance < it.price) { tell(T('not_enough', { n: it.price, have: me.balance })); return false; }
-    return ask(T('confirm', { name: it[lang], n: it.price })).then((yes) => {
-      if (!yes) return false;
-      return request('POST', '/buy', { item: id }).then((r) => {
-        keepOwned(r.owned || owned.concat(id));
-        if (me) me.balance = r.balance;
-        badge();
-        try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch (e) { /* ignore */ }
-        return true;
-      });
+    return (via ? Promise.resolve(via) : choose(it)).then((how) => {
+      if (how === 'stars' && canStars()) return buyStars(it);
+      if (how === 'tokens') return buyTokens(it);
+      return false;
     });
-  }).catch(() => { tell(T('buy_failed')); return false; });
+  }).catch((e) => {
+    if (e && e.status === 409) return refresh().then(() => owned.includes(id), () => false);
+    tell(T('buy_failed'));
+    return false;
+  });
 }
 
 window.Wallet = {
   enabled,
   owns: (id) => owned.includes(id),
   price: (id) => { const it = info && info.shop.find((x) => x.id === id); return it ? it.price : null; },
+  stars: (id) => { const it = info && info.shop.find((x) => x.id === id); return it ? it.stars : null; },
   buy,
   grants,
   open,

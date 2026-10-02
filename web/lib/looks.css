@@ -39,7 +39,7 @@
 }
 .looksItem.on { border-color: #f8d020; background: rgba(248, 208, 32, 0.15); }
 .looksItem.locked { opacity: 0.45; }
-.looksItem i { position: absolute; top: 4px; right: 4px; font-style: normal; color: #f8d020; }
+.looksItem i { position: absolute; top: 4px; right: 4px; font-style: normal; color: #f8d020; white-space: pre; text-align: right; line-height: 1.15; }
 .looksItem canvas { width: 48px; height: 48px; image-rendering: pixelated; }
 .looksDone {
   margin: 10px auto 0;

@@ -1,5 +1,5 @@
 {
-  "_comment": "Жетоны (ТЗ P1-7). Все суммы — целые числа. Меняются только через PR; проверка — bot/test/economy.test.js.",
+  "_comment": "Жетоны (ТЗ P1-7). Все суммы — целые числа. Меняются только через PR; проверка — bot/test/economy.test.js. stars — цена товара в Telegram Stars.",
   "dailyCap": 150,
   "achievement": 20,
   "record": 10,
@@ -10,14 +10,16 @@
     "pool": 2000,
     "notify": true,
     "boards": {
-      "mario": [400, 250, 150, 100, 80, 60, 50, 40, 40, 30],
-      "overall": [300, 180, 100, 60, 40, 30, 30, 20, 20, 20]
+      "mario": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
+      "tanks": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
+      "overall": [100, 70, 50, 40, 30, 20, 10, 10, 5, 5]
     }
   },
   "shop": [
-    { "id": "pryg-hero-knight", "game": "mario", "price": 300, "ru": "Прыг-Скок: герой «Рыцарь»", "en": "Hop-Skip: hero «Knight»" },
-    { "id": "pryg-enemy-ruby", "game": "mario", "price": 150, "ru": "Прыг-Скок: враги «Рубин»", "en": "Hop-Skip: «Ruby» enemies" },
-    { "id": "pryg-pipe-neon", "game": "mario", "price": 100, "ru": "Прыг-Скок: трубы «Неон»", "en": "Hop-Skip: «Neon» pipes" },
-    { "id": "tanks-tank-emerald", "game": "tanks", "price": 300, "ru": "Танкодром: танк «Изумруд»", "en": "Tank Field: «Emerald» tank" }
+    { "id": "pryg-hero-knight", "game": "mario", "price": 300, "stars": 25, "ru": "Прыг-Скок: герой «Рыцарь»", "en": "Hop-Skip: hero «Knight»" },
+    { "id": "pryg-enemy-ruby", "game": "mario", "price": 150, "stars": 15, "ru": "Прыг-Скок: враги «Рубин»", "en": "Hop-Skip: «Ruby» enemies" },
+    { "id": "pryg-pipe-neon", "game": "mario", "price": 100, "stars": 10, "ru": "Прыг-Скок: трубы «Неон»", "en": "Hop-Skip: «Neon» pipes" },
+    { "id": "tanks-tank-emerald", "game": "tanks", "price": 300, "stars": 25, "ru": "Танкодром: танк «Изумруд»", "en": "Tank Field: «Emerald» tank" },
+    { "id": "tanks-walls-gold", "game": "tanks", "price": 150, "stars": 15, "ru": "Танкодром: стены «Золото»", "en": "Tank Field: «Gold» walls" }
   ]
 }
