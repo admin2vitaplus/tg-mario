@@ -166,7 +166,7 @@ function hud(s) {
   $('coins').textContent = '×' + String(s.coins).padStart(2, '0');
   $('lives').textContent = String(s.lives);
   $('time').textContent = String(Math.max(0, s.timeLeft)).padStart(3, '0');
-  $('world').textContent = '1-' + (s.level + 1);
+  $('world').textContent = (s.world || 1) + '-' + (s.level + 1);
 }
 
 function loadBest() {
@@ -456,6 +456,53 @@ function makeTextures(scene) {
     '..UQQQQQQQQU....',
     '..UUUUUUUUUU....',
   ]);
+  // Biting plant in a pipe: a violet bud on a stem; the bud opens and shuts.
+  const STEM = [
+    '.......NG.......',
+    '..LL...NG...LL..',
+    '.LNNL..NG..LNNL.',
+    '.LNNNL.NG.LNNNL.',
+    '..LNNNLNGLNNNL..',
+    '...LNNNNGNNNL...',
+    '....GGNNGNGG....',
+    '.......NG.......',
+    '.......NG.......',
+    '.......NG.......',
+  ];
+  pix(scene, 'plant0', [
+    '....VVVVVVVV....',
+    '...VWVVVVVVWV...',
+    '..VWWVVVVVVWWV..',
+    '..VVVVVVVVVVVV..',
+    '..DWDWDWDWDWDD..',
+    '..KKKKKKKKKKKK..',
+    '..KKKKKKKKKKKK..',
+    '..DWDWDWDWDWDD..',
+    '..VVVVVVVVVVVV..',
+    '...VVVVVVVVVV...',
+    '....VVVVVVVV....',
+    '......VVVV......',
+    '.......NG.......',
+    '.......NG.......',
+    ...STEM,
+  ]);
+  pix(scene, 'plant1', [
+    '................',
+    '................',
+    '....VVVVVVVV....',
+    '...VWVVVVVVWV...',
+    '..VWWVVVVVVWWV..',
+    '..VVVVVVVVVVVV..',
+    '..DWDWDWDWDWDD..',
+    '..VVVVVVVVVVVV..',
+    '...VVVVVVVVVV...',
+    '....VVVVVVVV....',
+    '......VVVV......',
+    '.......NG.......',
+    '.......NG.......',
+    '.......NG.......',
+    ...STEM,
+  ]);
   pix(scene, 'arrow', ['.WWWWW.', '.WWWWW.', 'WWWWWWW', '.WWWWW.', '..WWW..', '...W...']);
 
   for (const [key, colors] of Object.entries(TILESETS)) drawTiles(scene, key, colors);
@@ -663,307 +710,11 @@ const TILE_OF = {
   'q': T.SIDE_LIP_T, 'w': T.SIDE_LIP_B, 'z': T.SIDE_T, 'x': T.SIDE_B,
 };
 
-// A level is one wide grid split into areas (the main course, a bonus room, an exit
-// outside). Each area has its own colors and camera limits; pipes move the hero between them.
-function grid(W) {
-  const H = 15;
-  const g = Array.from({ length: H }, () => Array(W).fill('.'));
-  const put = (x, y, ch) => { if (x >= 0 && x < W && y >= 0 && y < H) g[y][x] = ch; };
-  const row = (x, y, s) => { [...s].forEach((ch, i) => { if (ch !== ' ') put(x + i, y, ch); }); };
-  const fill = (x0, x1, y0, y1, ch) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(x, y, ch); };
-  const L = {
-    g, W, H, put, row, fill,
-    areas: [],
-    pipes: [],
-    lifts: [],
-    pipe(x, h) {
-      const top = 13 - h;
-      put(x, top, '['); put(x + 1, top, ']');
-      for (let y = top + 1; y < 13; y++) { put(x, y, '{'); put(x + 1, y, '}'); }
-    },
-    // Pipe lying on its side with the mouth at (x, y..y+1), turning up into the ceiling.
-    sidePipe(x, y, top) {
-      put(x, y, 'q'); put(x, y + 1, 'w');
-      put(x + 1, y, 'z'); put(x + 1, y + 1, 'x');
-      for (let yy = top; yy <= y + 1; yy++) { put(x + 2, yy, '{'); put(x + 3, yy, '}'); }
-    },
-    column(x, h) { for (let y = 13 - h; y < 13; y++) put(x, y, 'H'); },
-    stairsUp(x, n) { for (let i = 0; i < n; i++) L.column(x + i, i + 1); },
-    stairsDown(x, n) { for (let i = 0; i < n; i++) L.column(x + i, n - i); },
-    floor(ch = '#', x0 = 0, x1 = W - 1) { fill(x0, x1, 13, 14, ch); },
-    gap(a, b, lava) {
-      fill(a, b, 13, 14, '.');
-      if (lava) { fill(a, b, 13, 13, '~'); fill(a, b, 14, 14, '='); }
-    },
-    tree(x, w, top) {
-      put(x, top, '(');
-      for (let i = 1; i < w - 1; i++) put(x + i, top, '-');
-      put(x + w - 1, top, ')');
-      const t0 = x + Math.floor((w - 1) / 2);
-      const t1 = w >= 6 ? t0 + 1 : t0;
-      fill(t0, t1, top + 1, 14, 'i');
-    },
-    enemies(xs, y = 12) { for (const x of xs) put(x, y, 'e'); },
-    flagpole(x) {
-      put(x, 3, 'T');
-      for (let y = 4; y < 12; y++) put(x, y, '|');
-      put(x, 12, 'H');
-    },
-    area(x0, x1, tiles, sky, scenery = 'none') { L.areas.push({ x0, x1, tiles, sky, scenery }); },
-    done(extra) { return Object.assign({ grid: g, W, H, areas: L.areas, pipes: L.pipes, lifts: L.lifts }, extra); },
-  };
-  return L;
-}
-
-// 1-1 follows the classic rhythm: first blocks and a berry, four pipes of growing height
-// (the last one leads down to a coin room), a hidden extra life, brick rows high up,
-// block clusters, two pairs of staircases (the second over a pit) and a big staircase to the flag.
-function levelField() {
-  const L = grid(230);
-  const { row, fill, pipe, column, stairsUp, stairsDown, put } = L;
-  L.area(0, 212, 'tiles', '#6b8cff', 'field');
-  L.area(214, 230, 'tilesCave', '#000000');
-  L.floor('#', 0, 211);
-  L.gap(69, 70);
-  L.gap(86, 88);
-  L.gap(153, 154);
-
-  row(16, 9, '?');
-  row(20, 9, 'BMB?B');
-  row(22, 5, '?');
-  pipe(28, 2);
-  pipe(38, 3);
-  pipe(46, 4);
-  pipe(57, 4);
-  put(64, 8, 'h');
-  row(77, 9, 'BMB');
-  row(80, 5, 'BBBBBBBB');
-  row(91, 5, 'BBB?');
-  row(94, 9, 'C');
-  row(100, 9, 'BB');
-  row(106, 9, '?  ?  ?');
-  row(109, 5, 'M');
-  row(118, 9, 'B');
-  row(121, 5, 'BBB');
-  row(128, 5, 'B??B');
-  row(129, 9, 'BB');
-  stairsUp(134, 4);
-  stairsDown(140, 4);
-  stairsUp(148, 4);
-  column(152, 4);
-  stairsDown(155, 4);
-  pipe(163, 2);
-  row(168, 9, 'BB?B');
-  pipe(179, 2);
-  stairsUp(181, 8);
-  column(189, 8);
-  L.flagpole(198);
-
-  L.enemies([22, 40, 51, 53, 97, 99, 107, 114, 116, 124, 126, 128, 130, 174, 176]);
-  L.enemies([81, 83], 4);
-
-  // Coin room under the last tall pipe; its side pipe leads back up through the pipe near the end.
-  L.floor('#', 214, 229);
-  fill(214, 214, 2, 12, 'B');
-  fill(214, 229, 1, 1, 'B');
-  fill(217, 223, 10, 12, 'B');
-  row(217, 9, 'ooooooo');
-  row(217, 8, 'ooooooo');
-  row(218, 6, 'ooooo');
-  L.sidePipe(226, 11, 2);
-  L.pipes.push({ type: 'down', x: 57, y: 9, to: { area: 1, x: 216, y: 3 } });
-  L.pipes.push({ type: 'side', x: 226, y: 11, to: { area: 0, pipeX: 163, pipeY: 11 } });
-
-  return L.done({ goal: 'pole', goalX: 198 });
-}
-
-// Underground: brick ceiling, low passages, lots of coins, lifts over a pit,
-// then a side pipe up to the surface where the flag is.
-function levelCave() {
-  const L = grid(212);
-  const { row, fill, pipe, column, stairsUp } = L;
-  L.area(0, 178, 'tilesCave', '#000000');
-  L.area(180, 212, 'tiles', '#6b8cff', 'field');
-  L.floor('#', 0, 177);
-  fill(0, 0, 1, 12, 'B');
-  fill(6, 175, 1, 1, 'B');
-  L.gap(46, 48);
-  L.gap(98, 100);
-  L.gap(122, 123);
-
-  row(10, 9, 'M?????');
-  row(18, 11, 'oo');
-  stairsUp(27, 4);
-  column(31, 4);
-  column(32, 3);
-  row(28, 6, 'oooo');
-  fill(38, 43, 5, 6, 'B');
-  row(38, 8, 'oooooo');
-  row(39, 6, 'C');
-  row(45, 9, 'BBBBB');
-  fill(52, 53, 2, 8, 'B');
-  row(52, 9, 'CB');
-  row(56, 11, 'oooooo');
-  fill(56, 63, 9, 9, 'B');
-  row(56, 8, 'oooooooo');
-  fill(66, 71, 2, 9, 'B');
-  fill(66, 71, 5, 7, '.');
-  row(66, 6, 'oooooo');
-  row(73, 9, 'B?B');
-  pipe(80, 3);
-  row(84, 6, 'oooo');
-  pipe(88, 4);
-  row(92, 9, 'BMB');
-  fill(94, 97, 3, 3, 'B');
-  row(101, 9, 'BBB');
-  row(101, 8, 'ooo');
-  pipe(106, 2);
-  row(110, 5, 'BBBBBBBBBB');
-  row(110, 9, 'B?BCB?B');
-  row(110, 8, 'ooooooo');
-  column(118, 2);
-  row(125, 9, 'oooo');
-  fill(126, 129, 10, 10, 'H');
-  stairsUp(136, 6);
-  fill(142, 145, 7, 12, 'H');
-  row(142, 6, 'oooo');
-
-  // Pit with two lifts going up and down.
-  L.gap(146, 157);
-  L.lifts.push({ x: 148, y: 8, w: 3, axis: 'y', dist: 4, period: 4, phase: 0 });
-  L.lifts.push({ x: 153, y: 8, w: 3, axis: 'y', dist: 4, period: 4, phase: 0.5 });
-  row(160, 9, 'BB?BB');
-  row(160, 8, 'ooooo');
-  L.sidePipe(170, 11, 2);
-  fill(174, 177, 1, 12, 'H');
-  L.pipes.push({ type: 'side', x: 170, y: 11, to: { area: 1, pipeX: 182, pipeY: 11 } });
-
-  // Outside: exit pipe, stairs and the flag.
-  L.floor('#', 180, 211);
-  pipe(182, 2);
-  stairsUp(188, 8);
-  column(196, 8);
-  L.flagpole(204);
-
-  L.enemies([16, 20, 35, 37, 58, 60, 62, 76, 84, 86, 96, 112, 114, 120, 131, 133, 163, 166]);
-  return L.done({ goal: 'pole', goalX: 204 });
-}
-
-// Treetops: platforms high above a bottomless drop, with lifts between them.
-function levelTrees() {
-  const L = grid(180);
-  const { row, tree } = L;
-  L.area(0, 180, 'tiles', '#6b8cff', 'sky');
-  L.floor('#', 0, 15);
-  tree(17, 4, 11);
-  tree(23, 6, 8);
-  row(24, 5, 'oooo');
-  tree(31, 3, 10);
-  tree(36, 5, 7);
-  tree(44, 7, 9);
-  row(46, 5, '?M?');
-  L.lifts.push({ x: 53, y: 9, w: 3, axis: 'x', dist: 5, period: 4, phase: 0 });
-  tree(61, 5, 7);
-  row(62, 4, 'ooo');
-  tree(69, 4, 10);
-  tree(76, 8, 7);
-  row(77, 4, 'oooooo');
-  L.lifts.push({ x: 87, y: 6, w: 3, axis: 'y', dist: 5, period: 3.5, phase: 0.25 });
-  tree(92, 4, 8);
-  row(93, 6, 'oo');
-  tree(99, 6, 11);
-  row(100, 8, '?  ?');
-  L.lifts.push({ x: 107, y: 9, w: 3, axis: 'x', dist: 4, period: 3.5, phase: 0 });
-  tree(115, 5, 7);
-  row(116, 4, 'ooo');
-  tree(122, 3, 9);
-  tree(128, 6, 7);
-  row(129, 4, 'oooo');
-  L.lifts.push({ x: 136, y: 5, w: 3, axis: 'y', dist: 5, period: 3.5, phase: 0.75 });
-  tree(141, 5, 9);
-  L.floor('#', 148, 179);
-  L.stairsUp(152, 4);
-  L.flagpole(166);
-
-  L.enemies([25], 7);
-  L.enemies([38], 6);
-  L.enemies([46, 48], 8);
-  L.enemies([79, 81], 6);
-  L.enemies([101], 10);
-  L.enemies([130], 6);
-  L.enemies([158, 161]);
-  return L.done({ goal: 'pole', goalX: 166 });
-}
-
-// Castle: lava pits with jumping lava balls, rotating fire bars, and a bridge
-// guarded by a big beetle. Pulling the lever at the far end drops the bridge.
-function levelCastle() {
-  const L = grid(200);
-  const { row, fill, column, put } = L;
-  L.area(0, 200, 'tilesCastle', '#000000');
-  L.floor();
-  fill(0, 145, 0, 2, 'H');
-  fill(0, 5, 8, 12, 'H');
-  fill(6, 15, 9, 12, 'H');
-  L.gap(16, 19, true);
-  put(18, 13, 'f');
-  fill(20, 26, 9, 12, 'H');
-  fill(27, 45, 3, 4, 'H');
-  put(34, 8, 'r');
-  put(30, 9, 'M');
-  L.gap(46, 49, true);
-  put(48, 13, 'f');
-  fill(50, 54, 11, 12, 'H');
-  row(58, 9, '? ? ?');
-  L.gap(66, 69, true);
-  put(67, 13, 'f');
-  fill(70, 73, 10, 12, 'H');
-  put(72, 10, 'r');
-  fill(74, 90, 3, 5, 'H');
-  row(78, 10, 'oooooo');
-  put(86, 12, 'r');
-  L.gap(92, 99, true);
-  fill(95, 96, 10, 14, 'H');
-  put(93, 13, 'f');
-  put(98, 13, 'f');
-  fill(100, 104, 8, 12, 'H');
-  put(104, 8, 'r');
-  row(108, 9, '?M?');
-  column(115, 3);
-  put(115, 10, 'r');
-  L.gap(120, 132, true);
-  fill(123, 125, 11, 14, 'H');
-  fill(128, 130, 9, 14, 'H');
-  put(121, 13, 'f');
-  put(126, 13, 'f');
-  put(131, 13, 'f');
-  fill(133, 145, 3, 4, 'H');
-  fill(133, 135, 10, 12, 'H');
-  put(134, 10, 'r');
-
-  // Boss room: a bridge over lava, the lever behind it.
-  fill(146, 199, 0, 3, 'H');
-  fill(146, 149, 9, 12, 'H');
-  L.gap(150, 165, true);
-  fill(150, 165, 9, 9, '_');
-  fill(166, 172, 9, 14, 'H');
-  fill(173, 199, 4, 12, 'H');
-
-  L.enemies([12, 24], 8);
-  L.enemies([40, 42, 56, 64, 80, 84, 110, 112, 140, 144]);
-  return L.done({
-    goal: 'lever', goalX: 167, start: [3, 8],
-    bridge: { x0: 150, x1: 165, y: 9 },
-    boss: { x: 161, min: 153, max: 164 },
-  });
-}
-
-const LEVELS = [
-  { name: 'ПОЛЕ', build: levelField, time: 400 },
-  { name: 'ПОДЗЕМЕЛЬЕ', build: levelCave, time: 400 },
-  { name: 'ВЕРХУШКИ ДЕРЕВЬЕВ', build: levelTrees, time: 300 },
-  { name: 'ЗАМОК', build: levelCastle, time: 300 },
-];
+// Level maps live in levels.js (loaded before this file).
+const LEVELS = window.PrygLevels.LEVELS;
+// Worlds 2-4 replay the same maps with faster enemies, until they get maps of their own.
+const WORLDS = 4;
+const worldSpeed = (w) => 1 + 0.2 * (w - 1);
 
 // ---------- Looks («Внешний вид») ----------
 // Each item has a stars price for later; everything is free for now.
@@ -1209,7 +960,10 @@ class Play extends Phaser.Scene {
   constructor() { super('play'); }
 
   init(data) {
-    this.s = Object.assign({ lives: 3, score: 0, coins: 0, level: 0 }, data || {});
+    this.s = Object.assign({ lives: 3, score: 0, coins: 0, level: 0, world: 1 }, data || {});
+    // Past the checkpoint the hero restarts from it after losing a life.
+    this.fromCheckpoint = this.s.checkpoint === this.s.level;
+    delete this.s.checkpoint;
     this.def = LEVELS[this.s.level];
     this.s.timeLeft = this.def.time;
     this.big = !!this.s.big;
@@ -1312,7 +1066,7 @@ class Play extends Phaser.Scene {
     else this.lever = this.add.image(goalX, lvl.bridge.y * TILE, 'lever').setOrigin(0.5, 1);
 
     // Hero.
-    const [sx, sy] = lvl.start || [3, 13];
+    const [sx, sy] = this.fromCheckpoint ? lvl.checkpoint.start : lvl.start || [3, 13];
     this.player = this.physics.add.sprite(sx * TILE + 8, sy * TILE, this.heroTex() + '0').setOrigin(0.5, 1).setDepth(DEPTH.HERO);
     this.player.body.setMaxVelocity(300, 270);
     this.applyBody();
@@ -1365,6 +1119,11 @@ class Play extends Phaser.Scene {
       this.physics.add.overlap(this.player, zone, () => this.pullLever());
     }
     if (lvl.boss) this.addBoss(lvl.boss);
+    this.plants = (lvl.plants || []).map((pl) => this.addPlant(pl));
+    for (const sg of lvl.signs || []) {
+      this.add.text(sg.x * TILE, sg.y * TILE, sg.text, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 })
+        .setOrigin(0.5).setDepth(DEPTH.TILES + 1);
+    }
 
     const kb = this.input.keyboard;
     this.keys = kb.addKeys('LEFT,RIGHT,UP,DOWN,Z,X,A,S,SPACE,SHIFT');
@@ -1380,8 +1139,10 @@ class Play extends Phaser.Scene {
       },
     });
 
-    this.setArea(0);
-    cam.scrollX = 0;
+    const startArea = Math.max(0, lvl.areas.findIndex((ar) => sx >= ar.x0 && sx < ar.x1));
+    this.setArea(startArea);
+    const ar0 = lvl.areas[startArea];
+    cam.scrollX = Phaser.Math.Clamp(this.player.x - VIEW_W * 0.42, ar0.x0 * TILE, ar0.x1 * TILE - VIEW_W);
 
     // The physics world outlives scene restarts, so its paused flag does too.
     this.physics.pause();
@@ -1460,6 +1221,7 @@ class Play extends Phaser.Scene {
   }
 
   leavePipe(to) {
+    if (to.world) { this.warp(to.world); return; }
     const p = this.player;
     const b = p.body;
     const cam = this.cameras.main;
@@ -1645,7 +1407,7 @@ class Play extends Phaser.Scene {
     this.physics.pause();
     const items = [
       this.add.rectangle(0, 0, VIEW_W, VIEW_H, 0x000000).setOrigin(0),
-      this.add.text(VIEW_W / 2, 92, `МИР 1-${this.s.level + 1}`, { fontFamily: 'Courier New, monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0.5),
+      this.add.text(VIEW_W / 2, 92, `МИР ${this.s.world}-${this.s.level + 1}`, { fontFamily: 'Courier New, monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0.5),
       this.add.text(VIEW_W / 2, 116, this.def.name, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#f8d020', resolution: 4 }).setOrigin(0.5),
       this.add.image(VIEW_W / 2 - 14, 150, this.heroTex() + '0').setOrigin(0.5, 1),
       this.add.text(VIEW_W / 2 + 2, 142, `× ${this.s.lives}`, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0, 0.5),
@@ -1761,6 +1523,7 @@ class Play extends Phaser.Scene {
     this.updateFireballs();
     this.updateBoss(time, delta);
     this.updateHazards(delta);
+    this.updatePlants(time);
 
     if (this.dead || this.inPipe) return;
 
@@ -1773,6 +1536,14 @@ class Play extends Phaser.Scene {
     }
 
     if (p.y > VIEW_H + 24) { this.die(true); return; }
+    const cp = this.lvl.checkpoint;
+    if (cp && p.x > cp.x * TILE) this.passedCheckpoint = true;
+    // Walking (or running over the ceiling) into the next area moves the camera there.
+    const here = this.lvl.areas[this.area];
+    if (p.x >= here.x1 * TILE) {
+      const next = this.lvl.areas.findIndex((ar) => p.x >= ar.x0 * TILE && p.x < ar.x1 * TILE);
+      if (next >= 0) { this.setArea(next); cam.scrollX = this.lvl.areas[next].x0 * TILE; }
+    }
     const under = this.layerAt(Math.floor(p.x / TILE)).getTileAtWorldXY(p.x, b.bottom - 4);
     if (under && under.index === T.LAVA_TOP && b.bottom > under.pixelY + 6) { this.die(true); return; }
 
@@ -1874,10 +1645,10 @@ class Play extends Phaser.Scene {
       const st = e.getData('state');
       if (st === 'idle' && e.x < cam.scrollX + VIEW_W + 24 && e.x > cam.scrollX - 24) {
         e.setData('state', 'walk');
-        e.body.setVelocityX(-30);
+        e.body.setVelocityX(-30 * worldSpeed(this.s.world));
       } else if (st === 'walk') {
-        if (e.body.blocked.left) e.body.setVelocityX(30);
-        else if (e.body.blocked.right) e.body.setVelocityX(-30);
+        if (e.body.blocked.left) e.body.setVelocityX(30 * worldSpeed(this.s.world));
+        else if (e.body.blocked.right) e.body.setVelocityX(-30 * worldSpeed(this.s.world));
         e.setTexture('bug' + (Math.floor(time / 200) % 2));
       }
       if (e.y > VIEW_H + 32) e.destroy();
@@ -2096,7 +1867,10 @@ class Play extends Phaser.Scene {
     this.time.delayedCall(2500, () => {
       this.s.lives--;
       if (this.s.lives > 0) {
-        this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: this.s.level });
+        this.scene.restart({
+          lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: this.s.level, world: this.s.world,
+          checkpoint: this.passedCheckpoint ? this.s.level : undefined,
+        });
       } else {
         this.gameOver('ИГРА ОКОНЧЕНА');
       }
@@ -2106,9 +1880,12 @@ class Play extends Phaser.Scene {
   gameOver(title, completed) {
     const best = saveBest(this.s.score);
     this.physics.pause();
-    const levels = completed ? LEVELS.length : this.s.level;
-    showOverlay(title, `Счёт: ${this.s.score}<br>Рекорд: ${best}`, 'Играть снова', () => {
-      this.scene.restart({});
+    // The score server counts the levels of one world (0..4).
+    const levels = completed ? LEVELS.length : Math.min(LEVELS.length - 1, this.s.level);
+    // As on the console, a lost game continues from the start of the current world.
+    const world = completed ? 1 : this.s.world;
+    showOverlay(title, `Счёт: ${this.s.score}<br>Рекорд: ${best}`, world > 1 ? `Продолжить с мира ${world}` : 'Играть снова', () => {
+      this.scene.restart({ world });
     });
     api.runDone(this.s.score, levels, !!completed).then((r) => {
       if (!r) return;
@@ -2156,11 +1933,73 @@ class Play extends Phaser.Scene {
   finishLevel() {
     api.levelDone(this.s.level, this.s.score, this.s.timeLeft);
     this.addScore(this.s.timeLeft * 50);
-    const next = this.s.level + 1;
-    if (next < LEVELS.length) {
-      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, big: this.big, fire: this.fire });
+    let next = this.s.level + 1;
+    let world = this.s.world;
+    if (next >= LEVELS.length) { next = 0; world++; }
+    if (world <= WORLDS) {
+      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, world, big: this.big, fire: this.fire });
     } else {
-      this.gameOver('МИР 1 ПРОЙДЕН!', true);
+      this.gameOver('ВСЕ МИРЫ ПРОЙДЕНЫ!', true);
+    }
+  }
+
+  // Warp zone pipe: straight to the first level of another world.
+  warp(world) {
+    this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: 0, world, big: this.big, fire: this.fire });
+  }
+
+  // ---------- Biting plants in pipes ----------
+  addPlant(pl) {
+    const x = pl.x * TILE + TILE;
+    const top = pl.y * TILE;
+    // Sits behind the pipe tiles, so it is hidden while down.
+    const plant = this.add.image(x, top + 24, 'plant0').setOrigin(0.5, 1).setDepth(DEPTH.SPROUT);
+    plant.setData('top', top);
+    plant.setData('alive', true);
+    plant.setData('next', 0);
+    plant.setData('phase', 'down');
+    return plant;
+  }
+
+  updatePlants(time) {
+    const pb = this.player.body;
+    for (const plant of this.plants) {
+      if (!plant.getData('alive')) continue;
+      const top = plant.getData('top');
+      plant.setTexture('plant' + (Math.floor(time / 180) % 2));
+      if (plant.getData('phase') === 'down' && time > plant.getData('next')) {
+        // Like on the console, it stays in the pipe while the hero is right next to it.
+        if (Math.abs(this.player.x - plant.x) < 28) { plant.setData('next', time + 300); continue; }
+        plant.setData('phase', 'up');
+        this.tweens.add({
+          targets: plant, y: top, duration: 700,
+          onComplete: () => this.time.delayedCall(1400, () => {
+            if (!plant.getData('alive')) return;
+            this.tweens.add({ targets: plant, y: top + 24, duration: 700, onComplete: () => {
+              plant.setData('phase', 'down');
+              plant.setData('next', this.time.now + 1500);
+            } });
+          }),
+        });
+      }
+      const out = top - (plant.y - 24);
+      if (out <= 2) continue;
+      const left = plant.x - 6;
+      const right = plant.x + 6;
+      const ptop = top - out + 2;
+      for (const f of this.fireballs.getChildren()) {
+        if (f.active && f.x > left - 3 && f.x < right + 3 && f.y > ptop && f.y < top) {
+          f.destroy();
+          plant.setData('alive', false);
+          this.tweens.killTweensOf(plant);
+          plant.destroy();
+          this.addScore(200);
+          SFX.stomp();
+          break;
+        }
+      }
+      if (!plant.active) continue;
+      if (!this.dead && !this.won && pb.right > left && pb.left < right && pb.bottom > ptop && pb.top < top) this.hurt();
     }
   }
 }
