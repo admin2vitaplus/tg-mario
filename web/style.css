@@ -223,3 +223,26 @@ html, body {
 }
 #menu.loading .hint { opacity: 1; color: #f8d020; animation: blink 0.8s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
+
+/* «Назад» (lib/back.js): a small button in the top-left corner during a game */
+#backBtn {
+  position: absolute;
+  top: 4px;
+  left: calc(4px + env(safe-area-inset-left));
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font: bold 18px "Courier New", monospace;
+}
+.withBack #hud { padding-left: 40px; }
+#overlay { z-index: 4; }
+#overlay #ovMenu { margin-top: 12px; padding: 8px 16px; border: 0; background: transparent; color: #fff; font-size: 14px; opacity: 0.8; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .withBack #hud { top: 42px; padding-left: 0; }
+  #overlay #ovMenu { margin-top: 6px; padding: 4px 12px; font-size: 13px; }
+}

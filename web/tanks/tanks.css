@@ -224,3 +224,25 @@ html, body {
   #menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 }
 #ovShare { margin-top: 10px; }
+
+/* «Назад» (../lib/back.js): a small button in the top-left corner */
+#backBtn {
+  position: absolute;
+  top: 4px;
+  left: calc(4px + env(safe-area-inset-left));
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font: bold 18px "Courier New", monospace;
+}
+.withBack #hud { padding-left: 40px; }
+#overlay { z-index: 4; }
+#overlay #ovMenu { margin-top: 12px; padding: 8px 16px; background: transparent; font-size: 14px; opacity: 0.8; }
+@media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
+  .withBack #hud { padding-left: 0; }
+}
