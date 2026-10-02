@@ -17,8 +17,6 @@ if (tg) {
     if (tg.isVersionAtLeast('6.1')) {
       tg.setHeaderColor('#000000');
       tg.setBackgroundColor('#000000');
-      tg.BackButton.show();
-      tg.BackButton.onClick(() => { location.href = '../'; });
     }
     if (tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes();
   } catch (e) { /* not inside Telegram */ }
@@ -855,6 +853,7 @@ function showOverlay(title, html, button, action, panel) {
   btn.textContent = button || '';
   overlayAction = action;
   $('ovShare').classList.add('hidden');
+  $('ovMenu').classList.add('hidden');
   $('overlay').classList.remove('hidden');
 }
 
@@ -1433,6 +1432,32 @@ if (window.CARTRIDGE && !window.CARTRIDGE.isEnabled('tanks')) {
   $('back').classList.remove('hidden');
   return;
 }
+
+// «Назад» (../lib/back.js): the ← in the corner and Telegram's back button.
+// In a game it pauses (an online game keeps going for the friend); in the
+// online panel it returns to this game's menu; anywhere else to the list of games.
+function leave() {
+  netClose(); // leaving on purpose: the friend sees «вышел» at once
+  if (window.Back) window.Back.toMenu(); else location.href = '../';
+}
+function back() {
+  const looks = document.querySelector('.looks .looksDone');
+  if (looks) { looks.click(); return; } // «Внешний вид» open: back closes it
+  const inGame = state && $('overlay').classList.contains('hidden') && (running || mode === 'guest');
+  if (inGame) {
+    const online = mode !== 'local';
+    if (!online) running = false;
+    showOverlay(T('pause_title'), online ? T('pause_online') : T('pause_text'), T('btn_continue'), () => {
+      $('overlay').classList.add('hidden');
+      if (!online) running = true;
+    });
+    $('ovMenu').classList.remove('hidden');
+  } else if (!$('online').classList.contains('hidden') && mode === 'local' && !net.ws) showMenu();
+  else leave();
+}
+if (window.Back) window.Back.attach(back, { menu: '../', label: T('back_label') });
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') back(); });
+$('ovMenu').addEventListener('click', () => { audio(); leave(); });
 
 track('game_open');
 bindTouch();

@@ -20,7 +20,7 @@ const config = {
       scores: true,
       // Loaded on this page only when the game is chosen, in this order.
       styles: ['lib/looks.css'],
-      scripts: ['lib/phaser.min.js', 'lib/looks.js', 'levels.js', 'worlds.js', 'game.js'],
+      scripts: ['lib/phaser.min.js', 'lib/looks.js', 'lib/back.js', 'levels.js', 'worlds.js', 'game.js'],
     },
     {
       id: 'tanks',

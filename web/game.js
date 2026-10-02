@@ -2384,6 +2384,19 @@ bindControls();
 
 $('ovLooks').addEventListener('click', openLooks);
 
+// «Назад»: during a level it pauses the game; on the title, pause and
+// game-over screens it goes back to the list of games.
+function back() {
+  const scene = window.__scene;
+  const playing = started && $('overlay').classList.contains('hidden') && scene && !scene.scene.isPaused();
+  if (!playing) { window.Back.toMenu(); return; }
+  scene.scene.pause();
+  showOverlay('ПАУЗА', 'Игра остановлена.', 'Продолжить', () => scene.scene.resume());
+}
+if (window.Back) window.Back.attach(back);
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') back(); });
+$('ovMenu').addEventListener('click', () => window.Back.toMenu());
+
 $('ovBtn').addEventListener('click', () => {
   audio();
   $('overlay').classList.add('hidden');
