@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { verifyInitData } from "./auth.js";
 import { ACHIEVEMENTS, publicList } from "./achievements.js";
 import { createRateLimiter } from "./ratelimit.js";
-import { checkLevel, checkRun, SEQUENCE_TTL_MS } from "./plausibility.js";
+import { checkLevel, checkRun, currentGame, LAST_LEVEL, PER_WORLD, SEQUENCE_TTL_MS, WORLD_TIMES } from "./plausibility.js";
 import { CLIENT_EVENTS, GAMES } from "./stats.js";
 import { publicRules } from "./economy.js";
 
@@ -10,7 +10,7 @@ import { publicRules } from "./economy.js";
 // Сетевые игры (например, танки) подключаются к этому же серверу через событие
 // "upgrade" (WebSocket), см. README, раздел «Сервер для других игр».
 
-const LIMITS = { score: 500000, coins: 2000, level: 3, timeLeft: 400, deaths: 99, levels: 4 };
+const LIMITS = { score: 500000, coins: 2000, level: PER_WORLD - 1, world: WORLD_TIMES.length, timeLeft: 400, deaths: 99, levels: LAST_LEVEL + 1 };
 
 const int = (v, max) => {
   const n = Math.floor(Number(v));
@@ -80,13 +80,8 @@ export function createApiServer({
   const byUser = createRateLimiter({ limit: limits.userWritesPerMinute, now });
   const originAllowed = (o) => allowedOrigins.includes("*") || allowedOrigins.includes(o);
 
-  // Отчёты об уровнях текущей игры: после последнего итога игры, начиная с последнего уровня 0.
-  const sequence = (id) => {
-    const rows = store.levelsSince(id, Math.max(store.lastRunAt(id), now() - SEQUENCE_TTL_MS));
-    let start = -1;
-    for (let i = rows.length - 1; i >= 0; i--) if (rows[i].level === 0) { start = i; break; }
-    return start < 0 ? [] : rows.slice(start);
-  };
+  // Отчёты об уровнях текущей игры: после последнего итога игры (plausibility.js, currentGame).
+  const sequence = (id) => currentGame(store.levelsSince(id, Math.max(store.lastRunAt(id), now() - SEQUENCE_TTL_MS)));
 
   const newAchievements = (playerId, event, grants = []) => {
     const player = store.getPlayer(playerId);
@@ -129,19 +124,22 @@ export function createApiServer({
       return [200, meBody(user.id)];
     },
 
-    // Итог пройденного уровня: { level, score, timeLeft, deaths }
+    // Итог пройденного уровня: { world, level, score, timeLeft, deaths }; world 1…4 (старая игра — без него),
+    // level — уровень в мире 0…3. Дальше level — сквозной номер (plausibility.js).
     "POST /api/mario/level": (body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
+      const world = body.world === undefined ? 1 : int(body.world, LIMITS.world);
+      const inWorld = int(body.level, LIMITS.level);
       const e = {
         type: "level",
-        level: int(body.level, LIMITS.level),
+        level: world && inWorld !== null ? (world - 1) * PER_WORLD + inWorld : null,
         score: int(body.score, LIMITS.score),
         timeLeft: int(body.timeLeft, LIMITS.timeLeft),
         deaths: int(body.deaths, LIMITS.deaths),
       };
       if (Object.values(e).includes(null)) return [400, { error: "bad data" }];
       store.touchPlayer(user);
-      const verdict = checkLevel(e, e.level === 0 ? [] : sequence(user.id), now());
+      const verdict = checkLevel(e, sequence(user.id), now());
       if (!verdict.ok) {
         console.warn(`Отклонён отчёт об уровне: ${verdict.why}`);
         economy?.rejected(user.id);
@@ -165,7 +163,6 @@ export function createApiServer({
         bossFire: body.bossFire === true,
       };
       if ([e.score, e.coins, e.levels, e.deaths].includes(null)) return [400, { error: "bad data" }];
-      if (e.completed && e.levels < LIMITS.levels) return [400, { error: "bad data" }];
       store.touchPlayer(user);
       const verdict = checkRun(e, sequence(user.id));
       if (!verdict.ok) {

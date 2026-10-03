@@ -55,11 +55,11 @@ function track(kind) {
 
 const canSave = () => !!(base && initData && server.online !== false);
 
-function levelDone(level, score, timeLeft) {
+function levelDone(level, score, timeLeft, world) {
   const deaths = run.levelDeaths;
   run.levelDeaths = 0;
   if (!canSave()) return;
-  request('POST', '/level', { level, score, timeLeft, deaths })
+  request('POST', '/level', { world: world || 1, level, score, timeLeft, deaths })
     .then((r) => { showAchievements(r.newAchievements); if (window.Wallet) window.Wallet.grants(r.wallet); })
     .catch(() => {});
 }

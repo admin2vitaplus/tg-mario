@@ -350,3 +350,27 @@ test("interface texts avoid the words the spec forbids", () => {
   ];
   for (const t of texts) assert.doesNotMatch(t, banned);
 });
+
+test("migration 6 lifts the automatic flags caused by the unknown worlds 2-4, and only those", () => {
+  const dir = mkdtempSync(join(tmpdir(), "flags-"));
+  const file = join(dir, "db.sqlite");
+  try {
+    let store = openDb(file);
+    const { db } = store;
+    const add = (id, flagged, at) => db.prepare(
+      "INSERT INTO wallets (player_id, balance, flagged, flagged_at, strikes, strike_day) VALUES (?, 0, ?, ?, 3, 1)",
+    ).run(id, flagged, at);
+    add(1, "auto: отклонённые отчёты", Date.UTC(2026, 9, 2, 21));
+    add(2, "auto: отклонённые отчёты", Date.UTC(2026, 8, 30));
+    add(3, "admin", Date.UTC(2026, 9, 2, 21));
+    db.exec("PRAGMA user_version = 5");
+    store.close();
+    store = openDb(file);
+    const flags = store.db.prepare("SELECT player_id, flagged FROM wallets ORDER BY player_id").all()
+      .map((r) => [r.player_id, r.flagged]);
+    assert.deepEqual(flags, [[1, null], [2, "auto: отклонённые отчёты"], [3, "admin"]]);
+    store.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

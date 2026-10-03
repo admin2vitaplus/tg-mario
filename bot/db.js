@@ -185,6 +185,12 @@ export const MIGRATIONS = [
     );
     CREATE INDEX purchases_player ON purchases(player_id);
   `,
+  // 6. Миры 2–4 «Прыг-Скока» (02.10.2026) сервер сначала не знал и отклонял их уровни, из-за чего
+  // честных игроков автоматически помечало. Снимаем такие автоматические пометки с 02.10.2026 00:00 UTC.
+  `
+    UPDATE wallets SET flagged = NULL, flagged_at = NULL, strikes = 0, strike_day = NULL
+      WHERE flagged = 'auto: отклонённые отчёты' AND flagged_at >= 1790899200000;
+  `,
 ];
 
 export function migrate(db) {

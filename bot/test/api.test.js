@@ -61,9 +61,11 @@ test("rejects missing or forged signatures", () =>
   }));
 
 // Честная игра: отчёты об уровнях по порядку, с реальным временем между ними.
-async function playLevels(call, wait, user, levels) {
-  for (const [i, [score, timeLeft, deaths = 0]] of levels.entries()) {
-    const r = await call("POST", "/api/mario/level", { user, body: { level: i, score, timeLeft, deaths } });
+// Уровень в мире и мир считаются по порядку, начиная с from (сквозной номер).
+async function playLevels(call, wait, user, levels, from = 0) {
+  for (const [k, [score, timeLeft, deaths = 0]] of levels.entries()) {
+    const i = from + k;
+    const r = await call("POST", "/api/mario/level", { user, body: { world: Math.floor(i / 4) + 1, level: i % 4, score, timeLeft, deaths } });
     assert.equal(r.status, 200, `level ${i}: ${JSON.stringify(r.json)}`);
     wait(90);
   }
@@ -78,17 +80,19 @@ test("records levels and runs, awards achievements once, ranks players", () =>
     wait(90);
 
     // Новая игра с начала: те же достижения второй раз не выдаются.
-    await playLevels(call, wait, alice, [[3000, 250], [20000, 250], [35000, 150], [45000, 100]]);
+    // Все четыре мира без потерь.
+    const all = Array.from({ length: 16 }, (_, i) => [3000 + i * 3500, i === 8 ? 150 : 100]);
+    await playLevels(call, wait, alice, all);
 
     r = await call("POST", "/api/mario/run", {
-      user: alice, body: { score: 60000, coins: 55, levels: 4, deaths: 0, completed: true, bossFire: true },
+      user: alice, body: { score: 60000, coins: 55, levels: 16, deaths: 0, completed: true, bossFire: true },
     });
     assert.equal(r.status, 200);
     assert.equal(r.json.best, 60000);
     assert.equal(r.json.rank, 1);
     assert.equal(r.json.newRecord, true);
     assert.deepEqual(r.json.newAchievements.map((a) => a.code).sort(),
-      ["boss_fire", "coins_run_50", "no_death_world", "score_50k", "world_clear"]);
+      ["boss_fire", "coins_run_50", "no_death_world", "score_50k"]);
     assert.deepEqual(notified.flatMap(([, list]) => list.map((a) => a.code)).sort(), [
       "boss_fire", "coins_run_50", "first_level", "no_death_level", "no_death_world",
       "score_50k", "speedrun", "treetops", "underground", "world_clear",
@@ -113,8 +117,9 @@ test("records levels and runs, awards achievements once, ranks players", () =>
 test("rejects out-of-range or inconsistent results", () =>
   withServer(async (call) => {
     assert.equal((await call("POST", "/api/mario/run", { user: alice, body: { score: 9e9, coins: 0, levels: 0, deaths: 0 } })).status, 400);
-    assert.equal((await call("POST", "/api/mario/run", { user: alice, body: { score: 1, coins: 0, levels: 1, deaths: 0, completed: true } })).status, 400);
+    assert.equal((await call("POST", "/api/mario/run", { user: alice, body: { score: 1, coins: 0, levels: 1, deaths: 0, completed: true } })).status, 422);
     assert.equal((await call("POST", "/api/mario/level", { user: alice, body: { level: 7, score: 1, timeLeft: 1, deaths: 0 } })).status, 400);
+    assert.equal((await call("POST", "/api/mario/level", { user: alice, body: { world: 5, level: 0, score: 1, timeLeft: 1, deaths: 0 } })).status, 400);
     assert.equal((await call("GET", "/api/nope")).status, 404);
   }));
 
@@ -200,3 +205,41 @@ test("impossible scores never reach the leaderboard", () =>
     assert.equal((await run({ score: 20000, levels: 2, coins: 30 })).status, 200);
     assert.deepEqual((await call("GET", "/api/mario/top")).json.map((p) => p.score), [20000]);
   }));
+
+// Четыре мира (PR с мирами 2–4): продолжение по мирам, труба-переход, «Продолжить с мира N».
+test("worlds 2-4: a game goes on across worlds, through the warp pipe and from a later world", () =>
+  withServer(async (call, _n, wait) => {
+    const level = (body) => call("POST", "/api/mario/level", { user: alice, body: { deaths: 0, ...body } });
+    const run = (body) => call("POST", "/api/mario/run", { user: alice, body: { deaths: 0, coins: 0, ...body } });
+
+    // Весь первый мир и первый уровень второго: счёт идёт дальше, это та же игра.
+    await playLevels(call, wait, alice, [[4000, 200], [9000, 200], [15000, 150], [22000, 150], [30000, 200]]);
+    assert.equal((await run({ score: 32000, levels: 5 })).status, 200);
+    wait(60);
+
+    // 1-1, затем труба в 1-2 ведёт сразу в 4-1.
+    assert.equal((await level({ world: 1, level: 0, score: 5000, timeLeft: 200 })).status, 200);
+    wait(120);
+    assert.equal((await level({ world: 4, level: 0, score: 26000, timeLeft: 200 })).status, 200);
+    wait(120);
+    // Но не прыжок в середину мира.
+    assert.equal((await level({ world: 4, level: 2, score: 30000, timeLeft: 100 })).status, 422);
+    assert.equal((await run({ score: 30000, levels: 2 })).status, 200);
+
+    // «Продолжить с мира 3»: новая игра с нуля с первого уровня третьего мира.
+    wait(600);
+    assert.equal((await level({ world: 3, level: 0, score: 4000, timeLeft: 200 })).status, 200);
+    wait(120);
+    assert.equal((await level({ world: 3, level: 1, score: 8000, timeLeft: 200 })).status, 200);
+    assert.equal((await run({ score: 9000, levels: 2 })).status, 200);
+    // Начать с середины мира нельзя.
+    assert.equal((await level({ world: 3, level: 2, score: 4000, timeLeft: 200 })).status, 422);
+  }));
+
+test("level times on the server are the game's own", async () => {
+  const { WORLD_TIMES } = await import("../plausibility.js");
+  const { readFileSync } = await import("node:fs");
+  const times = (f) => [...readFileSync(new URL(`../../web/${f}`, import.meta.url), "utf8")
+    .matchAll(/\btime: (\d+)/g)].map((m) => Number(m[1]));
+  assert.deepEqual([...times("levels.js"), ...times("worlds.js")], WORLD_TIMES.flat());
+});
