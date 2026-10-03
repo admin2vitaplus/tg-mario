@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 
 // Жетоны (ТЗ P1-7): игровая валюта, которую начисляет только сервер и только за результаты,
-// которые он сам проверил (P0-4). Сейчас это «Прыг-Скок»: отчёты об уровнях и итоги игр проходят
-// проверку правдоподобия; «Танкодром» серверу пока ничего проверяемого не присылает.
+// которые он сам проверил (P0-4): уровни и итоги «Прыг-Скока» (проверка правдоподобия), игры
+// «Танкодрома» (повтор записанных нажатий) и «Слово дня» (попытки проверяет сам сервер).
 //
 // Учёт:
 //  • журнал ledger — только добавление; баланс = сумма журнала, wallets.balance — кэш,
@@ -33,13 +33,19 @@ export const REASONS = ["achievement", "record", "daily", "task", "invite", "pri
 // Начисления с дневным потолком на игрока. Призы недели ограничены своим фондом.
 const CAPPED = ["achievement", "record", "daily", "task", "invite"];
 // Игры с жетонами и их ежедневные задания (сбрасываются в 00:00 UTC).
-export const GAMES = ["mario", "tanks"];
+export const GAMES = ["mario", "tanks", "word"];
 export const DAILY_TASKS = ["play", "level", "record"];
 const CAPPED_SQL = CAPPED.map((r) => `'${r}'`).join(", ");
 // Таблицы недели: рекорды игр за неделю и общий зачёт (жетоны за неделю без призов и покупок).
-export const BOARDS = ["mario", "tanks", "overall"];
+export const BOARDS = ["mario", "tanks", "word", "overall"];
 // Таблица принятых игр для каждой игры: у «Прыг-Скока» runs, у «Танкодрома» tanks_runs.
 const RUN_TABLES = { mario: "runs", tanks: "tanks_runs" };
+// У «Слова дня» (word.js) в таблице не лучший счёт, а сумма очков по дням: за день берётся
+// лучший из результатов на двух языках; при равенстве выше тот, кто набрал сумму раньше.
+const wordSums = (from, to) => `SELECT player_id AS id, SUM(best) AS value, MAX(at) AS tie FROM (
+    SELECT player_id, day, MAX(score) AS best, MIN(finished_at) AS at FROM word_plays
+    WHERE state != 'play' AND finished_at >= ${Number(from)} AND finished_at < ${Number(to)} GROUP BY player_id, day)
+  GROUP BY player_id HAVING value > 0`;
 
 const isInt = (v) => Number.isSafeInteger(v) && v >= 0;
 
@@ -103,14 +109,14 @@ const SEASON_TEXT = {
   ru: {
     head: (label) => `🏁 Неделя ${label} закончилась.`,
     gained: (n) => `Жетонов за неделю: ${n}.`,
-    place: (board, place, prize) => `${{ mario: "Прыг-Скок", tanks: "Танкодром" }[board] || "Общий зачёт"}: ${place} место, приз ${prize}.`,
+    place: (board, place, prize) => `${{ mario: "Прыг-Скок", tanks: "Танкодром", word: "Слово дня" }[board] || "Общий зачёт"}: ${place} место, приз ${prize}.`,
     balance: (n) => `Баланс: ${n}.`,
     off: "Не присылать итоги",
   },
   en: {
     head: (label) => `🏁 The week ${label} is over.`,
     gained: (n) => `Tickets this week: ${n}.`,
-    place: (board, place, prize) => `${{ mario: "Hop-Skip", tanks: "Tank Field" }[board] || "Overall"}: place ${place}, prize ${prize}.`,
+    place: (board, place, prize) => `${{ mario: "Hop-Skip", tanks: "Tank Field", word: "Word of the Day" }[board] || "Overall"}: place ${place}, prize ${prize}.`,
     balance: (n) => `Balance: ${n}.`,
     off: "Stop weekly results",
   },
@@ -148,6 +154,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     purchase: db.prepare("SELECT * FROM purchases WHERE charge_id = ?"),
     refund: db.prepare("UPDATE purchases SET refunded_at = ? WHERE charge_id = ? AND refunded_at IS NULL"),
     tanksGames: db.prepare("SELECT COUNT(*) AS n FROM tanks_runs WHERE player_id = ?"),
+    wordGames: db.prepare("SELECT COUNT(*) AS n FROM word_plays WHERE player_id = ? AND state != 'play'"),
     sum: db.prepare("SELECT COALESCE(SUM(amount), 0) AS n FROM ledger WHERE player_id = ?"),
     meta: db.prepare("SELECT value FROM economy_meta WHERE key = ?"),
     setMeta: db.prepare("INSERT OR IGNORE INTO economy_meta (key, value) VALUES (?, ?)"),
@@ -251,8 +258,8 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     inviteCheck(playerId, out = [], at = now()) {
       const seen = store.getSeen(playerId);
       if (!seen || seen.source !== "ref" || !seen.inviter || seen.inviter === playerId) return out;
-      // Игры, которые сервер проверил: «Прыг-Скок» и «Танкодром».
-      const games = (id) => (store.getPlayer(id)?.games ?? 0) + q.tanksGames.get(id).n;
+      // Игры, которые сервер проверил: «Прыг-Скок», «Танкодром» и «Слово дня».
+      const games = (id) => (store.getPlayer(id)?.games ?? 0) + q.tanksGames.get(id).n + q.wordGames.get(id).n;
       if (games(playerId) < cfg.invite.gamesNeeded || games(seen.inviter) < 1) return out;
       tx(() => {
         if (q.invitesThisSeason.get(seen.inviter, seasonOf(at)).n < cfg.invite.perWeek) {
@@ -381,6 +388,8 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         sql = `SELECT l.player_id AS id, SUM(l.amount) AS value, MAX(l.id) AS tie FROM ledger l
           WHERE l.reason NOT IN ('prize', 'shop', 'annul') ${period === "week" ? `AND l.season = ${season}` : ""}
           GROUP BY l.player_id HAVING value > 0`;
+      } else if (board === "word") {
+        sql = wordSums(period === "week" ? from : 0, Number.MAX_SAFE_INTEGER);
       } else {
         sql = `SELECT player_id AS id, MAX(score) AS value, MIN(created_at) AS tie FROM ${RUN_TABLES[board]}
           WHERE score > 0 ${period === "week" ? `AND created_at >= ${from}` : ""} GROUP BY player_id`;
@@ -449,6 +458,9 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       const boards = {
         mario: best("mario"),
         tanks: best("tanks"),
+        word: db.prepare(`SELECT t.id AS player_id, t.value FROM (${wordSums(from, to)}) t
+          LEFT JOIN wallets w ON w.player_id = t.id WHERE w.flagged IS NULL
+          ORDER BY t.value DESC, t.tie ASC LIMIT ?`).all(cfg.season.boards.word.length),
         overall: db.prepare(`SELECT l.player_id, SUM(l.amount) AS value, MAX(l.id) AS first
           FROM ledger l LEFT JOIN wallets w ON w.player_id = l.player_id
           WHERE l.season = ? AND l.reason NOT IN ('prize', 'shop') AND w.flagged IS NULL

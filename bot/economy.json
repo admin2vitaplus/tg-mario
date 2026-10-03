@@ -8,11 +8,12 @@
   "invite": { "inviter": 50, "newcomer": 30, "gamesNeeded": 3, "perWeek": 10 },
   "suspicious": { "rejectedPerDay": 3 },
   "season": {
-    "pool": 2000,
+    "pool": 2400,
     "notify": true,
     "boards": {
       "mario": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
       "tanks": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
+      "word": [150, 90, 60, 40, 30, 20, 10],
       "overall": [100, 70, 50, 40, 30, 20, 10, 10, 5, 5]
     }
   },
@@ -21,6 +22,8 @@
     { "id": "pryg-enemy-ruby", "game": "mario", "price": 150, "stars": 15, "ru": "Прыг-Скок: враги «Рубин»", "en": "Hop-Skip: «Ruby» enemies" },
     { "id": "pryg-pipe-neon", "game": "mario", "price": 100, "stars": 10, "ru": "Прыг-Скок: трубы «Неон»", "en": "Hop-Skip: «Neon» pipes" },
     { "id": "tanks-tank-emerald", "game": "tanks", "price": 300, "stars": 25, "ru": "Танкодром: танк «Изумруд»", "en": "Tank Field: «Emerald» tank" },
-    { "id": "tanks-walls-gold", "game": "tanks", "price": 150, "stars": 15, "ru": "Танкодром: стены «Золото»", "en": "Tank Field: «Gold» walls" }
+    { "id": "tanks-walls-gold", "game": "tanks", "price": 150, "stars": 15, "ru": "Танкодром: стены «Золото»", "en": "Tank Field: «Gold» walls" },
+    { "id": "word-tiles-sea", "game": "word", "price": 150, "stars": 15, "ru": "Слово дня: плитки «Море»", "en": "Word of the Day: «Sea» tiles" },
+    { "id": "word-tiles-candy", "game": "word", "price": 100, "stars": 10, "ru": "Слово дня: плитки «Карамель»", "en": "Word of the Day: «Candy» tiles" }
   ]
 }

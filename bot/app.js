@@ -5,6 +5,7 @@ import { createTracker } from "./stats.js";
 import { currentCommit } from "./version.js";
 import { createEconomy, loadEconomy } from "./economy.js";
 import { createTanksResults } from "./tanks-results.js";
+import { createWord } from "./word.js";
 
 // Всё, кроме самого бота Telegram и туннеля: база, HTTP API и комнаты «Танкодрома».
 // Вынесено отдельно, чтобы запуск и остановку можно было проверить тестом без сети и токена.
@@ -46,8 +47,9 @@ export async function startApp({
   // Онлайн-матч засчитывается обоим игрокам комнаты, поэтому итоги танков знают состав комнат.
   let tanks = null;
   const tanksResults = createTanksResults(store, { members: (code) => tanks?.members(code) ?? null });
+  const word = createWord(store, { economy, tracker });
   const server = createApiServer({
-    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, createInvoice,
+    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, createInvoice, word,
   });
   tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
 
@@ -73,5 +75,5 @@ export async function startApp({
     store.close();
   })();
 
-  return { server, store, tanks, tracker, economy, commit, gameUrl, allowedOrigins, port: server.address().port, close };
+  return { server, store, tanks, tracker, economy, word, commit, gameUrl, allowedOrigins, port: server.address().port, close };
 }

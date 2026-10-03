@@ -10,7 +10,7 @@
 //   Wallet.stars(shopId)      -> price in Telegram Stars, or null
 //   Wallet.grants(res.wallet) -> shows «+10» toasts after a game result
 //   Wallet.open(tab, {game})  -> the collection's own panel (tabs: tasks, top, shop, history) or,
-//                                with game 'mario' | 'tanks', that game's (tasks, top, shop)
+//                                with game 'mario' | 'tanks' | 'word', that game's (tasks, top, shop)
 //   Wallet.button(el, game)   -> turns a button into «◆ balance», opening the game's panel
 //
 // The collection's tasks (a visit a day, friends) and each game's own tasks (play, clear
@@ -29,7 +29,7 @@ const STR = {
   ru: {
     title: 'ЖЕТОНЫ',
     tab_tasks: 'Задания', tab_top: 'Топ-100', tab_table: 'Таблица', tab_history: 'История', tab_shop: 'Магазин',
-    game_mario: 'Прыг-Скок', game_tanks: 'Танкодром',
+    game_mario: 'Прыг-Скок', game_tanks: 'Танкодром', game_word: 'Слово дня',
     sec_day: 'Каждый день · обновятся через {left} (00:00 UTC)',
     sec_week: 'Каждую неделю · новая неделя через {left}',
     sec_once: 'Достижения · один раз',
@@ -38,9 +38,11 @@ const STR = {
     t_invite: 'Позвать друга: {count} из {max} за неделю',
     t_invite_note: 'Друг сыграет {games} игры — тебе {inviter}, ему {newcomer}.',
     t_play: 'Сыграть игру', t_level: 'Пройти уровень', t_record: 'Побить свой рекорд',
+    t_level_word: 'Отгадать слово', t_record_word: 'Побить свой рекорд серии (от 2 дней)',
     t_other: 'Свои задания у каждой игры: откройте игру и нажмите «◆» в её меню.',
     period_week: 'За неделю', period_all: 'За всё время',
     top_overall: 'Жетоны, полученные за {p}', top_game: 'Лучший счёт за {p}',
+    top_word: 'Очки за {p}: каждый день до 6 (6 — с первой попытки)',
     p_week: 'неделю', p_all: 'всё время',
     prizes: 'Призы недели за 1–{n} места: {list}.',
     me_place: 'Твоё место: {place} ({value})', me_none: 'Тебя пока нет в этой таблице.',
@@ -62,7 +64,7 @@ const STR = {
     no_history: 'Операций пока нет. Сыграй — и здесь появятся первые жетоны.',
     r_achievement: 'Достижение', r_record: 'Личный рекорд', r_daily: 'Вход за день', r_task: 'Задание',
     r_invite: 'Приглашение', r_prize: 'Приз недели', r_shop: 'Покупка', r_annul: 'Отменено администратором',
-    prize_place: '{place} место ({board})', board_mario: 'Прыг-Скок', board_tanks: 'Танкодром', board_overall: 'общий зачёт',
+    prize_place: '{place} место ({board})', board_mario: 'Прыг-Скок', board_tanks: 'Танкодром', board_word: 'Слово дня', board_overall: 'общий зачёт',
     shop_note: 'Купленное включается в «Внешнем виде» игры.',
     buy: 'Купить', bought: 'Куплено',
     confirm: 'Купить «{name}» за {n} {w}?',
@@ -76,7 +78,7 @@ const STR = {
   en: {
     title: 'TICKETS',
     tab_tasks: 'Tasks', tab_top: 'Top 100', tab_table: 'Table', tab_history: 'History', tab_shop: 'Shop',
-    game_mario: 'Hop-Skip', game_tanks: 'Tank Field',
+    game_mario: 'Hop-Skip', game_tanks: 'Tank Field', game_word: 'Word of the Day',
     sec_day: 'Every day · new ones in {left} (00:00 UTC)',
     sec_week: 'Every week · new week in {left}',
     sec_once: 'Achievements · once',
@@ -85,9 +87,11 @@ const STR = {
     t_invite: 'Invite a friend: {count} of {max} this week',
     t_invite_note: 'Your friend plays {games} games — {inviter} for you, {newcomer} for them.',
     t_play: 'Play a game', t_level: 'Clear a level', t_record: 'Beat your best',
+    t_level_word: 'Guess the word', t_record_word: 'Beat your best streak (2 days or more)',
     t_other: 'Each game has its own tasks: open the game and tap «◆» in its menu.',
     period_week: 'This week', period_all: 'All time',
     top_overall: 'Tickets got in {p}', top_game: 'Best score in {p}',
+    top_word: 'Points in {p}: up to 6 a day (6 for the first try)',
     p_week: 'this week', p_all: 'all time',
     prizes: 'Weekly prizes for places 1–{n}: {list}.',
     me_place: 'Your place: {place} ({value})', me_none: 'You are not in this table yet.',
@@ -109,7 +113,7 @@ const STR = {
     no_history: 'Nothing here yet. Play a game to get your first tickets.',
     r_achievement: 'Achievement', r_record: 'Personal best', r_daily: 'Visit of the day', r_task: 'Task',
     r_invite: 'Invite', r_prize: 'Weekly prize', r_shop: 'Purchase', r_annul: 'Cancelled by admin',
-    prize_place: 'place {place} ({board})', board_mario: 'Hop-Skip', board_tanks: 'Tank Field', board_overall: 'overall',
+    prize_place: 'place {place} ({board})', board_mario: 'Hop-Skip', board_tanks: 'Tank Field', board_word: 'Word of the Day', board_overall: 'overall',
     shop_note: 'What you buy is switched on in the game\'s Looks.',
     buy: 'Buy', bought: 'Bought',
     confirm: 'Buy «{name}» for {n} {w}?',
@@ -239,7 +243,7 @@ function left(ms) {
 
 let panel = null;
 let current = 'tasks';
-let scope = null;      // null — the collection; 'mario' | 'tanks' — that game
+let scope = null;      // null — the collection; 'mario' | 'tanks' | 'word' — that game
 let period = 'week';   // tables: 'week' | 'all'
 const tables = {};     // board:period -> answer of /top
 
@@ -265,7 +269,7 @@ function renderTasks(body) {
     html += `<h2 class="wSec">${esc(T('sec_day', { left: left(me.dayEndsAt - now) }))}</h2><ul class="wTasks">` +
       day.map((t) => (t.id === 'login'
         ? taskRow(t, T('t_login'), T('t_login_note', { streak: me.streak, step: r.daily.perStreakDay, max: r.daily.max }))
-        : taskRow(t, T('t_' + t.id)))).join('') + '</ul>';
+        : taskRow(t, T(STR.ru['t_' + t.id + '_' + scope] ? 't_' + t.id + '_' + scope : 't_' + t.id)))).join('') + '</ul>';
   }
   if (week.length) {
     html += `<h2 class="wSec">${esc(T('sec_week', { left: left(me.seasonEndsAt - now) }))}</h2><ul class="wTasks">` +
@@ -288,7 +292,7 @@ function renderTable(body) {
   const prizes = (info.season.boards[board] || []).filter((n) => n > 0);
   let html = '<div class="wTabs wPeriod">' + ['week', 'all'].map((p) =>
     `<button data-period="${p}" class="${p === period ? 'on' : ''}">${esc(T('period_' + p))}</button>`).join('') + '</div>' +
-    `<p class="wNote">${esc(T(scope ? 'top_game' : 'top_overall', { p: T('p_' + period) }))}</p>`;
+    `<p class="wNote">${esc(T(scope === 'word' ? 'top_word' : scope ? 'top_game' : 'top_overall', { p: T('p_' + period) }))}</p>`;
   if (period === 'week' && prizes.length) {
     html += `<p class="wNote">${esc(T('prizes', { n: prizes.length, list: prizes.join(', ') }))}</p>`;
   }
@@ -380,7 +384,7 @@ function onKey(e) {
 function open(tab, opts) {
   if (!enabled) return;
   close();
-  scope = opts && (opts.game === 'mario' || opts.game === 'tanks') ? opts.game : null;
+  scope = opts && ['mario', 'tanks', 'word'].includes(opts.game) ? opts.game : null;
   period = 'week';
   for (const k of Object.keys(tables)) delete tables[k]; // fresh tables on every opening
   const tabs = tabsOf(scope);

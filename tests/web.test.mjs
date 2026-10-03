@@ -96,13 +96,23 @@ function fakePage() {
   };
 }
 
-function runMenu(patch) {
+function runMenu(patch, search = '') {
   const cfg = loadConfig(patch);
   const page = fakePage();
-  const ctx = { window: { CARTRIDGE: cfg }, document: page.document, location: { search: '' } };
+  const ctx = { window: { CARTRIDGE: cfg }, document: page.document, location: { search }, URLSearchParams };
   vm.runInNewContext(read(path.join(WEB, 'menu.js')), ctx);
-  return { lines: page.byId.menuList.children.map((li) => li.textContent) };
+  return { lines: page.byId.menuList.children.map((li) => li.textContent), location: ctx.location };
 }
+
+// A shared «Слово дня» result (startapp=ref_<id>-word) opens that game straight from the menu.
+test('a launch link to a game opens it', () => {
+  let r = runMenu(null, '?tgWebAppStartParam=ref_42-word__abc-def&bot=x');
+  assert.match(r.location.href || '', /^word\/\?/);
+  r = runMenu((c) => { c.game('word').enabled = false; }, '?tgWebAppStartParam=word');
+  assert.equal(r.location.href, undefined, 'a switched-off game is not opened');
+  r = runMenu(null, '?tgWebAppStartParam=src_promo');
+  assert.equal(r.location.href, undefined);
+});
 
 test('every game in the config has what the menu needs', () => {
   const cfg = loadConfig();
@@ -126,9 +136,10 @@ test('the menu lists all enabled games', () => {
   const { lines } = runMenu();
   assert.ok(lines.some((l) => l.includes('ПРЫГ-СКОК')));
   assert.ok(lines.some((l) => l.includes('ТАНКОДРОМ')));
+  assert.ok(lines.some((l) => l.includes('СЛОВО ДНЯ')));
 });
 
-for (const id of ['pryg-skok', 'tanks']) {
+for (const id of ['pryg-skok', 'tanks', 'word']) {
   test(`switching off ${id} removes it from the menu and breaks nothing`, () => {
     const cfg = loadConfig();
     const title = cfg.game(id).title;
@@ -148,6 +159,7 @@ test('with every game off the menu still opens', () => {
 test('no separate records button: tables live in the tickets panels', () => {
   assert.ok(!read(path.join(WEB, 'index.html')).includes('Рекорды'));
   assert.match(read(path.join(WEB, 'tanks/index.html')), /data-wallet-game="tanks"/);
+  assert.match(read(path.join(WEB, 'word/index.html')), /data-wallet-game="word"/);
   assert.match(read(path.join(WEB, 'api.js')), /walletGame = 'mario'/);
 });
 
