@@ -818,7 +818,6 @@ const TILE_OF = {
 // Level maps live in levels.js and worlds.js (loaded before this file): four worlds of four levels.
 const WORLD_MAPS = window.PrygLevels.WORLDS;
 const WORLDS = WORLD_MAPS.length;
-const LEVELS = WORLD_MAPS[0];
 
 // ---------- Looks («Внешний вид») ----------
 // Each item has a stars price for later; everything is free for now.
@@ -1064,7 +1063,8 @@ class Play extends Phaser.Scene {
   constructor() { super('play'); }
 
   init(data) {
-    this.s = Object.assign({ lives: 3, score: 0, coins: 0, level: 0, world: 1 }, data || {});
+    // cleared: levels finished in this game, for the score server.
+    this.s = Object.assign({ lives: 3, score: 0, coins: 0, level: 0, world: 1, cleared: 0 }, data || {});
     // Past the checkpoint the hero restarts from it after losing a life.
     this.fromCheckpoint = this.s.checkpoint === this.s.level;
     delete this.s.checkpoint;
@@ -2243,7 +2243,7 @@ class Play extends Phaser.Scene {
       this.s.lives--;
       if (this.s.lives > 0) {
         this.scene.restart({
-          lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: this.s.level, world: this.s.world,
+          lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: this.s.level, world: this.s.world, cleared: this.s.cleared,
           checkpoint: this.passedCheckpoint ? this.s.level : undefined,
         });
       } else {
@@ -2255,8 +2255,8 @@ class Play extends Phaser.Scene {
   gameOver(title, completed) {
     const best = saveBest(this.s.score);
     this.physics.pause();
-    // The score server counts the levels of one world (0..4).
-    const levels = completed ? LEVELS.length : Math.min(LEVELS.length - 1, this.s.level);
+    // The score server checks this against the levels it was told about in this game.
+    const levels = this.s.cleared;
     // As on the console, a lost game continues from the start of the current world.
     const world = completed ? 1 : this.s.world;
     showOverlay(title, `Счёт: ${this.s.score}<br>Рекорд: ${best}`, world > 1 ? `Продолжить с мира ${world}` : 'Играть снова', () => {
@@ -2306,13 +2306,14 @@ class Play extends Phaser.Scene {
   }
 
   finishLevel() {
-    api.levelDone(this.s.level, this.s.score, this.s.timeLeft);
+    api.levelDone(this.s.level, this.s.score, this.s.timeLeft, this.s.world);
+    this.s.cleared++;
     this.addScore(this.s.timeLeft * 50);
     let next = this.s.level + 1;
     let world = this.s.world;
     if (next >= WORLD_MAPS[world - 1].length) { next = 0; world++; }
     if (world <= WORLDS) {
-      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, world, big: this.big, fire: this.fire });
+      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, world, cleared: this.s.cleared, big: this.big, fire: this.fire });
     } else {
       this.gameOver('ВСЕ МИРЫ ПРОЙДЕНЫ!', true);
     }
@@ -2320,7 +2321,7 @@ class Play extends Phaser.Scene {
 
   // Warp zone pipe: straight to the first level of another world.
   warp(world) {
-    this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: 0, world, big: this.big, fire: this.fire });
+    this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: 0, world, cleared: this.s.cleared, big: this.big, fire: this.fire });
   }
 
   // ---------- Biting plants in pipes ----------

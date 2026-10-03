@@ -28,9 +28,13 @@ export function seasonLabel(season) {
   return `${d(seasonStart(season))}–${d(seasonStart(season + 1) - 1)}`;
 }
 
-export const REASONS = ["achievement", "record", "daily", "invite", "prize", "shop", "annul"];
+// daily — вход в сборник за день (с серией дней), task — ежедневное задание в игре.
+export const REASONS = ["achievement", "record", "daily", "task", "invite", "prize", "shop", "annul"];
 // Начисления с дневным потолком на игрока. Призы недели ограничены своим фондом.
-const CAPPED = ["achievement", "record", "daily", "invite"];
+const CAPPED = ["achievement", "record", "daily", "task", "invite"];
+// Игры с жетонами и их ежедневные задания (сбрасываются в 00:00 UTC).
+export const GAMES = ["mario", "tanks"];
+export const DAILY_TASKS = ["play", "level", "record"];
 const CAPPED_SQL = CAPPED.map((r) => `'${r}'`).join(", ");
 // Таблицы недели: рекорды игр за неделю и общий зачёт (жетоны за неделю без призов и покупок).
 export const BOARDS = ["mario", "tanks", "overall"];
@@ -46,6 +50,7 @@ export function validateEconomy(cfg) {
   need(isInt(cfg.achievement), "achievement");
   need(isInt(cfg.record), "record");
   for (const k of ["base", "perStreakDay", "max"]) need(isInt(cfg.daily?.[k]), `daily.${k}`);
+  for (const k of ["play", "level"]) need(isInt(cfg.tasks?.[k]), `tasks.${k}`);
   for (const k of ["inviter", "newcomer", "gamesNeeded", "perWeek"]) need(isInt(cfg.invite?.[k]), `invite.${k}`);
   need(cfg.invite?.gamesNeeded >= 1, "invite.gamesNeeded >= 1");
   need(isInt(cfg.suspicious?.rejectedPerDay) && cfg.suspicious.rejectedPerDay > 0, "suspicious.rejectedPerDay");
@@ -65,6 +70,7 @@ export function validateEconomy(cfg) {
     ids.add(it.id);
     need(isInt(it.price) && it.price > 0, `shop ${it.id}: price`);
     need(isInt(it.stars) && it.stars > 0, `shop ${it.id}: stars`);
+    need(GAMES.includes(it.game), `shop ${it.id}: game`);
     need(typeof it.ru === "string" && typeof it.en === "string", `shop ${it.id}: ru/en`);
   }
   need(ids.size >= 1, "shop пуст");
@@ -86,6 +92,7 @@ export const publicRules = (cfg) => ({
   achievement: cfg.achievement,
   record: cfg.record,
   daily: { ...cfg.daily },
+  tasks: { ...cfg.tasks },
   invite: { inviter: cfg.invite.inviter, newcomer: cfg.invite.newcomer, gamesNeeded: cfg.invite.gamesNeeded },
   season: { pool: cfg.season.pool, boards: cfg.season.boards },
   shop: cfg.shop.map(({ id, game, price, stars, ru, en }) => ({ id, game, price, stars, ru, en })),
@@ -190,6 +197,11 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
   }
 
   const grant = (out, reason, n) => { if (n > 0) out.push({ reason, amount: n }); };
+  // Сколько даст вход сегодня: база плюс шаг за каждый день серии, не больше max.
+  const loginAmount = (w, day) => {
+    const streak = w.streak_day === day - 1 ? w.streak + 1 : w.streak_day === day ? w.streak : 1;
+    return Math.min(cfg.daily.base + cfg.daily.perStreakDay * (streak - 1), cfg.daily.max);
+  };
 
   const economy = {
     cfg,
@@ -202,21 +214,33 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       return out;
     },
 
-    // Принятый сервером итог игры (game — mario или tanks): ежедневный бонус с серией
-    // (один на все игры), личный рекорд в этой игре, награда за приглашение.
-    run(playerId, { newRecord, game = "mario" }, out = []) {
+    // Вход в сборник за день (общее задание главной): с серией дней подряд.
+    checkin(playerId, out = []) {
       const at = now();
       const day = dayUtc(at);
       tx(() => {
         const w = wallet(playerId);
-        if (w.streak_day !== day && !w.flagged) {
-          const streak = w.streak_day === day - 1 ? w.streak + 1 : 1;
-          const amount = Math.min(cfg.daily.base + cfg.daily.perStreakDay * (streak - 1), cfg.daily.max);
-          const n = post(playerId, amount, "daily", `day:${day}`, { at });
-          if (n > 0) q.setStreak.run(streak, day, playerId);
-          grant(out, "daily", n);
-        }
+        if (w.streak_day === day || w.flagged) return;
+        const n = post(playerId, loginAmount(w, day), "daily", `day:${day}`, { at });
+        if (n > 0) q.setStreak.run(w.streak_day === day - 1 ? w.streak + 1 : 1, day, playerId);
+        grant(out, "daily", n);
       });
+      return out;
+    },
+
+    // Ежедневное задание игры (play — сыграть, level — пройти уровень). Раз в день по UTC.
+    task(playerId, game, task, out = [], at = now()) {
+      grant(out, "task", post(playerId, cfg.tasks[task], "task", `${game}:${task}:${dayUtc(at)}`, { at }));
+      return out;
+    },
+
+    // Принятый сервером итог игры (game — mario или tanks): задание «сыграть», «пройти уровень»
+    // (levels — сколько пройдено в этой игре), личный рекорд в этой игре, награда за приглашение.
+    run(playerId, { newRecord, game = "mario", levels = 0 }, out = []) {
+      const at = now();
+      const day = dayUtc(at);
+      this.task(playerId, game, "play", out, at);
+      if (levels > 0) this.task(playerId, game, "level", out, at);
       if (newRecord) grant(out, "record", post(playerId, cfg.record, "record", `${game}:${day}`, { at }));
       this.inviteCheck(playerId, out, at);
       return out;
@@ -317,7 +341,57 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         season: seasonOf(at),
         seasonEndsAt: seasonStart(seasonOf(at) + 1),
         notify: !!w.notify,
+        tasks: economy.tasks(playerId, at),
+        dayEndsAt: (day + 1) * DAY_MS,
       };
+    },
+
+    // Задания с отметкой «выполнено»: общие (главная) и по играм. Достижения «Прыг-Скока»
+    // добавляет сервер (он знает их список).
+    tasks(playerId, at = now()) {
+      const w = wallet(playerId);
+      const day = dayUtc(at);
+      const has = (reason, event) => !!q.has.get(playerId, reason, event);
+      const invited = q.invitesThisSeason.get(playerId, seasonOf(at)).n;
+      const out = {
+        main: [
+          { id: "login", period: "day", amount: loginAmount(w, day), done: has("daily", `day:${day}`) },
+          { id: "invite", period: "week", amount: cfg.invite.inviter, done: invited >= cfg.invite.perWeek,
+            count: invited, max: cfg.invite.perWeek, newcomer: cfg.invite.newcomer, games: cfg.invite.gamesNeeded },
+        ],
+      };
+      for (const g of GAMES) {
+        out[g] = DAILY_TASKS.map((t) => t === "record"
+          ? { id: t, period: "day", amount: cfg.record, done: has("record", `${g}:${day}`) }
+          : { id: t, period: "day", amount: cfg.tasks[t], done: has("task", `${g}:${t}:${day}`) });
+      }
+      return out;
+    },
+
+    achievementsDone: (playerId) => new Set(db.prepare(`SELECT event FROM ledger
+      WHERE player_id = ? AND reason = 'achievement'`).all(playerId).map((r) => r.event.replace(/^mario:/, ""))),
+
+    // Таблицы: overall — жетоны (за неделю без призов и покупок или всего полученных), mario и tanks —
+    // лучший счёт (за неделю или за всё время). Топ-100 и место игрока.
+    top(board, period, playerId = null, at = now()) {
+      const season = seasonOf(at);
+      const from = seasonStart(season);
+      let sql;
+      if (board === "overall") {
+        sql = `SELECT l.player_id AS id, SUM(l.amount) AS value, MAX(l.id) AS tie FROM ledger l
+          WHERE l.reason NOT IN ('prize', 'shop', 'annul') ${period === "week" ? `AND l.season = ${season}` : ""}
+          GROUP BY l.player_id HAVING value > 0`;
+      } else {
+        sql = `SELECT player_id AS id, MAX(score) AS value, MIN(created_at) AS tie FROM ${RUN_TABLES[board]}
+          WHERE score > 0 ${period === "week" ? `AND created_at >= ${from}` : ""} GROUP BY player_id`;
+      }
+      const ranked = db.prepare(`SELECT t.id, t.value, COALESCE(p.name, 'Игрок') AS name,
+          ROW_NUMBER() OVER (ORDER BY t.value DESC, t.tie ASC) AS place
+        FROM (${sql}) t LEFT JOIN players p ON p.id = t.id LEFT JOIN wallets w ON w.player_id = t.id
+        WHERE w.flagged IS NULL`).all();
+      const rows = ranked.slice(0, 100).map((r) => ({ place: r.place, name: r.name, value: r.value, me: r.id === playerId }));
+      const mine = playerId == null ? null : ranked.find((r) => r.id === playerId);
+      return { board, period, rows, me: mine ? { place: mine.place, value: mine.value } : null };
     },
 
     // Сверка: кэш баланса равен сумме журнала.
@@ -430,7 +504,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
 // ---------- Отчёты для администратора ----------
 
 const REASON_NAMES = {
-  achievement: "достижения", record: "рекорды", daily: "ежедневные", invite: "приглашения",
+  achievement: "достижения", record: "рекорды", daily: "вход за день", task: "задания в играх", invite: "приглашения",
   prize: "призы", shop: "магазин", annul: "аннулировано",
 };
 

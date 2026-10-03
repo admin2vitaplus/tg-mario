@@ -143,7 +143,7 @@ async function withServer(fn) {
   }
 }
 
-test("HTTP: a checked tanks game pays the daily bonus and a record; a forged one pays nothing", () =>
+test("HTTP: a checked tanks game closes the game's tasks and a record; a forged one pays nothing", () =>
   withServer(async ({ call, clock, economy }) => {
     let r = await call("POST", "/api/tanks/ticket");
     assert.equal(r.status, 200);
@@ -153,8 +153,12 @@ test("HTTP: a checked tanks game pays the daily bonus and a record; a forged one
     r = await call("POST", "/api/tanks/run", { seed, players: 1, log: g.log });
     assert.equal(r.status, 200, JSON.stringify(r.json));
     assert.equal(r.json.score, g.state.players[0].score);
-    const reasons = r.json.wallet.grants.map((x) => x.reason).sort();
-    assert.deepEqual(reasons, g.state.players[0].score > 0 ? ["daily", "record"] : ["daily"]);
+    const reasons = r.json.wallet.grants.map((x) => x.reason);
+    // «Сыграть», «пройти уровень» (если пройден) и рекорд (если очки есть).
+    const expect = ["task"];
+    if (g.state.stage > 0 || g.state.phase === "clearDone") expect.push("task");
+    if (g.state.players[0].score > 0) expect.push("record");
+    assert.deepEqual(reasons.sort(), expect.sort());
 
     const t2 = (await call("POST", "/api/tanks/ticket")).json.seed;
     // Обрезанная запись: игра в ней не закончена, очков не будет.

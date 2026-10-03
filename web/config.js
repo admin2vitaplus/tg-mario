@@ -16,7 +16,7 @@ const config = {
       id: 'pryg-skok',
       title: 'ПРЫГ-СКОК',
       enabled: true,
-      // Uses the score server (the «Рекорды» button).
+      // Uses the score server (its tables and tasks are in «◆ Жетоны»).
       scores: true,
       // Loaded on this page only when the game is chosen, in this order.
       styles: ['lib/looks.css'],

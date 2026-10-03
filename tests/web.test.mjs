@@ -101,7 +101,7 @@ function runMenu(patch) {
   const page = fakePage();
   const ctx = { window: { CARTRIDGE: cfg }, document: page.document, location: { search: '' } };
   vm.runInNewContext(read(path.join(WEB, 'menu.js')), ctx);
-  return { lines: page.byId.menuList.children.map((li) => li.textContent), scores: !page.byId.menuScores.removed };
+  return { lines: page.byId.menuList.children.map((li) => li.textContent) };
 }
 
 test('every game in the config has what the menu needs', () => {
@@ -123,10 +123,9 @@ test('every game in the config has what the menu needs', () => {
 });
 
 test('the menu lists all enabled games', () => {
-  const { lines, scores } = runMenu();
+  const { lines } = runMenu();
   assert.ok(lines.some((l) => l.includes('ПРЫГ-СКОК')));
   assert.ok(lines.some((l) => l.includes('ТАНКОДРОМ')));
-  assert.ok(scores);
 });
 
 for (const id of ['pryg-skok', 'tanks']) {
@@ -140,10 +139,16 @@ for (const id of ['pryg-skok', 'tanks']) {
   });
 }
 
-test('with every game off the menu still opens, without the scores button', () => {
-  const { lines, scores } = runMenu((c) => c.games.forEach((g) => { g.enabled = false; }));
+test('with every game off the menu still opens', () => {
+  const { lines } = runMenu((c) => c.games.forEach((g) => { g.enabled = false; }));
   assert.ok(lines.every((l) => l.includes('СКОРО')));
-  assert.equal(scores, false);
+});
+
+// Таблицы рекордов переехали в «◆ Жетоны» (главная и каждая игра): отдельной кнопки нет.
+test('no separate records button: tables live in the tickets panels', () => {
+  assert.ok(!read(path.join(WEB, 'index.html')).includes('Рекорды'));
+  assert.match(read(path.join(WEB, 'tanks/index.html')), /data-wallet-game="tanks"/);
+  assert.match(read(path.join(WEB, 'api.js')), /walletGame = 'mario'/);
 });
 
 // ---------- Size budgets (gzip) ----------
