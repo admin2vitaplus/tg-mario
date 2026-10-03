@@ -21,6 +21,8 @@ const config = {
       // Loaded on this page only when the game is chosen, in this order.
       styles: ['lib/looks.css'],
       scripts: ['lib/phaser.min.js', 'lib/looks.js', 'lib/back.js', 'levels.js', 'worlds.js', 'game.js'],
+      // startapp=mario (or ref_<id>-mario from an invite in a chat) opens it straight away.
+      start: 'mario',
     },
     {
       id: 'tanks',
@@ -28,6 +30,7 @@ const config = {
       enabled: true,
       // A game with its own page, relative to the menu.
       url: 'tanks/',
+      start: 'tanks',
     },
     {
       id: 'word',
