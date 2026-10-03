@@ -93,3 +93,41 @@
   font: bold 13px "Courier New", monospace;
   white-space: nowrap;
 }
+
+/* Tasks: crossed off when done, the daily ones open again at 00:00 UTC. */
+.wSec { margin: 14px 0 4px; font-size: 13px; color: #7fe8ec; font-weight: bold; }
+.wTasks { list-style: none; margin: 0; padding: 0; }
+.wTask {
+  display: grid;
+  grid-template-columns: 1.4em 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 2px;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.wTask small { color: #aaa; font-size: 12px; }
+.wTask i { font-style: normal; color: #7fe8ec; font-weight: bold; }
+.wMark { color: #7fe8ec; text-align: center; }
+.wTask.done { opacity: 0.45; }
+.wTask.done b { text-decoration: line-through; }
+.wTask.done .wMark { color: #8fdf6f; }
+
+/* Tables: top 100 with the player's own row lit. */
+.wPeriod { margin-top: 2px; }
+.wPeriod button { padding: 7px 4px; font-size: 12px; }
+.wTop { list-style: none; margin: 6px 0; padding: 0; }
+.wTop li {
+  display: grid;
+  grid-template-columns: 2.4em 1fr auto;
+  gap: 8px;
+  padding: 6px 2px;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.wTop li span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wTop li.me { background: rgba(31, 162, 168, 0.3); }
+.wTop b { color: #7fe8ec; }
+
+/* A game's own «◆» button in its menu. */
+.wGameBtn { color: #7fe8ec; }

@@ -133,13 +133,5 @@ function onKey(e) {
 }
 
 document.addEventListener('keydown', onKey, true);
-const scoresBtn = document.getElementById('menuScores');
-if (games.some((g) => g.scores)) {
-  scoresBtn.addEventListener('click', () => {
-    if (window.GameAPI) window.GameAPI.openScores();
-  });
-} else {
-  scoresBtn.remove();
-}
 render();
 })();

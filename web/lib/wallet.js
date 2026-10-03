@@ -9,7 +9,13 @@
 //                                Stars); without it the player picks one
 //   Wallet.stars(shopId)      -> price in Telegram Stars, or null
 //   Wallet.grants(res.wallet) -> shows «+10» toasts after a game result
-//   Wallet.open(tab)          -> 'how' | 'history' | 'shop'
+//   Wallet.open(tab, {game})  -> the collection's own panel (tabs: tasks, top, shop, history) or,
+//                                with game 'mario' | 'tanks', that game's (tasks, top, shop)
+//   Wallet.button(el, game)   -> turns a button into «◆ balance», opening the game's panel
+//
+// The collection's tasks (a visit a day, friends) and each game's own tasks (play, clear
+// a level, beat your best; Hop-Skip's achievements once) are crossed off when done; the
+// daily ones open again at 00:00 UTC.
 (() => {
 'use strict';
 
@@ -22,7 +28,24 @@ const lang = /^(ru|uk|be|kk)\b/i.test((tg && tg.initDataUnsafe && tg.initDataUns
 const STR = {
   ru: {
     title: 'ЖЕТОНЫ',
-    tab_how: 'Как получить', tab_history: 'История', tab_shop: 'Магазин',
+    tab_tasks: 'Задания', tab_top: 'Топ-100', tab_table: 'Таблица', tab_history: 'История', tab_shop: 'Магазин',
+    game_mario: 'Прыг-Скок', game_tanks: 'Танкодром',
+    sec_day: 'Каждый день · обновятся через {left} (00:00 UTC)',
+    sec_week: 'Каждую неделю · новая неделя через {left}',
+    sec_once: 'Достижения · один раз',
+    t_login: 'Зайти в сборник сегодня',
+    t_login_note: 'Дней подряд: {streak}. Каждый следующий день +{step}, до {max}.',
+    t_invite: 'Позвать друга: {count} из {max} за неделю',
+    t_invite_note: 'Друг сыграет {games} игры — тебе {inviter}, ему {newcomer}.',
+    t_play: 'Сыграть игру', t_level: 'Пройти уровень', t_record: 'Побить свой рекорд',
+    t_other: 'Свои задания у каждой игры: откройте игру и нажмите «◆» в её меню.',
+    period_week: 'За неделю', period_all: 'За всё время',
+    top_overall: 'Жетоны, полученные за {p}', top_game: 'Лучший счёт за {p}',
+    p_week: 'неделю', p_all: 'всё время',
+    prizes: 'Призы недели за 1–{n} места: {list}.',
+    me_place: 'Твоё место: {place} ({value})', me_none: 'Тебя пока нет в этой таблице.',
+    table_empty: 'Пока пусто. Будь первым!',
+    shop_game: 'Товары этой игры. Все товары — в «◆ Жетоны» на главной.',
     close: 'Закрыть', loading: 'Загрузка…',
     offline: 'Сервер сейчас недоступен. Попробуйте позже.',
     moved: 'сервер переехал — открыть заново',
@@ -32,18 +55,12 @@ const STR = {
     reopen: 'Открыть игру заново',
     balance: 'Баланс: {n}',
     today: 'Сегодня получено {n} из {cap}. Серия дней: {streak}.',
-    how_ach: 'Достижение — {n} (каждое один раз)',
-    how_record: 'Личный рекорд — {n}, раз в день в каждой игре',
-    how_daily: 'Первая игра за день — {base}, каждый день подряд ещё +{step}, до {max}',
-    how_invite: 'Друг по твоей ссылке сыграет {games} игры — тебе {inviter}, ему {newcomer}',
-    how_week: 'Итоги недели: призы за места в таблицах «Прыг-Скока», «Танкодрома» и в общем зачёте, фонд {pool}',
-    how_ends: 'Неделя закончится через {left} (понедельник 00:00 UTC)',
     how_cap: 'В день можно получить не больше {cap}, не считая призов недели.',
     how_note: 'Жетоны начисляет сервер за результаты, которые он проверил.',
     invite: 'Позвать друга',
     invite_text: 'Сыграем? Ретро-игры прямо в Telegram.',
     no_history: 'Операций пока нет. Сыграй — и здесь появятся первые жетоны.',
-    r_achievement: 'Достижение', r_record: 'Личный рекорд', r_daily: 'Игра за день',
+    r_achievement: 'Достижение', r_record: 'Личный рекорд', r_daily: 'Вход за день', r_task: 'Задание',
     r_invite: 'Приглашение', r_prize: 'Приз недели', r_shop: 'Покупка', r_annul: 'Отменено администратором',
     prize_place: '{place} место ({board})', board_mario: 'Прыг-Скок', board_tanks: 'Танкодром', board_overall: 'общий зачёт',
     shop_note: 'Купленное включается в «Внешнем виде» игры.',
@@ -58,7 +75,24 @@ const STR = {
   },
   en: {
     title: 'TICKETS',
-    tab_how: 'How to get', tab_history: 'History', tab_shop: 'Shop',
+    tab_tasks: 'Tasks', tab_top: 'Top 100', tab_table: 'Table', tab_history: 'History', tab_shop: 'Shop',
+    game_mario: 'Hop-Skip', game_tanks: 'Tank Field',
+    sec_day: 'Every day · new ones in {left} (00:00 UTC)',
+    sec_week: 'Every week · new week in {left}',
+    sec_once: 'Achievements · once',
+    t_login: 'Open the collection today',
+    t_login_note: 'Days in a row: {streak}. Each next day +{step}, up to {max}.',
+    t_invite: 'Invite a friend: {count} of {max} this week',
+    t_invite_note: 'Your friend plays {games} games — {inviter} for you, {newcomer} for them.',
+    t_play: 'Play a game', t_level: 'Clear a level', t_record: 'Beat your best',
+    t_other: 'Each game has its own tasks: open the game and tap «◆» in its menu.',
+    period_week: 'This week', period_all: 'All time',
+    top_overall: 'Tickets got in {p}', top_game: 'Best score in {p}',
+    p_week: 'this week', p_all: 'all time',
+    prizes: 'Weekly prizes for places 1–{n}: {list}.',
+    me_place: 'Your place: {place} ({value})', me_none: 'You are not in this table yet.',
+    table_empty: 'Empty so far. Be the first!',
+    shop_game: 'This game\'s items. All items are in «◆ Tickets» on the main screen.',
     close: 'Close', loading: 'Loading…',
     offline: 'The server is not reachable right now. Try again later.',
     moved: 'server moved — reopen',
@@ -68,18 +102,12 @@ const STR = {
     reopen: 'Open the game again',
     balance: 'Balance: {n}',
     today: 'Today: {n} of {cap}. Days in a row: {streak}.',
-    how_ach: 'Achievement — {n} (each one once)',
-    how_record: 'Personal best — {n}, once a day in each game',
-    how_daily: 'First game of the day — {base}, +{step} for every day in a row, up to {max}',
-    how_invite: 'A friend from your link plays {games} games — {inviter} for you, {newcomer} for them',
-    how_week: 'Weekly results: prizes for places in the Hop-Skip and Tank Field tables and overall, {pool} in total',
-    how_ends: 'The week ends in {left} (Monday 00:00 UTC)',
     how_cap: 'At most {cap} a day, weekly prizes aside.',
     how_note: 'Tickets are given by the server for results it has checked.',
     invite: 'Invite a friend',
     invite_text: 'Want to play? Retro games right in Telegram.',
     no_history: 'Nothing here yet. Play a game to get your first tickets.',
-    r_achievement: 'Achievement', r_record: 'Personal best', r_daily: 'Game of the day',
+    r_achievement: 'Achievement', r_record: 'Personal best', r_daily: 'Visit of the day', r_task: 'Task',
     r_invite: 'Invite', r_prize: 'Weekly prize', r_shop: 'Purchase', r_annul: 'Cancelled by admin',
     prize_place: 'place {place} ({board})', board_mario: 'Hop-Skip', board_tanks: 'Tank Field', board_overall: 'overall',
     shop_note: 'What you buy is switched on in the game\'s Looks.',
@@ -152,12 +180,14 @@ function refresh() {
 let badgeEl = null;
 function badge() {
   // Only the collection's menu (with its game list); a game page keeps its own screen.
+  if (!enabled) return;
+  for (const b of gameButtons) b.textContent = '◆ ' + (me ? me.balance + ' ' + word(me.balance) : T('title').toLowerCase());
   const menu = document.getElementById('menuList') && document.getElementById('menu');
-  if (!enabled || !menu) return;
+  if (!menu) return;
   if (!badgeEl) {
     badgeEl = document.createElement('button');
     badgeEl.id = 'walletBadge';
-    badgeEl.addEventListener('click', () => (server.online === false ? reopen() : open('how')));
+    badgeEl.addEventListener('click', () => (server.online === false ? reopen() : open('tasks')));
     const h1 = menu.querySelector('h1');
     if (h1) h1.insertAdjacentElement('afterend', badgeEl); else menu.prepend(badgeEl);
   }
@@ -165,10 +195,22 @@ function badge() {
     : server.online === false ? T('moved') : T('title').toLowerCase());
 }
 
+// A game's own «◆ Жетоны» button: its tasks, its table and its shop.
+const gameButtons = [];
+function button(el, game) {
+  if (!el) return;
+  if (!enabled) { el.remove(); return; }
+  gameButtons.push(el);
+  el.addEventListener('click', () => (server.online === false ? reopen() : open('tasks', { game })));
+  badge();
+}
+
 // ---------- Toasts after a game result ----------
 function grants(w) {
   if (!w || !Array.isArray(w.grants)) return;
   if (me && typeof w.balance === 'number') { me.balance = w.balance; badge(); }
+  // The tasks crossed off by this result show up the next time the panel opens.
+  if (w.grants.length) refreshSoon();
   let box = document.getElementById('walletToasts');
   if (!box) {
     box = document.createElement('div');
@@ -196,29 +238,88 @@ function left(ms) {
 }
 
 let panel = null;
-let current = 'how';
+let current = 'tasks';
+let scope = null;      // null — the collection; 'mario' | 'tanks' — that game
+let period = 'week';   // tables: 'week' | 'all'
+const tables = {};     // board:period -> answer of /top
+
+function tabsOf(game) { return game ? ['tasks', 'table', 'shop'] : ['tasks', 'top', 'shop', 'history']; }
+
+function taskRow(t, title, note) {
+  return `<li class="wTask${t.done ? ' done' : ''}"><span class="wMark">${t.done ? '✓' : '◆'}</span>` +
+    `<span><b>${esc(title)}</b>${note ? `<br><small>${esc(note)}</small>` : ''}</span>` +
+    `<i>${t.done ? '' : '+' + t.amount}</i></li>`;
+}
+
+function renderTasks(body) {
+  const note = (t) => `<p class="wNote">${esc(t)}</p>`;
+  const now = Date.now();
+  let html = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` +
+    note(T('today', { n: me.today, cap: me.dailyCap, streak: me.streak }));
+  const list = (me.tasks && me.tasks[scope || 'main']) || [];
+  const day = list.filter((t) => t.period === 'day');
+  const week = list.filter((t) => t.period === 'week');
+  const once = list.filter((t) => t.period === 'once');
+  const r = info;
+  if (day.length) {
+    html += `<h2 class="wSec">${esc(T('sec_day', { left: left(me.dayEndsAt - now) }))}</h2><ul class="wTasks">` +
+      day.map((t) => (t.id === 'login'
+        ? taskRow(t, T('t_login'), T('t_login_note', { streak: me.streak, step: r.daily.perStreakDay, max: r.daily.max }))
+        : taskRow(t, T('t_' + t.id)))).join('') + '</ul>';
+  }
+  if (week.length) {
+    html += `<h2 class="wSec">${esc(T('sec_week', { left: left(me.seasonEndsAt - now) }))}</h2><ul class="wTasks">` +
+      week.map((t) => taskRow(t, T('t_invite', { count: t.count, max: t.max }),
+        T('t_invite_note', { games: t.games, inviter: t.amount, newcomer: t.newcomer }))).join('') + '</ul>';
+    if (botName && myId) html += `<button class="wAct" data-act="invite">${esc(T('invite'))}</button>`;
+  }
+  if (once.length) {
+    html += `<h2 class="wSec">${esc(T('sec_once'))}</h2><ul class="wTasks">` +
+      once.map((t) => taskRow(t, (t.icon ? t.icon + ' ' : '') + t.title, t.text)).join('') + '</ul>';
+  }
+  if (!scope) html += note(T('t_other'));
+  body.innerHTML = html + note(T('how_cap', { cap: r.dailyCap })) + note(T('how_note'));
+}
+
+function renderTable(body) {
+  const board = scope || 'overall';
+  const key = board + ':' + period;
+  const t = tables[key];
+  const prizes = (info.season.boards[board] || []).filter((n) => n > 0);
+  let html = '<div class="wTabs wPeriod">' + ['week', 'all'].map((p) =>
+    `<button data-period="${p}" class="${p === period ? 'on' : ''}">${esc(T('period_' + p))}</button>`).join('') + '</div>' +
+    `<p class="wNote">${esc(T(scope ? 'top_game' : 'top_overall', { p: T('p_' + period) }))}</p>`;
+  if (period === 'week' && prizes.length) {
+    html += `<p class="wNote">${esc(T('prizes', { n: prizes.length, list: prizes.join(', ') }))}</p>`;
+  }
+  if (!t) {
+    body.innerHTML = html + `<p class="wNote">${esc(T('loading'))}</p>`;
+    request('GET', `/top?board=${board}&period=${period}`).then((r) => {
+      tables[key] = r;
+      if (panel && current === 'table') renderTable(body);
+    }, () => { if (panel && current === 'table') body.innerHTML = html + `<p class="wNote">${esc(T('offline'))}</p>`; });
+    return;
+  }
+  html += `<p class="wNote">${esc(t.me ? T('me_place', { place: t.me.place, value: t.me.value }) : T('me_none'))}</p>`;
+  html += t.rows.length ? '<ol class="wTop">' + t.rows.map((p) =>
+    `<li class="${p.me ? 'me' : ''}"><span>${p.place}</span><span>${esc(p.name)}</span><b>${p.value}</b></li>`).join('') + '</ol>'
+    : `<p class="wNote">${esc(T('table_empty'))}</p>`;
+  body.innerHTML = html;
+}
 
 function render(body) {
   const note = (t) => `<p class="wNote">${esc(t)}</p>`;
-  if (current === 'how') {
-    const r = info;
-    const rows = [
-      T('how_ach', { n: r.achievement }),
-      T('how_record', { n: r.record }),
-      T('how_daily', { base: r.daily.base, step: r.daily.perStreakDay, max: r.daily.max }),
-      T('how_invite', { games: r.invite.gamesNeeded, inviter: r.invite.inviter, newcomer: r.invite.newcomer }),
-      T('how_week', { pool: r.season.pool }),
-    ];
-    body.innerHTML = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` +
-      note(T('today', { n: me.today, cap: me.dailyCap, streak: me.streak })) +
-      '<ul class="wList">' + rows.map((t) => `<li>${esc(t)}</li>`).join('') + '</ul>' +
-      note(T('how_ends', { left: left(me.seasonEndsAt - Date.now()) })) + note(T('how_cap', { cap: r.dailyCap })) +
-      note(T('how_note')) + (botName && myId ? `<button class="wAct" data-act="invite">${esc(T('invite'))}</button>` : '');
-  } else if (current === 'history') {
+  if (current === 'tasks') renderTasks(body);
+  else if (current === 'table') renderTable(body);
+  else if (current === 'history') {
     if (!me.history.length) { body.innerHTML = note(T('no_history')); return; }
     body.innerHTML = '<ul class="wHist">' + me.history.map((h) => {
       let what = T('r_' + h.reason);
       if (h.reason === 'shop') what += ': ' + itemName(h.event);
+      if (h.reason === 'task' || h.reason === 'record') {
+        const g = String(h.event).split(':')[0];
+        if (STR.ru['game_' + g]) what += ': ' + T('game_' + g);
+      }
       if (h.reason === 'prize') {
         const [, board, place] = String(h.event).split(':');
         if (place) what += ': ' + T('prize_place', { place, board: T('board_' + board) });
@@ -229,8 +330,10 @@ function render(body) {
         `${h.amount > 0 ? '+' : ''}${h.amount}</b></li>`;
     }).join('') + '</ul>';
   } else {
-    body.innerHTML = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` + note(T('shop_note')) +
-      '<ul class="wShop">' + info.shop.map((it) => {
+    const items = info.shop.filter((it) => !scope || it.game === scope);
+    body.innerHTML = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` +
+      note(scope ? T('shop_game') : T('shop_note')) +
+      '<ul class="wShop">' + items.map((it) => {
         const has = owned.includes(it.id);
         return `<li><span>${esc(it[lang])}</span>` + (has ? `<i>${esc(T('bought'))}</i>`
           : `<span class="wPay"><button class="wAct" data-act="buy" data-via="tokens" data-id="${esc(it.id)}">◆ ${it.price}</button>` +
@@ -241,12 +344,12 @@ function render(body) {
 }
 
 function show(tab) {
-  current = tab;
-  panel.querySelectorAll('.wTabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  current = tab === 'top' ? 'table' : tab;
+  panel.querySelectorAll('.wTabs.wMain button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   const body = panel.querySelector('.wBody');
   if (me && info) render(body);
   else body.innerHTML = `<p class="wNote">${esc(T('loading'))}</p>`;
-  refresh().then(() => { if (panel && current === tab) render(body); })
+  refresh().then(() => { if (panel && current === (tab === 'top' ? 'table' : tab)) render(body); })
     .catch((e) => {
       if (!panel || me) return;
       // Which of the failures it was, so the player (and whoever reads the report) can tell.
@@ -273,13 +376,20 @@ function onKey(e) {
   close();
 }
 
-function open(tab) {
+// Old callers asked for 'how'; it is the tasks tab now.
+function open(tab, opts) {
   if (!enabled) return;
   close();
+  scope = opts && (opts.game === 'mario' || opts.game === 'tanks') ? opts.game : null;
+  period = 'week';
+  for (const k of Object.keys(tables)) delete tables[k]; // fresh tables on every opening
+  const tabs = tabsOf(scope);
+  if (tab === 'how' || !tabs.includes(tab)) tab = 'tasks';
   panel = document.createElement('div');
   panel.className = 'wallet';
-  panel.innerHTML = `<h1>◆ ${esc(T('title'))}</h1><div class="wTabs">` +
-    ['how', 'history', 'shop'].map((t) => `<button data-tab="${t}">${esc(T('tab_' + t))}</button>`).join('') +
+  const title = scope ? T('title') + ' · ' + T('game_' + scope) : T('title');
+  panel.innerHTML = `<h1>◆ ${esc(title)}</h1><div class="wTabs wMain">` +
+    tabs.map((t) => `<button data-tab="${t}">${esc(T('tab_' + t))}</button>`).join('') +
     `</div><div class="wBody"></div><button class="wClose">${esc(T('close'))}</button>`;
   panel.querySelector('.wTabs').addEventListener('click', (e) => {
     const b = e.target.closest('button');
@@ -287,6 +397,8 @@ function open(tab) {
   });
   panel.querySelector('.wClose').addEventListener('click', close);
   panel.querySelector('.wBody').addEventListener('click', (e) => {
+    const p = e.target.closest('[data-period]');
+    if (p) { period = p.dataset.period; renderTable(panel.querySelector('.wBody')); return; }
     const b = e.target.closest('[data-act]');
     if (!b) return;
     if (b.dataset.act === 'buy') buy(b.dataset.id, b.dataset.via).then((ok) => { if (ok && panel) show('shop'); });
@@ -295,7 +407,7 @@ function open(tab) {
   });
   document.addEventListener('keydown', onKey, true);
   document.body.append(panel);
-  show(tab || 'how');
+  show(tab);
 }
 
 // The bot's /start answers with a button that carries the server's current address.
@@ -403,8 +515,27 @@ function buy(id, via) {
   });
 }
 
+let soon = null;
+function refreshSoon() {
+  clearTimeout(soon);
+  soon = setTimeout(() => refresh().catch(() => {}), 500);
+}
+
+// The collection's daily task «open it today» is done by opening it: once a day, the
+// server decides (UTC days), and a repeat gives nothing.
+const CHECKIN_KEY = 'wallet_checkin';
+function checkin() {
+  const day = Math.floor(Date.now() / 86400000);
+  try { if (localStorage.getItem(CHECKIN_KEY) === day + ':' + myId) return; } catch (e) { /* private mode */ }
+  request('POST', '/checkin').then((w) => {
+    try { localStorage.setItem(CHECKIN_KEY, day + ':' + myId); } catch (e) { /* private mode */ }
+    grants(w);
+  }, () => {});
+}
+
 window.Wallet = {
   enabled,
+  button,
   owns: (id) => owned.includes(id),
   price: (id) => { const it = info && info.shop.find((x) => x.id === id); return it ? it.price : null; },
   stars: (id) => { const it = info && info.shop.find((x) => x.id === id); return it ? it.stars : null; },
@@ -414,8 +545,12 @@ window.Wallet = {
   refresh,
 };
 
+// Games mark their «◆» button with data-wallet-game="<game>".
+document.querySelectorAll('[data-wallet-game]').forEach((el) => button(el, el.dataset.walletGame));
+
 if (enabled) {
   badge();
   refresh().catch(() => badge());
+  checkin();
 }
 })();

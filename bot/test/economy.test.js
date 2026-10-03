@@ -61,7 +61,7 @@ test("one event pays once: repeats and restarts add nothing, balance equals the 
     economy.achievements(1, [{ code: "first_level" }]);
     run(store, economy, clock, 1, 3000);
     const rows = ledgerRows(store, 1);
-    assert.deepEqual(rows.map((r) => r.reason).sort(), ["achievement", "daily", "record"]);
+    assert.deepEqual(rows.map((r) => r.reason).sort(), ["achievement", "record", "task"]);
     assert.deepEqual(economy.checkBalance(1), { cached: 20 + 10 + 10, ledger: 40 });
     assert.ok(rows.every((r) => Number.isInteger(r.amount)));
     store.close();
@@ -89,24 +89,65 @@ test("daily cap per player, with the next day open again", () => {
   assert.equal(economy.me(1).balance, CFG.dailyCap, "bonus and record are capped too");
   clock.t += DAY_MS;
   run(store, economy, clock, 1, 600);
-  assert.equal(economy.me(1).balance, CFG.dailyCap + CFG.daily.base + CFG.record);
+  assert.equal(economy.me(1).balance, CFG.dailyCap + CFG.tasks.play + CFG.record);
   store.close();
 });
 
-test("daily bonus grows with the streak up to its maximum and resets after a gap", () => {
+test("daily login grows with the streak up to its maximum and resets after a gap", () => {
   const { store, economy, clock } = setup();
   const bonus = () => ledgerRows(store, 1).filter((r) => r.reason === "daily").at(-1).amount;
   const seen = [];
   for (let d = 0; d < 9; d++) {
-    run(store, economy, clock, 1, 100);
+    // Задание показывает, сколько даст вход сегодня, и закрывается после него.
+    const before = economy.me(1).tasks.main.find((t) => t.id === "login");
+    assert.equal(before.done, false);
+    economy.checkin(1);
+    assert.equal(economy.checkin(1).length, 0, "once a day");
     seen.push(bonus());
+    const after = economy.me(1).tasks.main.find((t) => t.id === "login");
+    assert.deepEqual([after.done, after.amount, before.amount], [true, bonus(), bonus()]);
     clock.t += DAY_MS;
   }
   const { base, perStreakDay, max } = CFG.daily;
   assert.deepEqual(seen, seen.map((_, i) => Math.min(base + perStreakDay * i, max)));
   clock.t += DAY_MS; // пропущен день
-  run(store, economy, clock, 1, 100);
+  economy.checkin(1);
   assert.equal(bonus(), base);
+  store.close();
+});
+
+test("game tasks: play, clear a level and a record close once a day per game and open again at 00:00 UTC", () => {
+  const { store, economy, clock } = setup();
+  clock.t = Math.floor(clock.t / DAY_MS) * DAY_MS + DAY_MS - 60_000; // 23:59 UTC
+  const done = (game) => economy.me(1).tasks[game].filter((t) => t.done).map((t) => t.id);
+  economy.run(1, { newRecord: true, game: "tanks", levels: 2 });
+  assert.deepEqual(done("tanks"), ["play", "level", "record"]);
+  assert.deepEqual(done("mario"), []);
+  assert.equal(economy.run(1, { newRecord: true, game: "tanks", levels: 2 }).length, 0);
+  economy.run(1, { newRecord: false, game: "mario", levels: 0 });
+  assert.deepEqual(done("mario"), ["play"]);
+  clock.t += 120_000; // новый день по UTC
+  assert.deepEqual(done("tanks"), []);
+  assert.equal(economy.me(1).dayEndsAt, (Math.floor(clock.t / DAY_MS) + 1) * DAY_MS);
+  store.close();
+});
+
+test("tables: top-100 of the week and of all time, with the player's own place", () => {
+  const { store, economy, clock } = setup();
+  run(store, economy, clock, 1, 5000);
+  run(store, economy, clock, 2, 9000);
+  economy.achievements(3, [{ code: "x" }, { code: "y" }]);
+  const mario = economy.top("mario", "week", 1);
+  assert.deepEqual(mario.rows.map((r) => [r.place, r.value, r.me]), [[1, 9000, false], [2, 5000, true]]);
+  assert.deepEqual(mario.me, { place: 2, value: 5000 });
+  const overall = economy.top("overall", "week", 3);
+  assert.equal(overall.rows[0].value, 2 * CFG.achievement);
+  assert.deepEqual(overall.me, { place: 1, value: 2 * CFG.achievement });
+  clock.t += 8 * DAY_MS;
+  assert.deepEqual(economy.top("mario", "week", 1).rows, []);
+  assert.equal(economy.top("mario", "all", 1).rows.length, 2);
+  economy.flag(2, "test");
+  assert.deepEqual(economy.top("mario", "all").rows.map((r) => r.value), [5000]);
   store.close();
 });
 
@@ -273,7 +314,7 @@ test("/stats part: emission, top receivers and shares by reason", () => {
   playWeek(store, economy, clock);
   const text = economyReport(store.db, CFG, clock.t);
   assert.match(text, /Выдано: \d+ у 4 игроков/);
-  assert.match(text, /ежедневные \d+%/);
+  assert.match(text, /задания в играх \d+%/);
   assert.match(text, /Топ получателей: .*\(\d+\) \d+/);
   assert.match(text, /Помечены как подозрительные: 1/);
   assert.match(text, new RegExp(`фонд ${CFG.season.pool}`));
@@ -308,11 +349,16 @@ test("HTTP: only verified results pay; the client can look and buy, not credit",
     let r = await call("POST", "/api/mario/level", { level: 0, score: 3000, timeLeft: 250, deaths: 0 });
     assert.equal(r.status, 200);
     assert.equal(r.json.wallet.grants.filter((g) => g.reason === "achievement").length, 3);
+    assert.equal(r.json.wallet.grants.filter((g) => g.reason === "task").length, 1, "a level cleared today");
     clock.t += 90_000;
     r = await call("POST", "/api/mario/run", { score: 3000, coins: 0, levels: 1, deaths: 0 });
     assert.equal(r.status, 200);
-    assert.deepEqual(r.json.wallet.grants.map((g) => g.reason).sort(), ["daily", "record"]);
-    assert.equal(r.json.wallet.balance, 3 * CFG.achievement + CFG.daily.base + CFG.record);
+    assert.deepEqual(r.json.wallet.grants.map((g) => g.reason).sort(), ["record", "task"]);
+    assert.equal(r.json.wallet.balance, 3 * CFG.achievement + CFG.tasks.level + CFG.tasks.play + CFG.record);
+    // Вход за день: один раз.
+    r = await call("POST", "/api/wallet/checkin");
+    assert.deepEqual(r.json.grants, [{ reason: "daily", amount: CFG.daily.base }]);
+    assert.deepEqual((await call("POST", "/api/wallet/checkin")).json.grants, []);
 
     // Невозможный итог: ничего не начисляется, после нескольких — пометка.
     for (let i = 0; i < CFG.suspicious.rejectedPerDay; i++) {
@@ -324,7 +370,16 @@ test("HTTP: only verified results pay; the client can look and buy, not credit",
     assert.equal((await call("POST", "/api/wallet/credit", { amount: 100 })).status, 404);
     r = await call("GET", "/api/wallet/me");
     assert.equal(r.status, 200);
-    assert.equal(r.json.balance, 80);
+    assert.equal(r.json.balance, 3 * CFG.achievement + CFG.tasks.level + CFG.tasks.play + CFG.record + CFG.daily.base);
+    // Задания: вход и задания игры закрыты, достижения «Прыг-Скока» — разовые задания.
+    assert.deepEqual(r.json.tasks.main.map((t) => [t.id, t.done]), [["login", true], ["invite", false]]);
+    assert.deepEqual(r.json.tasks.mario.filter((t) => t.period === "day").map((t) => [t.id, t.done]),
+      [["play", true], ["level", true], ["record", true]]);
+    assert.equal(r.json.tasks.mario.filter((t) => t.period === "once" && t.done).length, 3);
+    r = await call("GET", "/api/wallet/top?board=mario&period=all");
+    assert.equal(r.status, 200);
+    assert.equal(r.json.me, null, "a flagged player is not in the tables");
+    assert.equal((await call("GET", "/api/wallet/top?board=nope")).status, 400);
     assert.equal(economy.wallet(5).lang, "en");
     assert.equal((await call("POST", "/api/wallet/buy", { item: CFG.shop[0].id })).status, 409);
     assert.equal((await call("POST", "/api/wallet/buy", { item: "nope" })).status, 404);

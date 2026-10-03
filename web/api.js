@@ -1,11 +1,10 @@
-// Связь игры с сервером очков: рекорды, таблица лидеров и достижения.
+// Связь игры с сервером очков: отчёты об уровнях и играх, всплывающие достижения, кнопка жетонов игры.
 // Адрес сервера приходит от бота в ссылке (?api=https://...). Без него игра работает как раньше.
 (() => {
 'use strict';
 
 const tg = window.Telegram && window.Telegram.WebApp;
 const initData = (tg && tg.initData) || '';
-const myId = tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id;
 
 // Address, health check and requests: lib/server.js.
 const server = window.Server;
@@ -32,12 +31,6 @@ function reopenViaBot() {
     if (tg && tg.openTelegramLink) { tg.openTelegramLink(link); tg.close(); return; }
   } catch (e) { /* fall through */ }
   location.href = link;
-}
-
-function offlineHtml() {
-  return '<p class="scNote">Сервер рекордов переехал на новый адрес, а игра открыта по старой ссылке.</p>' +
-    (botName ? '<p class="scNote"><button class="scReopen">Открыть игру заново</button></p>'
-             : '<p class="scNote">Отправьте боту /start и откройте игру кнопкой «Играть» из его ответа.</p>');
 }
 
 const request = (method, path, body) => server.request(method, '/api/mario' + path, body);
@@ -98,83 +91,21 @@ function showAchievements(list) {
   });
 }
 
-// ---------- Экран рекордов и достижений ----------
-const panel = document.createElement('div');
-panel.id = 'scores';
-panel.className = 'hidden';
-panel.innerHTML = `
-  <div class="scTabs">
-    <button data-tab="top" class="on">🏆 Рекорды</button>
-    <button data-tab="ach">⭐ Достижения</button>
-  </div>
-  <div class="scBody"></div>
-  <button class="scClose">Закрыть</button>`;
-document.body.appendChild(panel);
-const bodyEl = panel.querySelector('.scBody');
-
-function esc(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-function showTab(tab) {
-  panel.querySelectorAll('.scTabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-  bodyEl.innerHTML = '<p class="scNote">Загрузка…</p>';
-  if (!base) {
-    bodyEl.innerHTML = '<p class="scNote">Сервер рекордов не подключён.<br><br>' +
-      'Таблица работает, когда игра открыта кнопкой «Играть» из сообщения бота ' +
-      '(команда /start), а сам бот запущен. После первого такого запуска ' +
-      'адрес запомнится и рекорды будут видны отовсюду.</p>';
-    return;
-  }
-  if (server.online === false) { bodyEl.innerHTML = offlineHtml(); return; }
-  const fail = () => {
-    bodyEl.innerHTML = server.online === false ? offlineHtml()
-      : '<p class="scNote">Сервер рекордов сейчас недоступен: бот выключен или нет связи. Попробуйте позже.</p>';
-  };
-  if (tab === 'top') {
-    request('GET', '/top').then((list) => {
-      if (!list.length) { bodyEl.innerHTML = '<p class="scNote">Рекордов пока нет. Будь первым!</p>'; return; }
-      bodyEl.innerHTML = '<ol class="scTop">' + list.map((p) =>
-        `<li class="${p.id === myId ? 'me' : ''}"><span>${p.place}</span><span>${esc(p.name)}</span><span>${p.score}</span></li>`,
-      ).join('') + '</ol>';
-    }).catch(fail);
-  } else {
-    const mine = initData ? request('GET', '/me').catch(() => null) : Promise.resolve(null);
-    Promise.all([request('GET', '/achievements'), mine]).then(([all, me]) => {
-      const got = new Set(me ? me.achievements.map((a) => a.code) : []);
-      const head = me
-        ? `<p class="scNote">Рекорд: ${me.best}${me.rank ? ` · место ${me.rank}` : ''} · открыто ${got.size} из ${all.length}</p>`
-        : '<p class="scNote">Откройте игру через бота, чтобы получать достижения.</p>';
-      bodyEl.innerHTML = head + '<ul class="scAch">' + all.map((a) =>
-        `<li class="${got.has(a.code) ? 'got' : ''}"><span class="achIcon">${got.has(a.code) ? a.icon : '🔒'}</span>` +
-        `<div><b>${esc(a.title)}</b><br>${esc(a.text)}</div></li>`,
-      ).join('') + '</ul>';
-    }).catch(fail);
-  }
-}
-
-panel.querySelector('.scTabs').addEventListener('click', (e) => {
-  const t = e.target.closest('button');
-  if (t) showTab(t.dataset.tab);
-});
-panel.querySelector('.scClose').addEventListener('click', () => panel.classList.add('hidden'));
-bodyEl.addEventListener('click', (e) => { if (e.target.closest('.scReopen')) reopenViaBot(); });
-
-function openScores() {
-  panel.classList.remove('hidden');
-  showTab('top');
-}
-
-// Кнопка «Рекорды» на заставке и экране окончания игры. Видна всегда:
-// без сервера экран рекордов объясняет, почему таблица пуста.
+// ---------- Жетоны игры ----------
+// Таблица рекордов, достижения и задания «Прыг-Скока» — в его разделе жетонов (lib/wallet.js
+// подхватывает кнопку по data-wallet-game). Без сервера и Telegram кнопки нет.
 {
   const btn = document.createElement('button');
-  btn.id = 'ovScores';
-  btn.textContent = '🏆 Рекорды и достижения';
-  btn.addEventListener('click', openScores);
+  btn.id = 'ovWallet';
+  btn.className = 'wGameBtn';
+  btn.dataset.walletGame = 'mario';
+  btn.textContent = '◆ Жетоны';
   const ov = document.getElementById('ovBtn');
   if (ov) ov.insertAdjacentElement('afterend', btn);
-  ready.then((ok) => { if (base && !ok) btn.textContent = '⚠️ Рекорды: сервер переехал'; });
+}
+
+function openScores() {
+  if (window.Wallet) window.Wallet.open('table', { game: 'mario' });
 }
 
 // ---------- Статистика (lib/events.js) ----------

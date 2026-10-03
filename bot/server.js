@@ -147,6 +147,7 @@ export function createApiServer({
       }
       store.addLevel(user.id, e, now());
       const grants = [];
+      economy?.task(user.id, "mario", "level", grants);
       return [200, { newAchievements: newAchievements(user.id, e, grants), ...walletBody(user.id, grants) }];
     },
 
@@ -176,7 +177,7 @@ export function createApiServer({
       const won = newAchievements(user.id, e, grants);
       const newRecord = e.score > before;
       economy?.setLang(user.id, user.language_code);
-      economy?.run(user.id, { newRecord }, grants);
+      economy?.run(user.id, { newRecord, game: "mario", levels: e.levels }, grants);
       tracker?.event(user.id, "game_finish", "mario");
       return [200, { ...meBody(user.id), newRecord, newAchievements: won, ...walletBody(user.id, grants) }];
     },
@@ -190,7 +191,32 @@ export function createApiServer({
       if (!user) return [401, { error: "unauthorized" }];
       store.touchPlayer(user);
       economy.setLang(user.id, user.language_code);
-      return [200, economy.me(user.id)];
+      const me = economy.me(user.id);
+      // Достижения «Прыг-Скока» — разовые задания этой игры.
+      const got = economy.achievementsDone(user.id);
+      me.tasks.mario.push(...publicList().map((a) => ({
+        id: `ach:${a.code}`, period: "once", amount: economy.cfg.achievement, done: got.has(a.code),
+        icon: a.icon, title: a.title, text: a.text,
+      })));
+      return [200, me];
+    };
+    // Вход в сборник за день: общее задание главной (раз в день по UTC, с серией дней).
+    routes["POST /api/wallet/checkin"] = (_body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      store.touchPlayer(user);
+      economy.setLang(user.id, user.language_code);
+      const grants = economy.checkin(user.id);
+      economy.inviteCheck(user.id, grants);
+      return [200, walletBody(user.id, grants).wallet];
+    };
+    // Таблицы: ?board=overall|mario|tanks&period=week|all — топ-100 и место игрока.
+    routes["GET /api/wallet/top"] = (_body, user, url) => {
+      const board = url.searchParams.get("board") || "overall";
+      const period = url.searchParams.get("period") || "week";
+      if (!["overall", "mario", "tanks"].includes(board) || !["week", "all"].includes(period)) {
+        return [400, { error: "bad data" }];
+      }
+      return [200, economy.top(board, period, user?.id ?? null)];
     };
     // { item } → { ok, balance }; повторная покупка того же товара ничего не списывает.
     routes["POST /api/wallet/buy"] = (body, user) => {
@@ -245,7 +271,7 @@ export function createApiServer({
       let mine = null;
       for (const res of r.results) {
         const out = res.playerId === user.id ? grants : [];
-        economy?.run(res.playerId, { newRecord: res.newRecord, game: "tanks" }, out);
+        economy?.run(res.playerId, { newRecord: res.newRecord, game: "tanks", levels: res.stages }, out);
         tracker?.event(res.playerId, "game_finish", "tanks");
         if (res.playerId === user.id) mine = res;
       }
@@ -281,7 +307,8 @@ export function createApiServer({
     }
     if (req.method === "OPTIONS") return res.writeHead(204).end();
 
-    const path = new URL(req.url, "http://x").pathname.replace(/\/+$/, "");
+    const url = new URL(req.url, "http://x");
+    const path = url.pathname.replace(/\/+$/, "");
     const handler = routes[`${req.method} ${path}`];
     if (!handler) return send(res, 404, { error: "not found" });
 
@@ -297,7 +324,7 @@ export function createApiServer({
         res.setHeader("Retry-After", String(byUser.retryAfter(user.id)));
         return send(res, 429, { error: "too many requests" });
       }
-      const [status, out] = await handler(body, user);
+      const [status, out] = await handler(body, user, url);
       send(res, status, out);
     } catch (err) {
       if (err instanceof HttpError) {
