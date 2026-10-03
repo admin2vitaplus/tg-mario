@@ -29,6 +29,15 @@ const config = {
       // A game with its own page, relative to the menu.
       url: 'tanks/',
     },
+    {
+      id: 'word',
+      title: 'СЛОВО ДНЯ',
+      enabled: true,
+      // Its own page without the game engine. A t.me/<bot>?startapp=word link (or ref_<id>-word,
+      // a shared result) opens it straight from the menu, see menu.js.
+      url: 'word/',
+      start: 'word',
+    },
   ],
 };
 

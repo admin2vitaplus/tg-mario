@@ -3,7 +3,7 @@ import { DAY_MS, dayOf, dayLabel } from "./days.js";
 // Статистика по ТЗ, P0-5: события игроков, источники, K-фактор и удержание.
 // Хранится только Telegram id и то, что нужно для подсчёта; имена и тексты сюда не попадают.
 
-export const GAMES = ["mario", "tanks"];
+export const GAMES = ["mario", "tanks", "word"];
 // События, которые присылает сама игра. Остальные (первое появление, переход по приглашению,
 // вход по приглашению, конец игры в «Прыг-Скок») сервер записывает сам.
 export const CLIENT_EVENTS = new Set([
@@ -16,8 +16,9 @@ const MATCH_DEDUP_MS = 60_000;
 // Метка источника из ?start= бота или startapp= Mini App:
 // src_<метка> — реклама/площадка, ref_<id> — личное приглашение, room_<код> (и старое tanks_<код>) — комната.
 export function parseStart(payload) {
-  // Ссылки startapp из игр несут после «__» имя туннеля сервера — для статистики оно не нужно.
-  const p = String(payload || "").trim().replace(/__[a-z0-9-]{1,63}$/, "");
+  // Ссылки startapp из игр несут после «__» имя туннеля сервера, а после «-» — игру, которую
+  // открыть сразу (ref_123-word); для статистики ни то, ни другое не нужно.
+  const p = String(payload || "").trim().replace(/__[a-z0-9-]{1,63}$/, "").replace(new RegExp(`-(?:${GAMES.join("|")})$`), "");
   let m;
   if ((m = /^src_([A-Za-z0-9-]{1,32})$/.exec(p))) return { source: `src_${m[1].toLowerCase()}`, ref: null };
   if ((m = /^ref_(\d{1,15})$/.exec(p))) return { source: "ref", ref: m[1] };
@@ -141,7 +142,7 @@ export function collectStats(db, at = Date.now()) {
 }
 
 const SOURCE_NAMES = { direct: "сами", ref: "по ссылке друга", room: "в комнату" };
-const GAME_NAMES = { mario: "Прыг-Скок", tanks: "Танкодром" };
+const GAME_NAMES = { mario: "Прыг-Скок", tanks: "Танкодром", word: "Слово дня" };
 const pct = (r) => (r.rate == null ? "—" : `${Math.round(r.rate * 100)}% (${r.returned} из ${r.cohort})`);
 const kText = (k) => (k.k == null ? `— (новых по приглашениям ${k.invited}, пригласивших 0)`
   : `${k.k.toFixed(2)} (${k.invited} новых ÷ ${k.inviters} пригласивших)`);

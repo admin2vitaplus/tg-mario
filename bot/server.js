@@ -4,7 +4,7 @@ import { ACHIEVEMENTS, publicList } from "./achievements.js";
 import { createRateLimiter } from "./ratelimit.js";
 import { checkLevel, checkRun, currentGame, LAST_LEVEL, PER_WORLD, SEQUENCE_TTL_MS, WORLD_TIMES } from "./plausibility.js";
 import { CLIENT_EVENTS, GAMES } from "./stats.js";
-import { publicRules } from "./economy.js";
+import { publicRules, seasonOf, seasonStart } from "./economy.js";
 
 // Один HTTP-сервер на все игры. Маршруты игры «Прыг-Скок» живут под /api/mario/.
 // Сетевые игры (например, танки) подключаются к этому же серверу через событие
@@ -65,7 +65,7 @@ export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
   store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
-  tanks = null, createInvoice = null,
+  tanks = null, createInvoice = null, word = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -73,7 +73,13 @@ export function createApiServer({
     if (!h.startsWith("tma ")) return null;
     const user = verifyInitData(h.slice(4), botToken, now());
     // start_param — метка из ссылки t.me/<бот>/<app>?startapp=..., подписана вместе с initData.
-    if (user) user.startParam = new URLSearchParams(h.slice(4)).get("start_param") || "";
+    if (user) {
+      const params = new URLSearchParams(h.slice(4));
+      user.startParam = params.get("start_param") || "";
+      // chat_instance — чат, из которого открыта игра (для таблиц чата); тоже подписан.
+      const chat = params.get("chat_instance") || "";
+      user.chat = /^-?\d{1,25}$/.test(chat) ? chat : null;
+    }
     return user;
   };
   const byIp = createRateLimiter({ limit: limits.ipPerMinute, now });
@@ -213,7 +219,7 @@ export function createApiServer({
     routes["GET /api/wallet/top"] = (_body, user, url) => {
       const board = url.searchParams.get("board") || "overall";
       const period = url.searchParams.get("period") || "week";
-      if (!["overall", "mario", "tanks"].includes(board) || !["week", "all"].includes(period)) {
+      if (!["overall", "mario", "tanks", "word"].includes(board) || !["week", "all"].includes(period)) {
         return [400, { error: "bad data" }];
       }
       return [200, economy.top(board, period, user?.id ?? null)];
@@ -278,6 +284,39 @@ export function createApiServer({
       economy?.setLang(user.id, user.language_code);
       return [200, { score: mine?.score ?? 0, best: mine?.best ?? tanks.best(user.id), newRecord: !!mine?.newRecord,
         ...walletBody(user.id, grants) }];
+    };
+  }
+
+  // «Слово дня» (word.js): состояние дня, попытка и таблица чата. Слово знает только сервер.
+  if (word) {
+    const langOf = (v) => (v === "en" ? "en" : v === "ru" ? "ru" : null);
+    routes["GET /api/word/today"] = (_body, user, url) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const lang = langOf(url.searchParams.get("lang"));
+      if (!lang) return [400, { error: "bad data" }];
+      store.touchPlayer(user);
+      return [200, word.state(user.id, lang, { chat: user.chat })];
+    };
+    // { lang, word, day } → состояние после попытки; в конце игры — жетоны (wallet).
+    routes["POST /api/word/guess"] = (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const lang = langOf(body.lang);
+      const day = body.day == null ? null : Number(body.day);
+      if (!lang || typeof body.word !== "string" || body.word.length > 20 || (day !== null && !Number.isSafeInteger(day))) {
+        return [400, { error: "bad data" }];
+      }
+      store.touchPlayer(user);
+      economy?.setLang(user.id, user.language_code);
+      const r = word.guess(user.id, lang, body.word, { day, chat: user.chat });
+      if (r.status !== 200) return [r.status, r.body];
+      const { grants, ...out } = r.body;
+      return [200, { ...out, ...(out.state !== "play" ? walletBody(user.id, grants) : {}) }];
+    };
+    routes["GET /api/word/chat"] = (_body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      store.touchPlayer(user);
+      const weekFrom = economy ? seasonStart(seasonOf(now())) : now() - 7 * 86_400_000;
+      return [200, word.chat(user.id, user.chat, weekFrom)];
     };
   }
 

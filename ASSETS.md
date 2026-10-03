@@ -14,6 +14,7 @@
 | Все спрайты и тайлы «Прыг-Скока»: герой, враги (жуки, рыбы, метатель болтов, наездник на облаке, колючки), кусачие растения, пружина, блоки, трубы, деревья, грибы, кораллы, вода, лава, босс, облака, холмы; карты уровней | `web/game.js`, `web/levels.js`, `web/worlds.js` (рисуются кодом в `makeTextures`, `drawTiles`, `drawScenery`) | Своя работа: пиксели заданы в коде проекта | MIT, как код проекта |
 | Все спрайты и карты «Танкодрома» | `web/tanks/tanks.js`, `web/tanks/sim.js` (рисуются кодом) | Своя работа | MIT, как код проекта |
 | Скины и оформление («Внешний вид») | `web/lib/looks.js`, `web/lib/looks.css` | Своя работа: цвета и стили заданы в коде | MIT, как код проекта |
+| «Слово дня»: плитки, клавиатура, темы плиток «Море» и «Карамель» | `web/word/word.js`, `web/word/word.css` | Своя работа: цвета и разметка заданы в коде | MIT, как код проекта |
 | Звуки | `web/game.js`, `web/tanks/tanks.js` (генерируются Web Audio API на лету) | Своя работа: синтез тонов в коде, без аудиофайлов | MIT, как код проекта |
 | Шрифт | `web/style.css` и другие CSS | Системный моноширинный шрифт устройства (`Courier New`, `monospace`); файлы шрифтов не загружаются | — |
 
@@ -24,6 +25,16 @@
 | `web/lib/phaser.min.js` | Игровой движок Phaser 3.80.1 | https://phaser.io, https://github.com/phaserjs/phaser | MIT, текст в `web/lib/phaser-LICENSE.md` |
 | `web/lib/phaser-LICENSE.md` | Текст лицензии Phaser | Из пакета Phaser | — |
 | `web/lib/telegram-web-app.js` | Telegram Mini Apps SDK (`window.Telegram.WebApp`), локальная копия, чтобы игра не ходила на `telegram.org` | https://telegram.org/js/telegram-web-app.js | © Telegram. Telegram распространяет этот скрипт для подключения Mini Apps; отдельной лицензии в файле нет |
+
+## Словари «Слова дня» (`bot/word/`)
+
+Списки лежат только на сервере: игра их не загружает, слово дня и проверку попыток делает сервер.
+
+| Файл | Что это | Откуда | Лицензия |
+|---|---|---|---|
+| `bot/word/ru-answers.txt`, `bot/word/en-answers.txt` | Слова дня: частые существительные из 5 букв | Своя подборка проекта | MIT, как код проекта |
+| `bot/word/ru-allowed.txt` | Допустимые попытки на русском: слова и формы из 5 букв | Изменённая выборка из словаря ru_RU для Hunspell (© 1997–2008 Alexander I. Lebedev), пакет npm `dictionary-ru` 3.0.0; собрано `bot/scripts/word-dict.mjs` | BSD-3-Clause, текст в `bot/word/LICENSE-ru.txt` |
+| `bot/word/en-allowed.txt` | Допустимые попытки на английском | Выборка из словаря en_US для Hunspell на основе SCOWL (Kevin Atkinson и др.), пакет npm `dictionary-en` 4.0.0; собрано `bot/scripts/word-dict.mjs` | Разрешительная лицензия SCOWL (MIT-подобная и BSD), текст в `bot/word/LICENSE-en.txt` |
 
 ## Библиотеки сервера (`bot/`, npm)
 
