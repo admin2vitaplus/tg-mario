@@ -106,7 +106,8 @@ function runMenu(patch, search = '') {
 
 // A shared «Слово дня» result (startapp=ref_<id>-word) opens that game straight from the menu.
 test('a launch link to a game opens it', () => {
-  let r = runMenu(null, '?tgWebAppStartParam=ref_42-word__abc-def&bot=x');
+  const wordOn = (c) => { c.game('word').enabled = true; };
+  let r = runMenu(wordOn, '?tgWebAppStartParam=ref_42-word__abc-def&bot=x');
   assert.match(r.location.href || '', /^word\/\?/);
   r = runMenu((c) => { c.game('word').enabled = false; }, '?tgWebAppStartParam=word');
   assert.equal(r.location.href, undefined, 'a switched-off game is not opened');
@@ -132,11 +133,24 @@ test('every game in the config has what the menu needs', () => {
   }
 });
 
-test('the menu lists all enabled games', () => {
+test('the menu lists exactly the enabled games', () => {
+  const cfg = loadConfig();
   const { lines } = runMenu();
+  for (const g of cfg.games) assert.equal(lines.some((l) => l.includes(g.title)), g.enabled, g.id);
   assert.ok(lines.some((l) => l.includes('ПРЫГ-СКОК')));
   assert.ok(lines.some((l) => l.includes('ТАНКОДРОМ')));
-  assert.ok(lines.some((l) => l.includes('СЛОВО ДНЯ')));
+});
+
+// An old link to a hidden game (a shared result, a bookmark of its page) lands on the menu.
+test('old links to a switched-off game land on the menu', () => {
+  const r = runMenu((c) => { c.game('word').enabled = false; }, '?tgWebAppStartParam=ref_42-word');
+  assert.equal(r.location.href, undefined);
+  assert.equal(r.lines.length, loadConfig().slots);
+  for (const g of loadConfig().games.filter((x) => x.url)) {
+    const dir = path.join(WEB, g.url);
+    const own = fs.readdirSync(dir).filter((f) => /\.(html|js)$/.test(f)).map((f) => read(path.join(dir, f))).join('\n');
+    assert.match(own, /isEnabled\(/, g.id + ' page does not check whether it is on');
+  }
 });
 
 for (const id of ['pryg-skok', 'tanks', 'word']) {
