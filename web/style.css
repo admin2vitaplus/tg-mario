@@ -124,15 +124,15 @@ html, body {
   .btn { opacity: 0.6; }
 
   /* Title, game-over and game menu must fit a short screen */
-  #overlay, #menu { justify-content: safe center; overflow-y: auto; padding: 8px 16px; touch-action: pan-y; }
+  #overlay { justify-content: safe center; overflow-y: auto; padding: 8px 16px; touch-action: pan-y; }
+  #menu { padding: 8px 16px; }
   #overlay h1 { margin: 0 0 6px; font-size: 22px; }
   #overlay p { margin: 0 0 10px; font-size: 13px; }
   #overlay .hint { display: none; }
-  #overlay button { padding: 8px 28px; font-size: 16px; }
-  #overlay #ovScores, #overlay #ovLooks { margin-top: 8px; padding: 6px 14px; font-size: 13px; }
-  #menu h1 { margin: 0 0 8px; font-size: 20px; }
-  #menu li { padding: 5px 12px 5px 36px; font-size: 16px; }
-  #menuScores { margin-top: 8px; padding: 6px 18px; }
+
+  #menu h1 { margin: 0 0 8px; font-size: 18px; }
+  #menu ol { grid-template-columns: repeat(4, 1fr); max-width: none; }
+
   #menu .hint { margin-top: 8px; }
 }
 
@@ -150,7 +150,7 @@ html, body {
   justify-content: center;
   padding: 16px;
   text-align: center;
-  background: rgba(0, 0, 0, 0.82);
+  background: rgba(0, 0, 0, 0.9);
 }
 
 #overlay.hidden { display: none; }
@@ -158,14 +158,7 @@ html, body {
 #overlay p { margin: 0 0 20px; font-size: 15px; line-height: 1.5; }
 #overlay .hint { margin-top: 20px; font-size: 12px; opacity: 0.6; }
 
-#overlay button {
-  padding: 12px 36px;
-  border: 0;
-  border-radius: 10px;
-  background: #1fa2a8;
-  color: #fff;
-  font: bold 18px "Courier New", monospace;
-}
+
 
 /* Narrow phones: four buttons must fit in one row */
 @media (max-width: 420px) {
@@ -177,17 +170,9 @@ html, body {
   .btn.turbo { font-size: 9px; }
 }
 
-/* «Внешний вид» button under «Играть» */
-#overlay #ovLooks {
-  margin-top: 12px;
-  padding: 8px 16px;
-  border: 2px solid #f8d020;
-  background: transparent;
-  color: #f8d020;
-  font-size: 14px;
-}
 
-/* Game menu, shown first, like a multi-game cartridge */
+
+/* Game menu, shown first: a lobby — the жетоны banner on top, games as cards below. */
 #menu {
   position: absolute;
   inset: 0;
@@ -195,32 +180,44 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: #000;
+  overflow-y: auto;
+  padding: calc(14px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  background: radial-gradient(120% 60% at 50% 0%, #1b1a10 0%, #000 60%);
+  touch-action: pan-y;
 }
 #menu.hidden { display: none; }
-#menu h1 { margin: 0 0 24px; font-size: 26px; color: #f8d020; letter-spacing: 2px; }
-#menu ol { margin: 0; padding: 0; list-style: none; width: 100%; max-width: 280px; }
-#menu li {
-  position: relative;
-  padding: 10px 12px 10px 36px;
-  font-size: 18px;
-  font-weight: bold;
+#menu h1 { margin: 4px 0 14px; font-size: 20px; color: #f8d020; letter-spacing: 2px; text-align: center; }
+#menu ol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: #141418;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, border-color 0.15s ease;
 }
-#menu li.soon { opacity: 0.35; cursor: default; }
-#menu li.on::before { content: '►'; position: absolute; left: 10px; color: #f8d020; }
-#menu .hint { margin-top: 24px; font-size: 12px; opacity: 0.6; }
-#menuScores {
-  margin-top: 20px;
-  padding: 10px 24px;
-  border: 2px solid #f8d020;
-  border-radius: 8px;
-  background: transparent;
-  color: #f8d020;
-  font: bold 16px "Courier New", monospace;
-}
+.card:not(.soon):active { transform: scale(0.97); }
+.card.on { border-color: #f8d020; }
+.card .cover { display: block; width: 100%; aspect-ratio: 8 / 5; image-rendering: pixelated; image-rendering: crisp-edges; }
+.cardTitle { margin: 8px 10px 0; font-size: 15px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardSub { margin: 2px 10px 0; min-height: 2.4em; font-size: 11px; line-height: 1.2; color: rgba(255, 255, 255, 0.6); }
+.card .cardPlay { width: auto; min-height: 36px; margin: 8px 10px 10px; padding: 6px 8px; font-size: 15px; }
+.card.soon { cursor: default; opacity: 0.55; }
+#menu .hint { margin-top: 16px; font-size: 12px; opacity: 0.6; }
+
 #menu.loading .hint { opacity: 1; color: #f8d020; animation: blink 0.8s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
 
@@ -241,8 +238,13 @@ html, body {
 }
 .withBack #hud { padding-left: 40px; }
 #overlay { z-index: 4; }
-#overlay #ovMenu { margin-top: 12px; padding: 8px 16px; border: 0; background: transparent; color: #fff; font-size: 14px; opacity: 0.8; }
+
 @media (orientation: landscape) and (max-height: 500px) {
   .withBack #hud { top: 42px; padding-left: 0; }
-  #overlay #ovMenu { margin-top: 6px; padding: 4px 12px; font-size: 13px; }
+
+}
+
+/* Keyboard help only where there is a keyboard and a mouse. */
+@media not all and (hover: hover) and (pointer: fine) {
+  #overlay .hint { display: none; }
 }

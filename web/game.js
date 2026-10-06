@@ -21,6 +21,24 @@ if (tg) {
   } catch (e) { /* not inside Telegram */ }
 }
 
+// ---------- Language ----------
+// The menu (menu.js) picks it; Russian names below have their English here.
+const L = (window.Cartridge && window.Cartridge.L) || ((ru) => ru);
+const EN_NAMES = {
+  'Классика': 'Classic', 'Лесник': 'Ranger', 'Космонавт': 'Astronaut', 'Ниндзя': 'Ninja', 'Пират': 'Pirate',
+  'Зефирка': 'Candy', 'Рыцарь': 'Knight', 'День': 'Day', 'Ночь': 'Night',
+  'Жук': 'Beetle', 'Синий': 'Blue', 'Травяной': 'Grass', 'Золотой': 'Golden', 'Тень': 'Shadow', 'Рубин': 'Ruby',
+  'Зелёные': 'Green', 'Красные': 'Red', 'Синие': 'Blue', 'Золотые': 'Golden', 'Стальные': 'Steel', 'Неон': 'Neon',
+  'Холмы': 'Hills', 'Горы': 'Mountains', 'Лес': 'Forest', 'Город': 'City', 'Пустыня': 'Desert',
+  'Выбери героя': 'Pick a hero', 'Погода: день или ночь': 'Weather: day or night', 'Враги': 'Enemies', 'Трубы': 'Pipes', 'Фон': 'Backdrop',
+  'ПОЛЕ': 'FIELD', 'ПОДЗЕМЕЛЬЕ': 'UNDERGROUND', 'ВЕРХУШКИ ДЕРЕВЬЕВ': 'TREETOPS', 'ЗАМОК': 'CASTLE',
+  'ЛУГ': 'MEADOW', 'ПОД ВОДОЙ': 'UNDER WATER', 'МОСТЫ НАД МОРЕМ': 'BRIDGES OVER THE SEA',
+  'НОЧНОЙ ЛУГ': 'NIGHT MEADOW', 'НОЧНАЯ ДОРОГА': 'NIGHT ROAD', 'НОЧНЫЕ ДЕРЕВЬЯ': 'NIGHT TREES',
+  'ОБЛАЧНЫЙ ЛУГ': 'CLOUD MEADOW', 'ГЛУБОКОЕ ПОДЗЕМЕЛЬЕ': 'DEEP UNDERGROUND', 'ГРИБЫ': 'MUSHROOMS',
+  'ЗАМОК-ЛАБИРИНТ': 'MAZE CASTLE', 'ЗОНА ПЕРЕХОДА': 'WARP ZONE',
+};
+const nameOf = (ru) => L(ru, EN_NAMES[ru] || ru);
+
 // Server scores and achievements (api.js). The stub keeps the game working without it.
 const api = window.GameAPI || { track() {}, levelDone() {}, runDone() { return Promise.resolve(null); }, newRun() {} };
 
@@ -997,7 +1015,10 @@ const LOOK_GROUPS = [
     ctx.fillStyle = '#c0601c';
     ctx.fillRect(0, size - 6, size, 6);
   } },
-].map((g) => Object.assign(g, { items: g.items.map((it) => Object.assign(it, { draw: (ctx, size) => g.draw(it, ctx, size) })) }));
+].map((g) => Object.assign(g, {
+  title: nameOf(g.title),
+  items: g.items.map((it) => Object.assign(it, { name: nameOf(it.name), draw: (ctx, size) => g.draw(it, ctx, size) })),
+}));
 
 // The hero skin used to be saved on its own; carry it over once.
 try {
@@ -1041,7 +1062,8 @@ function openLooks() {
   if (!window.Looks) return;
   window.Looks.open({
     key: LOOKS_KEY,
-    title: 'ВНЕШНИЙ ВИД',
+    title: L('ВНЕШНИЙ ВИД', 'LOOKS'),
+    doneText: L('Готово', 'Done'),
     groups: LOOK_GROUPS,
     onChange(sel) { looks = Object.assign({}, sel); },
     onClose(sel, changed) {
@@ -1267,7 +1289,7 @@ class Play extends Phaser.Scene {
     if (lvl.boss) this.addBoss(lvl.boss);
     this.plants = (lvl.plants || []).map((pl) => this.addPlant(pl));
     for (const sg of lvl.signs || []) {
-      this.add.text(sg.x * TILE, sg.y * TILE, sg.text, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 })
+      this.add.text(sg.x * TILE, sg.y * TILE, nameOf(sg.text), { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 })
         .setOrigin(0.5).setDepth(DEPTH.TILES + 1);
     }
 
@@ -1555,8 +1577,8 @@ class Play extends Phaser.Scene {
     this.physics.pause();
     const items = [
       this.add.rectangle(0, 0, VIEW_W, VIEW_H, 0x000000).setOrigin(0),
-      this.add.text(VIEW_W / 2, 92, `МИР ${this.s.world}-${this.s.level + 1}`, { fontFamily: 'Courier New, monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0.5),
-      this.add.text(VIEW_W / 2, 116, this.def.name, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#f8d020', resolution: 4 }).setOrigin(0.5),
+      this.add.text(VIEW_W / 2, 92, `${L('МИР', 'WORLD')} ${this.s.world}-${this.s.level + 1}`, { fontFamily: 'Courier New, monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0.5),
+      this.add.text(VIEW_W / 2, 116, nameOf(this.def.name), { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#f8d020', resolution: 4 }).setOrigin(0.5),
       this.add.image(VIEW_W / 2 - 14, 150, this.heroTex() + '0').setOrigin(0.5, 1),
       this.add.text(VIEW_W / 2 + 2, 142, `× ${this.s.lives}`, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0, 0.5),
     ];
@@ -2265,7 +2287,7 @@ class Play extends Phaser.Scene {
           checkpoint: this.passedCheckpoint ? this.s.level : undefined,
         });
       } else {
-        this.gameOver('ИГРА ОКОНЧЕНА');
+        this.gameOver(L('ИГРА ОКОНЧЕНА', 'GAME OVER'));
       }
     });
   }
@@ -2277,13 +2299,15 @@ class Play extends Phaser.Scene {
     const levels = this.s.cleared;
     // As on the console, a lost game continues from the start of the current world.
     const world = completed ? 1 : this.s.world;
-    showOverlay(title, `Счёт: ${this.s.score}<br>Рекорд: ${best}`, world > 1 ? `Продолжить с мира ${world}` : 'Играть снова', () => {
+    const scoreLine = `${L('Счёт', 'Score')}: ${this.s.score}`;
+    showOverlay(title, `${scoreLine}<br>${L('Рекорд', 'Best')}: ${best}`,
+      world > 1 ? L(`Продолжить с мира ${world}`, `Continue from world ${world}`) : L('Играть снова', 'Play again'), () => {
       this.scene.restart({ world });
     });
     api.runDone(this.s.score, levels, !!completed).then((r) => {
       if (!r) return;
-      const place = r.rank ? `<br>Место в таблице: ${r.rank}` : '';
-      $('ovText').innerHTML = `Счёт: ${this.s.score}<br>${r.newRecord ? 'Новый рекорд!' : `Рекорд: ${r.best}`}${place}`;
+      const place = r.rank ? `<br>${L('Место в таблице', 'Place in the table')}: ${r.rank}` : '';
+      $('ovText').innerHTML = `${scoreLine}<br>${r.newRecord ? L('Новый рекорд!', 'New best!') : `${L('Рекорд', 'Best')}: ${r.best}`}${place}`;
     });
   }
 
@@ -2333,7 +2357,7 @@ class Play extends Phaser.Scene {
     if (world <= WORLDS) {
       this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, world, cleared: this.s.cleared, lifeTaken: this.s.lifeTaken, big: this.big, fire: this.fire });
     } else {
-      this.gameOver('ВСЕ МИРЫ ПРОЙДЕНЫ!', true);
+      this.gameOver(L('ВСЕ МИРЫ ПРОЙДЕНЫ!', 'ALL WORLDS CLEARED!'), true);
     }
   }
 
@@ -2414,7 +2438,7 @@ function back() {
   const playing = started && $('overlay').classList.contains('hidden') && scene && !scene.scene.isPaused();
   if (!playing) { window.Back.toMenu(); return; }
   scene.scene.pause();
-  showOverlay('ПАУЗА', 'Игра остановлена.', 'Продолжить', () => scene.scene.resume());
+  showOverlay(L('ПАУЗА', 'PAUSE'), L('Игра остановлена.', 'The game is paused.'), L('Продолжить', 'Continue'), () => scene.scene.resume());
 }
 if (window.Back) window.Back.attach(back);
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') back(); });

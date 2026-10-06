@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Жёлтый картридж</title>
+  <link rel="stylesheet" href="lib/ui.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="scores.css">
   <link rel="stylesheet" href="lib/wallet.css">
@@ -13,11 +14,11 @@
 <body>
   <div id="app">
     <div id="hud">
-      <div>СЧЁТ<br><span id="score">000000</span></div>
-      <div>МОНЕТЫ<br><span id="coins">×00</span></div>
-      <div>ЖИЗНИ<br><span id="lives">3</span></div>
-      <div>МИР<br><span id="world">1-1</span></div>
-      <div>ВРЕМЯ<br><span id="time">300</span></div>
+      <div><span data-en="SCORE">СЧЁТ</span><br><span id="score">000000</span></div>
+      <div><span data-en="GOLD">ЗОЛОТО</span><br><span id="coins">×00</span></div>
+      <div><span data-en="LIVES">ЖИЗНИ</span><br><span id="lives">3</span></div>
+      <div><span data-en="WORLD">МИР</span><br><span id="world">1-1</span></div>
+      <div><span data-en="TIME">ВРЕМЯ</span><br><span id="time">300</span></div>
     </div>
     <div id="game"></div>
     <div id="controls">
@@ -28,24 +29,26 @@
         <div class="btn down">▼</div>
       </div>
       <div id="actions">
-        <div class="btn round turbo" id="btnTB">ТУРБО<br>B</div>
-        <div class="btn round turbo" id="btnTA">ТУРБО<br>A</div>
+        <div class="btn round turbo" id="btnTB" data-en="TURBO<br>B">ТУРБО<br>B</div>
+        <div class="btn round turbo" id="btnTA" data-en="TURBO<br>A">ТУРБО<br>A</div>
         <div class="btn round ab" id="btnB">B</div>
         <div class="btn round ab" id="btnA">A</div>
       </div>
     </div>
     <div id="menu">
-      <h1>ЖЁЛТЫЙ КАРТРИДЖ</h1>
+      <h1 data-en="YELLOW CARTRIDGE">ЖЁЛТЫЙ КАРТРИДЖ</h1>
       <ol id="menuList"></ol>
-      <p class="hint">Выберите игру</p>
+      <p class="hint" data-en="Choose a game">Выберите игру</p>
     </div>
     <div id="overlay">
-      <h1 id="ovTitle">ПРЫГ-СКОК</h1>
-      <p id="ovText">Добеги до флага, собирай монеты,<br>прыгай на жуков.</p>
-      <button id="ovBtn">Играть</button>
-      <button id="ovLooks">🎨 Внешний вид</button>
-      <button id="ovMenu">← Все игры</button>
-      <p class="hint" id="ovHint">Клавиатура: стрелки, A — Z/пробел, B (бег и огонь) — X/Shift, турбо A — A, турбо B — S</p>
+      <h1 id="ovTitle" data-en="HOP-SKIP">ПРЫГ-СКОК</h1>
+      <p id="ovText" data-en="Run to the flag, collect gold,<br>jump on the beetles.">Добеги до флага, собирай золото,<br>прыгай на жуков.</p>
+      <div class="ui-stack" id="ovActs">
+        <button id="ovBtn" class="ui-btn primary" data-en="Play">Играть</button>
+        <button id="ovLooks" class="ui-btn" data-en="🎨 Looks">🎨 Внешний вид</button>
+        <button id="ovMenu" class="ui-btn ghost" data-en="← All games">← Все игры</button>
+      </div>
+      <p class="hint" id="ovHint" data-en="Keyboard: arrows, A is Z/Space, B (run and fire) is X/Shift, turbo A is A, turbo B is S">Клавиатура: стрелки, A — Z/пробел, B (бег и огонь) — X/Shift, турбо A — A, турбо B — S</p>
     </div>
   </div>
   <!-- Only the menu loads up front; a game's own files (the engine too) load

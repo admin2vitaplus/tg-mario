@@ -95,7 +95,7 @@ export function createApiServer({
     for (const a of ACHIEVEMENTS) {
       if (a.check(event, player) && store.earn(playerId, a.code)) won.push(a);
     }
-    const out = won.map(({ code, icon, title, text }) => ({ code, icon, title, text }));
+    const out = won.map(({ code, icon, title, text, titleEn, textEn }) => ({ code, icon, title, text, titleEn, textEn }));
     if (out.length && onAchievements) onAchievements(playerId, out);
     if (out.length && economy) economy.achievements(playerId, out, grants);
     return out;
@@ -193,18 +193,21 @@ export function createApiServer({
   // лишь посмотреть баланс и потратить жетоны в магазине.
   if (economy) {
     routes["GET /api/wallet/info"] = () => [200, publicRules(economy.cfg)];
+    const walletMe = (id) => {
+      const me = economy.me(id);
+      // Достижения «Прыг-Скока» — разовые задания этой игры.
+      const got = economy.achievementsDone(id);
+      me.tasks.mario.push(...publicList().map((a) => ({
+        id: `ach:${a.code}`, period: "once", amount: economy.cfg.achievement, done: got.has(a.code),
+        icon: a.icon, title: a.title, text: a.text, titleEn: a.titleEn, textEn: a.textEn,
+      })));
+      return me;
+    };
     routes["GET /api/wallet/me"] = (_body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
       store.touchPlayer(user);
       economy.setLang(user.id, user.language_code);
-      const me = economy.me(user.id);
-      // Достижения «Прыг-Скока» — разовые задания этой игры.
-      const got = economy.achievementsDone(user.id);
-      me.tasks.mario.push(...publicList().map((a) => ({
-        id: `ach:${a.code}`, period: "once", amount: economy.cfg.achievement, done: got.has(a.code),
-        icon: a.icon, title: a.title, text: a.text,
-      })));
-      return [200, me];
+      return [200, walletMe(user.id)];
     };
     // Вход в сборник за день: общее задание главной (раз в день по UTC, с серией дней).
     routes["POST /api/wallet/checkin"] = (_body, user) => {
@@ -213,7 +216,9 @@ export function createApiServer({
       economy.setLang(user.id, user.language_code);
       const grants = economy.checkin(user.id);
       economy.inviteCheck(user.id, grants);
-      return [200, walletBody(user.id, grants).wallet];
+      // Вместе с начислением — всё, что показывает панель жетонов: странице не нужен второй запрос /me.
+      const me = walletMe(user.id);
+      return [200, { grants, balance: me.balance, me }];
     };
     // Таблицы: ?board=overall|mario|tanks&period=week|all — топ-100 и место игрока.
     routes["GET /api/wallet/top"] = (_body, user, url) => {

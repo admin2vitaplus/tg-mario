@@ -78,7 +78,7 @@ function fakePage() {
     id, children: [], className: '', textContent: '', removed: false,
     classList: { add() {}, remove() {}, toggle() {} },
     set innerHTML(v) { this.children = []; },
-    append(c) { this.children.push(c); },
+    append(...c) { this.children.push(...c); },
     addEventListener() {},
     querySelector() { return el('hint'); },
     remove() { this.removed = true; },
@@ -101,7 +101,8 @@ function runMenu(patch, search = '') {
   const page = fakePage();
   const ctx = { window: { CARTRIDGE: cfg }, document: page.document, location: { search }, URLSearchParams };
   vm.runInNewContext(read(path.join(WEB, 'menu.js')), ctx);
-  return { lines: page.byId.menuList.children.map((li) => li.textContent), location: ctx.location };
+  const text = (el) => [el.textContent, ...el.children.map(text)].filter(Boolean).join(' ');
+  return { lines: page.byId.menuList.children.map(text), location: ctx.location };
 }
 
 // A shared «Слово дня» result (startapp=ref_<id>-word) opens that game straight from the menu.
@@ -133,6 +134,7 @@ test('every game in the config has what the menu needs', () => {
   }
 });
 
+// The lobby: a card per enabled game, «скоро» cards only to even out the grid.
 test('the menu lists exactly the enabled games', () => {
   const cfg = loadConfig();
   const { lines } = runMenu();
@@ -145,7 +147,7 @@ test('the menu lists exactly the enabled games', () => {
 test('old links to a switched-off game land on the menu', () => {
   const r = runMenu((c) => { c.game('word').enabled = false; }, '?tgWebAppStartParam=ref_42-word');
   assert.equal(r.location.href, undefined);
-  assert.equal(r.lines.length, loadConfig().slots);
+  assert.equal(r.lines.filter((l) => !l.includes('СКОРО')).length, loadConfig().enabledGames().length);
   for (const g of loadConfig().games.filter((x) => x.url)) {
     const dir = path.join(WEB, g.url);
     const own = fs.readdirSync(dir).filter((f) => /\.(html|js)$/.test(f)).map((f) => read(path.join(dir, f))).join('\n');
@@ -159,7 +161,7 @@ for (const id of ['pryg-skok', 'tanks', 'word']) {
     const title = cfg.game(id).title;
     const { lines } = runMenu((c) => { c.game(id).enabled = false; });
     assert.ok(!lines.some((l) => l.includes(title)));
-    assert.equal(lines.length, cfg.slots);
+    assert.equal(lines.length % 2, 0, 'cards fill the two-column grid');
     assert.ok(lines.some((l) => !l.includes('СКОРО')), 'the other game stays');
   });
 }
@@ -264,4 +266,18 @@ test('the address that answers wins and is remembered; a dead one is not used', 
   assert.equal(r.server.online, false);
   await assert.rejects(r.server.request('GET', '/api/wallet/me'), (e) => e.offline === true);
   assert.equal(r.store.get('prygskok_api'), old, 'a dead address does not replace the stored one');
+});
+
+// «Прыг-Скок» in English: every level name and look has its English in game.js (EN_NAMES).
+test('Hop-Skip names all have English', () => {
+  const game = read(path.join(WEB, 'game.js'));
+  const table = game.split('const EN_NAMES = {')[1].split('};')[0];
+  const known = new Set([...table.matchAll(/'([^']+)':/g)].map((m) => m[1]));
+  const names = [
+    ...[...read(path.join(WEB, 'levels.js')).matchAll(/(?:name|text): '([^']+)'/g)].map((m) => m[1]),
+    ...[...read(path.join(WEB, 'worlds.js')).matchAll(/name: '([^']+)'/g)].map((m) => m[1]),
+    ...[...game.matchAll(/(?:name|title): '([^']*[А-Яа-яЁё][^']*)'/g)].map((m) => m[1]),
+  ];
+  assert.ok(names.length > 30);
+  assert.deepEqual(names.filter((n) => !known.has(n)), []);
 });

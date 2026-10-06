@@ -1,0 +1,84 @@
+/* Buttons shared by the menu and every game, so the whole collection looks alike.
+   The pixel font stays; the buttons are calm rounded blocks with one clear main action:
+     .ui-btn          — a plain action (dark block with a thin line)
+     .ui-btn.primary  — the main action of a screen (yellow, like the cartridge)
+     .ui-btn.teal     — «◆ Жетоны» (teal, the colour of жетоны everywhere)
+     .ui-btn.ghost    — a quiet way out (← Все игры)
+     .ui-stack        — a column of buttons of one width */
+:root {
+  --ui-yellow: #f8d020;
+  --ui-yellow-dark: #9c7a00;
+  --ui-ink: #1c1600;
+  --ui-teal: #1fa2a8;
+  --ui-teal-light: #7fe8ec;
+  /* Solid, so a game picture behind an overlay does not show through the buttons. */
+  --ui-surface: #1c1c1f;
+  --ui-surface-on: #2c2c30;
+  --ui-line: rgba(255, 255, 255, 0.16);
+  --ui-radius: 12px;
+}
+
+.ui-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: #fff;
+  font: bold 16px "Courier New", monospace;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, background-color 0.15s ease, box-shadow 0.08s ease;
+}
+.ui-btn:active { transform: scale(0.97); background-color: var(--ui-surface-on); }
+.ui-btn:focus-visible { outline: 2px solid var(--ui-teal-light); outline-offset: 2px; }
+.ui-btn:disabled { opacity: 0.45; cursor: default; transform: none; }
+.ui-btn.hidden { display: none; }
+
+.ui-btn.primary {
+  border-color: transparent;
+  background: var(--ui-yellow);
+  color: var(--ui-ink);
+  font-size: 18px;
+  box-shadow: 0 3px 0 var(--ui-yellow-dark);
+}
+.ui-btn.primary:active { transform: translateY(2px); background: var(--ui-yellow); box-shadow: 0 1px 0 var(--ui-yellow-dark); }
+
+.ui-btn.teal {
+  border-color: rgba(127, 232, 236, 0.5);
+  background: #0e3537;
+  color: var(--ui-teal-light);
+}
+.ui-btn.teal:active { background: #15494c; }
+
+.ui-btn.ghost {
+  min-height: 40px;
+  border-color: transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+}
+
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(280px, 100%);
+}
+
+/* A phone on its side: lower buttons so the column fits the short screen. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .ui-btn { min-height: 36px; padding: 6px 14px; font-size: 14px; }
+  .ui-btn.primary { font-size: 15px; }
+  .ui-stack { gap: 6px; }
+}

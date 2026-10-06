@@ -15,12 +15,11 @@
 .looksBody { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; }
 .looks section { min-width: 0; margin-bottom: 12px; }
 .looks h2 { margin: 0 0 6px; font-size: 14px; text-align: left; opacity: 0.85; }
+/* Every item in sight: rows wrap instead of hiding the last ones (often the ones for sale). */
 .looksRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
   gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  touch-action: pan-x pan-y;
 }
 .looksItem {
   position: relative;
@@ -29,32 +28,38 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  width: 76px;
+  min-width: 0;
   padding: 6px 4px;
   border: 2px solid transparent;
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   font: bold 11px "Courier New", monospace;
 }
 .looksItem.on { border-color: #f8d020; background: rgba(248, 208, 32, 0.15); }
-.looksItem.locked { opacity: 0.45; }
-.looksItem i { position: absolute; top: 4px; right: 4px; font-style: normal; color: #f8d020; white-space: pre; text-align: right; line-height: 1.15; }
+.looksItem.locked canvas, .looksItem.locked span { opacity: 0.5; }
+/* The price of a locked item, under its name: ◆ жетоны and ⭐ Stars. */
+.looksItem i { font-style: normal; font-size: 11px; color: #7fe8ec; white-space: nowrap; line-height: 1.2; }
+.looksItem i b { color: #f8d020; font-weight: bold; }
 .looksItem canvas { width: 48px; height: 48px; image-rendering: pixelated; }
 .looksDone {
+  width: min(280px, 100%);
+  min-height: 46px;
   margin: 10px auto 0;
-  padding: 12px 40px;
+  padding: 10px 16px;
   border: 0;
-  border-radius: 10px;
-  background: #1fa2a8;
-  color: #fff;
+  border-radius: 12px;
+  background: #f8d020;
+  color: #1c1600;
   font: bold 18px "Courier New", monospace;
+  box-shadow: 0 3px 0 #9c7a00;
 }
+.looksDone:active { transform: translateY(2px); box-shadow: 0 1px 0 #9c7a00; }
 
 /* Phone on its side: short screen, so groups go in two columns. */
 @media (orientation: landscape) and (max-height: 500px) {
   .looks { padding: 8px calc(12px + env(safe-area-inset-right)) 8px calc(12px + env(safe-area-inset-left)); }
   .looks h1 { margin: 0 0 4px; font-size: 18px; }
   .looksBody { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; align-content: start; }
-  .looksDone { margin-top: 6px; padding: 8px 40px; }
+  .looksDone { margin-top: 6px; min-height: 36px; padding: 6px 16px; }
 }
