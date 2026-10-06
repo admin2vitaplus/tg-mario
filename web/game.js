@@ -1728,7 +1728,14 @@ class Play extends Phaser.Scene {
     }
 
     // Horizontal movement with inertia.
-    const maxV = this.inWater ? 70 : run ? 150 : 90;
+    let maxV = this.inWater ? 70 : run ? 150 : 90;
+    // In the air the speed of the take-off is kept, as on the console: letting go of B
+    // (on a phone the thumb often slides from B to A to jump) does not slow the hero down.
+    if (onGround || this.inWater) this.airMaxV = 0;
+    else {
+      if (!this.airMaxV) this.airMaxV = Math.max(maxV, Math.abs(b.velocity.x));
+      maxV = Math.max(maxV, this.airMaxV);
+    }
     let target = 0;
     if (this.crouch) target = 0;
     else if (left && !right) target = -maxV;
