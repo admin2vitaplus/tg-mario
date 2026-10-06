@@ -18,6 +18,21 @@ if (tg) {
   } catch (e) { /* not inside Telegram */ }
 }
 
+// The page's language: Russian for ru/uk/be/kk Telegram (or browser), English otherwise.
+// Words fixed in index.html carry their English in data-en; games on this page use Cartridge.L().
+const langCode = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code)
+  || (typeof navigator !== 'undefined' && navigator.language) || 'ru';
+const EN = !/^(ru|uk|be|kk)\b/i.test(langCode);
+const L = (ru, en) => (EN ? en : ru);
+window.Cartridge = { lang: EN ? 'en' : 'ru', L };
+if (EN) {
+  document.documentElement.lang = 'en';
+  document.title = 'Yellow Cartridge';
+  document.querySelectorAll('[data-en]').forEach((el) => { el.innerHTML = el.dataset.en; });
+}
+const EN_TITLES = { 'pryg-skok': 'HOP-SKIP', tanks: 'TANK FIELD', word: 'WORD OF THE DAY' };
+const title = (g) => (EN ? g.titleEn || EN_TITLES[g.id] || g.title : g.title);
+
 let startGame = null; // a game to open right away, from the launch link
 
 // A t.me/<bot>?startapp=<label> link opens this menu with start_param, but
@@ -55,7 +70,7 @@ let startGame = null; // a game to open right away, from the launch link
 
 const cfg = window.CARTRIDGE || { games: [], enabledGames: () => [], slots: 0 };
 const games = cfg.enabledGames();
-const lines = games.concat(Array(Math.max(0, cfg.slots - games.length)).fill({ title: 'СКОРО' }));
+const lines = games.concat(Array(Math.max(0, cfg.slots - games.length)).fill({ title: L('СКОРО', 'SOON') }));
 
 const menu = document.getElementById('menu');
 const list = document.getElementById('menuList');
@@ -68,7 +83,7 @@ function render() {
   lines.forEach((g, i) => {
     const li = document.createElement('li');
     li.className = (i === cursor ? 'on ' : '') + (g.id ? '' : 'soon');
-    li.textContent = `${i + 1}. ${g.title}`;
+    li.textContent = `${i + 1}. ${g.id ? title(g) : g.title}`;
     li.addEventListener('click', () => { cursor = i; render(); choose(); });
     list.append(li);
   });
@@ -106,19 +121,19 @@ function choose() {
     };
     if (server && server.online === null) {
       loading = true;
-      hint.textContent = 'Загрузка…';
+      hint.textContent = L('Загрузка…', 'Loading…');
       server.ready.then(go);
     } else go();
     return;
   }
   loading = true;
-  hint.textContent = 'Загрузка…';
+  hint.textContent = L('Загрузка…', 'Loading…');
   menu.classList.add('loading');
   loadGame(g).then(() => {
     menu.classList.add('hidden');
     document.removeEventListener('keydown', onKey, true);
   }).catch(() => {
-    hint.textContent = 'Не удалось загрузить игру. Проверьте связь и выберите её ещё раз.';
+    hint.textContent = L('Не удалось загрузить игру. Проверьте связь и выберите её ещё раз.', 'Could not load the game. Check the connection and choose it again.');
   }).finally(() => {
     loading = false;
     menu.classList.remove('loading');

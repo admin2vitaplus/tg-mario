@@ -95,7 +95,7 @@ export function createApiServer({
     for (const a of ACHIEVEMENTS) {
       if (a.check(event, player) && store.earn(playerId, a.code)) won.push(a);
     }
-    const out = won.map(({ code, icon, title, text }) => ({ code, icon, title, text }));
+    const out = won.map(({ code, icon, title, text, titleEn, textEn }) => ({ code, icon, title, text, titleEn, textEn }));
     if (out.length && onAchievements) onAchievements(playerId, out);
     if (out.length && economy) economy.achievements(playerId, out, grants);
     return out;
@@ -199,7 +199,7 @@ export function createApiServer({
       const got = economy.achievementsDone(id);
       me.tasks.mario.push(...publicList().map((a) => ({
         id: `ach:${a.code}`, period: "once", amount: economy.cfg.achievement, done: got.has(a.code),
-        icon: a.icon, title: a.title, text: a.text,
+        icon: a.icon, title: a.title, text: a.text, titleEn: a.titleEn, textEn: a.textEn,
       })));
       return me;
     };

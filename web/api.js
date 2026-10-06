@@ -81,9 +81,10 @@ function showAchievements(list) {
     setTimeout(() => {
       const el = document.createElement('div');
       el.className = 'achToast';
-      el.innerHTML = `<span class="achIcon"></span><div><b>Достижение!</b><br><span class="achTitle"></span></div>`;
+      const en = window.Cartridge && window.Cartridge.lang === 'en';
+      el.innerHTML = `<span class="achIcon"></span><div><b>${en ? 'Achievement!' : 'Достижение!'}</b><br><span class="achTitle"></span></div>`;
       el.querySelector('.achIcon').textContent = a.icon;
-      el.querySelector('.achTitle').textContent = a.title;
+      el.querySelector('.achTitle').textContent = (en && a.titleEn) || a.title;
       toastBox.appendChild(el);
       try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch (e) { /* ignore */ }
       setTimeout(() => el.remove(), 3500);

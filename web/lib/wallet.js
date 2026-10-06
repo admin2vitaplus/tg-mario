@@ -36,7 +36,7 @@ const STR = {
     t_login: 'Зайти в сборник сегодня',
     t_login_note: 'Дней подряд: {streak}. Каждый следующий день +{step}, до {max}.',
     t_invite: 'Позвать друга: {count} из {max} за неделю',
-    t_invite_note: 'Друг сыграет {games} игры — тебе {inviter}, ему {newcomer}.',
+    t_invite_note: 'Друг сыграет {games} {games_w} — тебе {inviter} {inviter_w}, ему {newcomer}.',
     t_play: 'Сыграть игру', t_level: 'Пройти уровень', t_record: 'Побить свой рекорд',
     t_level_word: 'Отгадать слово', t_record_word: 'Побить свой рекорд серии (от 2 дней)',
     t_other: 'Свои задания у каждой игры: откройте игру и нажмите «◆» в её меню.',
@@ -73,7 +73,8 @@ const STR = {
     paid_wait: 'Оплата прошла, товар появится через несколько секунд. Если нет — откройте игру заново.',
     not_enough: 'Не хватает жетонов: нужно {n}, есть {have}.',
     buy_failed: 'Не получилось купить. Проверьте связь и попробуйте ещё раз.',
-    toast: '+{n} {w}', days: '{n} д.', hours: '{n} ч',
+    toast: '+{n} {w}', days: '{n} д.', hours: '{n} ч', minutes: '{n} мин',
+    task_play: 'сыграть игру', task_level: 'пройти уровень', invite_friend: 'друг доиграл', invite_from: 'по приглашению друга',
   },
   en: {
     title: 'TICKETS',
@@ -85,7 +86,7 @@ const STR = {
     t_login: 'Open the collection today',
     t_login_note: 'Days in a row: {streak}. Each next day +{step}, up to {max}.',
     t_invite: 'Invite a friend: {count} of {max} this week',
-    t_invite_note: 'Your friend plays {games} games — {inviter} for you, {newcomer} for them.',
+    t_invite_note: 'Your friend plays {games} {games_w} — {inviter} {inviter_w} for you, {newcomer} for them.',
     t_play: 'Play a game', t_level: 'Clear a level', t_record: 'Beat your best',
     t_level_word: 'Guess the word', t_record_word: 'Beat your best streak (2 days or more)',
     t_other: 'Each game has its own tasks: open the game and tap «◆» in its menu.',
@@ -122,7 +123,8 @@ const STR = {
     paid_wait: 'Paid. The item will appear in a few seconds; if not, open the game again.',
     not_enough: 'Not enough tickets: {n} needed, you have {have}.',
     buy_failed: 'Could not buy. Check the connection and try again.',
-    toast: '+{n} {w}', days: '{n} d', hours: '{n} h',
+    toast: '+{n} {w}', days: '{n} d', hours: '{n} h', minutes: '{n} min',
+    task_play: 'play a game', task_level: 'clear a level', invite_friend: 'your friend played', invite_from: 'invited by a friend',
   },
 };
 // Russian plural for «жетон»: 1 жетон, 2 жетона, 5 жетонов.
@@ -298,8 +300,20 @@ const itemName = (id) => {
 };
 function left(ms) {
   const h = Math.max(0, Math.floor(ms / 3600000));
+  if (h < 1) return T('minutes', { n: Math.max(1, Math.ceil(ms / 60000)) });
   return h >= 48 ? T('days', { n: Math.floor(h / 24) }) : T('hours', { n: h });
 }
+// «3 игры», «5 игр».
+function gamesWord(n) {
+  if (lang !== 'ru') return n === 1 ? 'game' : 'games';
+  const a = n % 100;
+  const b = n % 10;
+  if (a > 10 && a < 20) return 'игр';
+  return b === 1 ? 'игру' : b >= 2 && b <= 4 ? 'игры' : 'игр';
+}
+// A Hop-Skip achievement in the player's language (the server sends both).
+const achTitle = (a) => (lang === 'en' && a.titleEn) || a.title;
+const achText = (a) => (lang === 'en' && a.textEn) || a.text;
 
 let panel = null;
 let current = 'tasks';
@@ -333,12 +347,12 @@ function renderTasks(body) {
   if (week.length) {
     html += `<h2 class="wSec">${esc(T('sec_week', { left: left(me.seasonEndsAt - now) }))}</h2><ul class="wTasks">` +
       week.map((t) => taskRow(t, T('t_invite', { count: t.count, max: t.max }),
-        T('t_invite_note', { games: t.games, inviter: t.amount, newcomer: t.newcomer }))).join('') + '</ul>';
+        T('t_invite_note', { games: t.games, games_w: gamesWord(t.games), inviter: t.amount, inviter_w: word(t.amount), newcomer: t.newcomer }))).join('') + '</ul>';
     if (botName && myId) html += `<button class="wAct" data-act="invite">${esc(T('invite'))}</button>`;
   }
   if (once.length) {
     html += `<h2 class="wSec">${esc(T('sec_once'))}</h2><ul class="wTasks">` +
-      once.map((t) => taskRow(t, (t.icon ? t.icon + ' ' : '') + t.title, t.text)).join('') + '</ul>';
+      once.map((t) => taskRow(t, (t.icon ? t.icon + ' ' : '') + achTitle(t), achText(t))).join('') + '</ul>';
   }
   if (!scope) html += note(T('t_other'));
   body.innerHTML = html + note(T('how_cap', { cap: r.dailyCap })) + note(T('how_note'));
@@ -387,10 +401,17 @@ function render(body) {
     body.innerHTML = '<ul class="wHist">' + me.history.map((h) => {
       let what = T('r_' + h.reason);
       if (h.reason === 'shop') what += ': ' + itemName(h.event);
+      // What exactly: the game and the task, the achievement, the friend.
+      const [g, task] = String(h.event).split(':');
       if (h.reason === 'task' || h.reason === 'record') {
-        const g = String(h.event).split(':')[0];
         if (STR.ru['game_' + g]) what += ': ' + T('game_' + g);
+        if (h.reason === 'task' && STR.ru['task_' + task]) what += ' · ' + T('task_' + task);
       }
+      if (h.reason === 'achievement') {
+        const a = me.tasks && me.tasks.mario && me.tasks.mario.find((t) => t.id === 'ach:' + task);
+        if (a) what += ': ' + achTitle(a);
+      }
+      if (h.reason === 'invite' && STR.ru['invite_' + g]) what += ': ' + T('invite_' + g);
       if (h.reason === 'prize') {
         const [, board, place] = String(h.event).split(':');
         if (place) what += ': ' + T('prize_place', { place, board: T('board_' + board) });

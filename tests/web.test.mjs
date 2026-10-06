@@ -251,3 +251,17 @@ test('the address that answers wins and is remembered; a dead one is not used', 
   await assert.rejects(r.server.request('GET', '/api/wallet/me'), (e) => e.offline === true);
   assert.equal(r.store.get('prygskok_api'), old, 'a dead address does not replace the stored one');
 });
+
+// «Прыг-Скок» in English: every level name and look has its English in game.js (EN_NAMES).
+test('Hop-Skip names all have English', () => {
+  const game = read(path.join(WEB, 'game.js'));
+  const table = game.split('const EN_NAMES = {')[1].split('};')[0];
+  const known = new Set([...table.matchAll(/'([^']+)':/g)].map((m) => m[1]));
+  const names = [
+    ...[...read(path.join(WEB, 'levels.js')).matchAll(/(?:name|text): '([^']+)'/g)].map((m) => m[1]),
+    ...[...read(path.join(WEB, 'worlds.js')).matchAll(/name: '([^']+)'/g)].map((m) => m[1]),
+    ...[...game.matchAll(/(?:name|title): '([^']*[А-Яа-яЁё][^']*)'/g)].map((m) => m[1]),
+  ];
+  assert.ok(names.length > 30);
+  assert.deepEqual(names.filter((n) => !known.has(n)), []);
+});

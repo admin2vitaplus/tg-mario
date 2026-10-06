@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { createHmac } from "node:crypto";
 import { openDb } from "../db.js";
 import { createApiServer } from "../server.js";
+import { publicList } from "../achievements.js";
 import {
   createEconomy, DAY_MS, economyReport, exportSeason, loadEconomy, maxWeeklyEmission,
   seasonOf, seasonStart, validateEconomy,
@@ -433,6 +434,10 @@ test("interface texts avoid the words the spec forbids", () => {
     JSON.stringify(CFG.shop),
     readFileSync(new URL("../wallet-bot.js", import.meta.url), "utf8").match(/"[^"]*"|`[^`]*`/g).join("\n"),
     economyReport(openDb(":memory:").db, CFG),
+    // Hop-Skip's achievements are tasks in its «◆» panel.
+    publicList().map((a) => [a.title, a.text, a.titleEn, a.textEn].join("\n")).join("\n"),
+    // The page's own words (its dictionary).
+    readFileSync(new URL("../../web/lib/wallet.js", import.meta.url), "utf8").split("const STR = {")[1].split("\n};")[0],
   ];
   for (const t of texts) assert.doesNotMatch(t, banned);
 });
