@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { GAME_LINKS, appLink, groupPlay, inlineResults } from "../invites.js";
+import { GAME_LINKS, appLink, enabledStarts, groupPlay, inlineResults, watchEnabledGames } from "../invites.js";
 import { parseStart } from "../stats.js";
 
 const api = "https://quiet-river-sound-test.trycloudflare.com";
@@ -52,4 +52,33 @@ test("no forbidden or outside names in the invite texts", () => {
   for (const bad of ["mario", "nintendo", "dendy", "battle city", "wordle", "крипт", "монет", "токен", "заработ"]) {
     assert.ok(!texts.includes(bad), bad);
   }
+});
+
+test("a game switched off in web/config.js is not offered in chats", async () => {
+  const config = readFileSync(new URL("../../web/config.js", import.meta.url), "utf8");
+  const all = enabledStarts(config);
+  for (const g of GAME_LINKS) {
+    const on = new RegExp(`start: '${g.start}'`).test(config) && all.has(g.start);
+    // Выключаем только эту игру: «enabled: true» в её собственном блоке.
+    const parts = config.split(/(?=\bid:\s*')/);
+    const off = enabledStarts(parts.map((p) => (p.includes(`start: '${g.start}'`) ? p.replace("enabled: true", "enabled: false") : p)).join(""));
+    assert.equal(off.size, all.size - (on ? 1 : 0));
+    if (on) assert.ok(!off.has(g.start), `${g.start} switched off`);
+  }
+  const enabled = new Set(["tanks", "mario"]);
+  assert.deepEqual(inlineResults({ botName: "b", userId: 1, enabled }).map((r) => r.id), ["tanks", "mario"]);
+  assert.deepEqual(groupPlay({ botName: "b", userId: 1, enabled }).reply_markup.inline_keyboard.map((r) => r[0].url),
+    ["https://t.me/b?startapp=ref_1-tanks", "https://t.me/b?startapp=ref_1-mario"]);
+
+  // Бот берёт список с сайта; сайт не ответил — все игры.
+  const site = (text, ok = true) => async () => ({ ok, text: async () => text });
+  let w = watchEnabledGames("https://game.example/", { fetch: site("{ id: 'tanks', enabled: true, start: 'tanks' }, { id: 'word', enabled: false, start: 'word' }") });
+  await w.ready;
+  assert.deepEqual([...w.get()], ["tanks"]);
+  w.stop();
+  w = watchEnabledGames("https://game.example/", { fetch: async () => { throw new Error("offline"); } });
+  await w.ready;
+  assert.equal(w.get(), null);
+  assert.equal(inlineResults({ botName: "b", userId: 1, enabled: w.get() }).length, GAME_LINKS.length);
+  w.stop();
 });

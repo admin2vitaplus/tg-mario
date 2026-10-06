@@ -23,6 +23,38 @@ export const GAME_LINKS = [
 ];
 
 const PLAY = { ru: "▶ Играть", en: "▶ Play" };
+
+// Какие игры включены, решает web/config.js (выключенная игра пропадает из меню). Бот берёт
+// опубликованный config.js с сайта игры и показывает только включённые; пока он не загружен
+// или сайт не ответил — все игры.
+export function enabledStarts(configText) {
+  const out = new Set();
+  // Каждая игра в config.js — блок от «id:» до следующего «id:».
+  for (const block of String(configText).split(/\bid:\s*'/).slice(1)) {
+    const start = /\bstart:\s*'([a-z]+)'/.exec(block)?.[1];
+    if (start && /\benabled:\s*true\b/.test(block)) out.add(start);
+  }
+  return out;
+}
+
+export function watchEnabledGames(webappUrl, { fetch = globalThis.fetch, every = 3600_000 } = {}) {
+  let enabled = null;
+  const load = async () => {
+    try {
+      const res = await fetch(new URL("config.js", webappUrl), { signal: AbortSignal.timeout(10_000) });
+      if (!res.ok) return;
+      const set = enabledStarts(await res.text());
+      if (set.size) enabled = set;
+    } catch { /* сайт не ответил — остаётся прежний список */ }
+  };
+  const ready = load();
+  const timer = setInterval(load, every);
+  timer.unref?.();
+  return { get: () => enabled, ready, stop: () => clearInterval(timer) };
+}
+
+// Игры для приглашений: только включённые (enabled — набор ключей start или null = все).
+const games = (enabled) => GAME_LINKS.filter((g) => !enabled || enabled.has(g.start));
 export const langOf = (code) => (/^(ru|uk|be|kk)\b/i.test(code || "") ? "ru" : "en");
 
 // Имя туннеля после «__»: у ссылки startapp нет ?api=, игра найдёт сервер по нему (web/lib/server.js).
@@ -37,10 +69,10 @@ export function appLink(botName, label, apiUrl = "") {
 const label = (userId, start) => (Number.isSafeInteger(userId) ? `ref_${userId}-${start}` : start);
 
 // Ответ на инлайн-запрос: по карточке на игру; текст запроса отбирает игры по названию.
-export function inlineResults({ botName, apiUrl, userId, languageCode, query = "" }) {
+export function inlineResults({ botName, apiUrl, userId, languageCode, query = "", enabled = null }) {
   const lang = langOf(languageCode);
   const q = String(query).trim().toLowerCase();
-  return GAME_LINKS
+  return games(enabled)
     .filter((g) => !q || g.ru.title.toLowerCase().includes(q) || g.en.title.toLowerCase().includes(q))
     .map((g) => ({
       type: "article",
@@ -53,13 +85,13 @@ export function inlineResults({ botName, apiUrl, userId, languageCode, query = "
 }
 
 // /play в группе: кнопки-ссылки на каждую игру (кто позвал — тот и пригласил).
-export function groupPlay({ botName, apiUrl, userId, languageCode }) {
+export function groupPlay({ botName, apiUrl, userId, languageCode, enabled = null }) {
   const lang = langOf(languageCode);
   return {
     text: lang === "ru" ? "Во что играем? Нажмите игру — она откроется прямо здесь, а таблица будет общей для этого чата."
       : "What shall we play? Tap a game: it opens right here, with a table for this chat.",
     reply_markup: {
-      inline_keyboard: GAME_LINKS.map((g) => [{ text: `${g.icon} ${g[lang].title}`, url: appLink(botName, label(userId, g.start), apiUrl) }]),
+      inline_keyboard: games(enabled).map((g) => [{ text: `${g.icon} ${g[lang].title}`, url: appLink(botName, label(userId, g.start), apiUrl) }]),
     },
   };
 }

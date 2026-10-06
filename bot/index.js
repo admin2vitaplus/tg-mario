@@ -6,7 +6,7 @@ import { addSecret, installSafeConsole } from "./log.js";
 import { statsReport } from "./stats.js";
 import { economyReport } from "./economy.js";
 import { installWalletCommands, starsInvoice, walletNotifier } from "./wallet-bot.js";
-import { groupPlay, inlineResults } from "./invites.js";
+import { groupPlay, inlineResults, watchEnabledGames } from "./invites.js";
 
 installSafeConsole();
 
@@ -114,8 +114,11 @@ const playKeyboard = () => new InlineKeyboard().webApp("🎮 Играть", game
 
 const medal = (place) => ["🥇", "🥈", "🥉"][place - 1] || `${place}.`;
 
+// Выключенная в web/config.js игра не попадает ни в /play, ни в инлайн-режим.
+const enabledGames = watchEnabledGames(baseGameUrl);
 const playInGroup = (ctx) => groupPlay({
   botName: bot.botInfo.username, apiUrl, userId: ctx.from?.id, languageCode: ctx.from?.language_code,
+  enabled: enabledGames.get(),
 });
 
 bot.command("start", (ctx) => {
@@ -149,6 +152,7 @@ bot.command("play", (ctx) => {
 // Инлайн-режим: в любом чате набрать @бот — и выбрать игру. Включается в BotFather (/setinline).
 bot.on("inline_query", (ctx) => ctx.answerInlineQuery(inlineResults({
   botName: bot.botInfo.username, apiUrl, userId: ctx.from.id, languageCode: ctx.from.language_code, query: ctx.inlineQuery.query,
+  enabled: enabledGames.get(),
 }), { cache_time: 60, is_personal: true }));
 // Отправленная карточка — приглашение (приходит, только если в BotFather включён /setinlinefeedback).
 bot.on("chosen_inline_result", (ctx) => tracker.event(ctx.from.id, "invite_created"));
