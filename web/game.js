@@ -1064,7 +1064,9 @@ class Play extends Phaser.Scene {
 
   init(data) {
     // cleared: levels finished in this game, for the score server.
-    this.s = Object.assign({ lives: 3, score: 0, coins: 0, level: 0, world: 1, cleared: 0 }, data || {});
+    // lifeTaken: extra-life blocks already emptied in this game ("world-level:x,y"); like on the console
+    // they stay empty after the hero loses a life, until the game is over.
+    this.s = Object.assign({ lives: 3, score: 0, coins: 0, level: 0, world: 1, cleared: 0, lifeTaken: [] }, data || {});
     // Past the checkpoint the hero restarts from it after losing a life.
     this.fromCheckpoint = this.s.checkpoint === this.s.level;
     delete this.s.checkpoint;
@@ -1103,14 +1105,17 @@ class Play extends Phaser.Scene {
     const springSpots = [];
     const throwerSpots = [];
     const spikySpots = [];
+    const usedSpots = [];
     for (let y = 0; y < lvl.H; y++) {
       for (let x = 0; x < lvl.W; x++) {
         const ch = lvl.grid[y][x];
         if (ch === '?') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
         if (ch === 'M') this.contents.set(x + ',' + y, { kind: 'berry', left: 1 });
-        if (ch === 'L' || ch === 'h') this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
+        const lifeGone = (ch === 'L' || ch === 'h') && this.s.lifeTaken.includes(this.lifeKey(x, y));
+        if (ch === 'L' && lifeGone) usedSpots.push([x, y]);
+        if ((ch === 'L' || ch === 'h') && !lifeGone) this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
         if (ch === 'k') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
-        if (ch === 'h' || ch === 'k') this.hidden.add(x + ',' + y);
+        if (ch === 'k' || (ch === 'h' && !lifeGone)) this.hidden.add(x + ',' + y);
         if (ch === 'C') this.contents.set(x + ',' + y, { kind: 'coin', left: 8 });
         if (ch === 'o') coinSpots.push([x, y]);
         if (ch === 'e') enemySpots.push([x, y]);
@@ -1169,6 +1174,8 @@ class Play extends Phaser.Scene {
       layer.setData('tiles', ar.tiles);
       return layer;
     });
+
+    for (const [x, y] of usedSpots) this.layerAt(x).putTileAt(T.USED, x, y);
 
     this.bars = [];
     barSpots.forEach(([x, y], i) => this.addFireBar(x, y, i % 2 ? -1 : 1));
@@ -2061,6 +2068,7 @@ class Play extends Phaser.Scene {
 
     if (content) {
       content.left--;
+      if (content.kind === 'life') this.s.lifeTaken.push(this.lifeKey(tx, ty));
       if (content.kind === 'coin') this.popCoin(tx, ty);
       else this.spawnBerry(tx, ty, content.kind);
       let idx = tile.index;
@@ -2250,7 +2258,7 @@ class Play extends Phaser.Scene {
       this.s.lives--;
       if (this.s.lives > 0) {
         this.scene.restart({
-          lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: this.s.level, world: this.s.world, cleared: this.s.cleared,
+          lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: this.s.level, world: this.s.world, cleared: this.s.cleared, lifeTaken: this.s.lifeTaken,
           checkpoint: this.passedCheckpoint ? this.s.level : undefined,
         });
       } else {
@@ -2320,15 +2328,19 @@ class Play extends Phaser.Scene {
     let world = this.s.world;
     if (next >= WORLD_MAPS[world - 1].length) { next = 0; world++; }
     if (world <= WORLDS) {
-      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, world, cleared: this.s.cleared, big: this.big, fire: this.fire });
+      this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: next, world, cleared: this.s.cleared, lifeTaken: this.s.lifeTaken, big: this.big, fire: this.fire });
     } else {
       this.gameOver('ВСЕ МИРЫ ПРОЙДЕНЫ!', true);
     }
   }
 
+  lifeKey(x, y) {
+    return `${this.s.world}-${this.s.level}:${x},${y}`;
+  }
+
   // Warp zone pipe: straight to the first level of another world.
   warp(world) {
-    this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: 0, world, cleared: this.s.cleared, big: this.big, fire: this.fire });
+    this.scene.restart({ lives: this.s.lives, score: this.s.score, coins: this.s.coins, level: 0, world, cleared: this.s.cleared, lifeTaken: this.s.lifeTaken, big: this.big, fire: this.fire });
   }
 
   // ---------- Biting plants in pipes ----------
