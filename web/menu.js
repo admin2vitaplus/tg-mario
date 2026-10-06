@@ -18,6 +18,8 @@ if (tg) {
   } catch (e) { /* not inside Telegram */ }
 }
 
+let startGame = null; // a game to open right away, from the launch link
+
 // A t.me/<bot>?startapp=<label> link opens this menu with start_param, but
 // without ?api=: the label may carry the server's tunnel name after «__»
 // (room_123456__abc-def means the server abc-def.trycloudflare.com, see lib/server.js), and an invite
@@ -26,7 +28,7 @@ if (tg) {
   if (typeof URLSearchParams === 'undefined') return;
   const start = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param)
     || new URLSearchParams(location.search).get('tgWebAppStartParam') || '';
-  const m = /^(\w+?)(?:__([a-z0-9-]{1,63}))?$/.exec(start);
+  const m = /^([\w-]+?)(?:__([a-z0-9-]{1,63}))?$/.exec(start);
   if (!m) return;
   // Coming back from a game (lib/back.js) the launch link has been followed already.
   try { if (sessionStorage.getItem('cartridge_start_done')) return; } catch (e) { /* ignore */ }
@@ -43,7 +45,12 @@ if (tg) {
       location.replace('tanks/?' + params + location.hash);
     };
     if (server) server.ready.then(go); else go();
+    return;
   }
+  // A link to a game (startapp=word, or ref_<id>-word from a shared result) opens that game.
+  const want = /(?:^|-)([a-z]+)$/.exec(m[1]);
+  const game = want && window.CARTRIDGE && window.CARTRIDGE.enabledGames().find((g) => g.start === want[1]);
+  if (game) startGame = game.id;
 })();
 
 const cfg = window.CARTRIDGE || { games: [], enabledGames: () => [], slots: 0 };
@@ -134,4 +141,13 @@ function onKey(e) {
 
 document.addEventListener('keydown', onKey, true);
 render();
+if (startGame) {
+  const i = lines.findIndex((g) => g.id === startGame);
+  if (i >= 0) {
+    try { sessionStorage.setItem('cartridge_start_done', '1'); } catch (e) { /* ignore */ }
+    cursor = i;
+    render();
+    choose();
+  }
+}
 })();

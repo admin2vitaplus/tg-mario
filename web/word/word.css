@@ -1,0 +1,156 @@
+/* «Слово дня»: plain HTML and CSS, no game engine. Fits a 360 px wide phone. */
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+:root {
+  /* Tile colors; the «Внешний вид» themes replace them (word.js). */
+  --hit: #3a9d3a;
+  --near: #c9a400;
+  --miss: #3a3a3c;
+  --tile: 52px;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: "Courier New", monospace;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
+}
+
+#top { width: 100%; padding: 0 40px; text-align: center; }
+#title { margin: 4px 0 0; font-size: 18px; letter-spacing: 2px; color: #f8d020; }
+#sub { margin: 2px 0 6px; min-height: 16px; font-size: 12px; opacity: 0.75; }
+#tools { display: flex; gap: 6px; justify-content: center; }
+#tools button {
+  min-width: 40px;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #222;
+  color: #fff;
+  font: bold 15px "Courier New", monospace;
+}
+#tools .wGameBtn { color: #7fe8ec; }
+
+#board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0;
+}
+.row { display: flex; gap: 6px; }
+.row.shake { animation: shake 0.4s; }
+@keyframes shake {
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.tile {
+  width: var(--tile);
+  height: var(--tile);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #3a3a3c;
+  font: bold calc(var(--tile) * 0.55) "Courier New", monospace;
+  text-transform: uppercase;
+}
+.tile.typed { border-color: #888; }
+.tile.m2, .tile.m1, .tile.m0 { border-color: transparent; animation: flip 0.35s both; }
+.tile.m2 { background: var(--hit); }
+.tile.m1 { background: var(--near); }
+.tile.m0 { background: var(--miss); }
+.tile.old { animation: none; }
+@keyframes flip {
+  0% { transform: scaleY(1); }
+  50% { transform: scaleY(0); }
+  100% { transform: scaleY(1); }
+}
+
+#msg { margin: 0; min-height: 18px; font-size: 14px; text-align: center; color: #f8d020; }
+
+#keys { width: 100%; display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.krow { display: flex; gap: 4px; justify-content: center; }
+.key {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 44px;
+  height: 50px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: #818384;
+  color: #fff;
+  font: bold 16px "Courier New", monospace;
+  text-transform: uppercase;
+}
+.key.wide { flex: 1.6 1 0; max-width: 70px; font-size: 13px; }
+.key.m2 { background: var(--hit); }
+.key.m1 { background: var(--near); }
+.key.m0 { background: var(--miss); }
+.key:active { filter: brightness(1.3); }
+
+#result {
+  width: 100%;
+  padding: 8px 0 4px;
+  text-align: center;
+}
+#result h2 { margin: 0 0 4px; font-size: 18px; color: #f8d020; }
+#result p { margin: 2px 0; font-size: 14px; }
+#result .answer { font-size: 22px; letter-spacing: 4px; text-transform: uppercase; }
+#result .acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+#result button {
+  flex: 1 1 140px;
+  max-width: 220px;
+  padding: 12px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: #f8d020;
+  color: #000;
+  font: bold 15px "Courier New", monospace;
+}
+#result button.ghost { background: #222; color: #fff; }
+.hidden { display: none !important; }
+
+/* Rules and the chat table use the panel look of lib/wallet.css (.wallet). */
+.wRules p { margin: 0 0 10px; font-size: 14px; line-height: 1.4; }
+.wRules .ex { display: flex; gap: 4px; margin: 6px 0 4px; }
+.wRules .tile { --tile: 34px; }
+.wTop li small { opacity: 0.7; margin-left: 4px; }
+
+/* «Назад» (../lib/back.js): a small button in the top-left corner */
+#backBtn {
+  position: absolute;
+  top: 6px;
+  left: calc(6px + env(safe-area-inset-left));
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font: bold 18px "Courier New", monospace;
+}

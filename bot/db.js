@@ -191,6 +191,37 @@ export const MIGRATIONS = [
     UPDATE wallets SET flagged = NULL, flagged_at = NULL, strikes = 0, strike_day = NULL
       WHERE flagged = 'auto: отклонённые отчёты' AND flagged_at >= 1790899200000;
   `,
+  // 7. «Слово дня» (word.js). word_days — слово дня на каждом языке, выбирается один раз;
+  // word_plays — игра игрока за день: попытки через запятую, итог и очки.
+  // chat_players — кто открывал игру из какого чата (chat_instance), для таблиц чата.
+  `
+    CREATE TABLE IF NOT EXISTS word_days (
+      day INTEGER NOT NULL,
+      lang TEXT NOT NULL,
+      answer TEXT NOT NULL,
+      PRIMARY KEY (day, lang)
+    );
+    CREATE TABLE IF NOT EXISTS word_plays (
+      player_id INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      lang TEXT NOT NULL,
+      guesses TEXT NOT NULL DEFAULT '',
+      state TEXT NOT NULL DEFAULT 'play',
+      score INTEGER NOT NULL DEFAULT 0,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER,
+      PRIMARY KEY (player_id, day, lang)
+    );
+    CREATE INDEX IF NOT EXISTS word_plays_day ON word_plays(day, lang, state);
+    CREATE INDEX IF NOT EXISTS word_plays_finished ON word_plays(finished_at);
+    CREATE TABLE IF NOT EXISTS chat_players (
+      chat TEXT NOT NULL,
+      game TEXT NOT NULL,
+      player_id INTEGER NOT NULL,
+      at INTEGER NOT NULL,
+      PRIMARY KEY (chat, game, player_id)
+    );
+  `,
 ];
 
 export function migrate(db) {
