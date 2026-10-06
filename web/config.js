@@ -32,7 +32,9 @@ const config = {
     {
       id: 'word',
       title: 'СЛОВО ДНЯ',
-      enabled: true,
+      // Hidden 2026-10-06 (owner): the collection is classic cartridge games.
+      // Code and server data stay; enabled: true brings it back.
+      enabled: false,
       // Its own page without the game engine. A t.me/<bot>?startapp=word link (or ref_<id>-word,
       // a shared result) opens it straight from the menu, see menu.js.
       url: 'word/',
