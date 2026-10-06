@@ -1,13 +1,15 @@
 /* Жетоны (lib/wallet.js): balance in the menu, the panel and toasts. */
 #walletBadge {
   margin: -12px 0 16px;
-  padding: 6px 14px;
-  border: 2px solid #1fa2a8;
-  border-radius: 8px;
-  background: transparent;
+  padding: 8px 16px;
+  border: 1px solid rgba(127, 232, 236, 0.5);
+  border-radius: 999px;
+  background: rgba(31, 162, 168, 0.18);
   color: #7fe8ec;
   font: bold 15px "Courier New", monospace;
+  -webkit-tap-highlight-color: transparent;
 }
+#walletBadge:active { background: rgba(31, 162, 168, 0.32); }
 
 .wallet {
   position: fixed;
@@ -21,19 +23,31 @@
   font-family: "Courier New", monospace;
 }
 .wallet h1 { margin: 4px 0 8px; font-size: 22px; color: #7fe8ec; letter-spacing: 2px; text-align: center; }
-.wTabs { display: flex; gap: 6px; }
+/* Tabs: one segmented bar, the open tab lit. */
+.wTabs { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); }
 .wTabs button, .wClose {
   flex: 1;
   min-width: 0;
   padding: 10px 4px;
   border: 0;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
   font: bold 13px "Courier New", monospace;
+  -webkit-tap-highlight-color: transparent;
 }
-.wTabs button.on { background: #1fa2a8; }
-.wClose { flex: 0 0 auto; margin-top: 10px; }
+.wTabs button.on { background: #1fa2a8; color: #fff; }
+.wClose {
+  flex: 0 0 auto;
+  min-height: 46px;
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 15px;
+}
+.wTabs button:active, .wClose:active { background: rgba(255, 255, 255, 0.16); }
 .wBody { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; touch-action: pan-y; }
 .wNote { margin: 8px 0; font-size: 13px; color: #ccc; text-align: center; }
 .wCode { font-size: 11px; opacity: 0.5; }
@@ -45,7 +59,7 @@
   margin: 10px auto;
   padding: 10px 18px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: #1fa2a8;
   color: #fff;
   font: bold 14px "Courier New", monospace;
@@ -72,12 +86,14 @@
 }
 .wShop .wAct { margin: 0; flex: 0 0 auto; padding: 8px 10px; }
 .wPay { display: flex; gap: 6px; flex: 0 0 auto; }
+.wAct:active { filter: brightness(1.15); transform: scale(0.97); }
 .wAct.wStars { background: #c8901c; }
 .wShop i { flex: 0 0 auto; font-style: normal; color: #7fe8ec; }
 
 #walletToasts {
   position: fixed;
-  bottom: calc(12px + env(safe-area-inset-bottom));
+  /* Above the panel's «Закрыть», so a toast never covers a button. */
+  bottom: calc(72px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   z-index: 80;
@@ -114,7 +130,7 @@
 .wTask.done .wMark { color: #8fdf6f; }
 
 /* Tables: top 100 with the player's own row lit. */
-.wPeriod { margin-top: 2px; }
+.wPeriod { margin-top: 2px; padding: 3px; }
 .wPeriod button { padding: 7px 4px; font-size: 12px; }
 .wTop { list-style: none; margin: 6px 0; padding: 0; }
 .wTop li {

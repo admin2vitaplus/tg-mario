@@ -128,11 +128,10 @@ html, body {
   #overlay h1 { margin: 0 0 6px; font-size: 22px; }
   #overlay p { margin: 0 0 10px; font-size: 13px; }
   #overlay .hint { display: none; }
-  #overlay button { padding: 8px 28px; font-size: 16px; }
-  #overlay #ovScores, #overlay #ovLooks { margin-top: 8px; padding: 6px 14px; font-size: 13px; }
+
   #menu h1 { margin: 0 0 8px; font-size: 20px; }
   #menu li { padding: 5px 12px 5px 36px; font-size: 16px; }
-  #menuScores { margin-top: 8px; padding: 6px 18px; }
+
   #menu .hint { margin-top: 8px; }
 }
 
@@ -150,7 +149,7 @@ html, body {
   justify-content: center;
   padding: 16px;
   text-align: center;
-  background: rgba(0, 0, 0, 0.82);
+  background: rgba(0, 0, 0, 0.9);
 }
 
 #overlay.hidden { display: none; }
@@ -158,14 +157,7 @@ html, body {
 #overlay p { margin: 0 0 20px; font-size: 15px; line-height: 1.5; }
 #overlay .hint { margin-top: 20px; font-size: 12px; opacity: 0.6; }
 
-#overlay button {
-  padding: 12px 36px;
-  border: 0;
-  border-radius: 10px;
-  background: #1fa2a8;
-  color: #fff;
-  font: bold 18px "Courier New", monospace;
-}
+
 
 /* Narrow phones: four buttons must fit in one row */
 @media (max-width: 420px) {
@@ -177,15 +169,7 @@ html, body {
   .btn.turbo { font-size: 9px; }
 }
 
-/* «Внешний вид» button under «Играть» */
-#overlay #ovLooks {
-  margin-top: 12px;
-  padding: 8px 16px;
-  border: 2px solid #f8d020;
-  background: transparent;
-  color: #f8d020;
-  font-size: 14px;
-}
+
 
 /* Game menu, shown first, like a multi-game cartridge */
 #menu {
@@ -204,23 +188,20 @@ html, body {
 #menu ol { margin: 0; padding: 0; list-style: none; width: 100%; max-width: 280px; }
 #menu li {
   position: relative;
+  margin-bottom: 4px;
   padding: 10px 12px 10px 36px;
+  border-radius: 12px;
   font-size: 18px;
   font-weight: bold;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
+#menu li.on { background: rgba(248, 208, 32, 0.12); }
+#menu li:not(.soon):active { background: rgba(248, 208, 32, 0.22); }
 #menu li.soon { opacity: 0.35; cursor: default; }
 #menu li.on::before { content: '►'; position: absolute; left: 10px; color: #f8d020; }
 #menu .hint { margin-top: 24px; font-size: 12px; opacity: 0.6; }
-#menuScores {
-  margin-top: 20px;
-  padding: 10px 24px;
-  border: 2px solid #f8d020;
-  border-radius: 8px;
-  background: transparent;
-  color: #f8d020;
-  font: bold 16px "Courier New", monospace;
-}
+
 #menu.loading .hint { opacity: 1; color: #f8d020; animation: blink 0.8s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
 
@@ -241,8 +222,13 @@ html, body {
 }
 .withBack #hud { padding-left: 40px; }
 #overlay { z-index: 4; }
-#overlay #ovMenu { margin-top: 12px; padding: 8px 16px; border: 0; background: transparent; color: #fff; font-size: 14px; opacity: 0.8; }
+
 @media (orientation: landscape) and (max-height: 500px) {
   .withBack #hud { top: 42px; padding-left: 0; }
-  #overlay #ovMenu { margin-top: 6px; padding: 4px 12px; font-size: 13px; }
+
+}
+
+/* Keyboard help only where there is a keyboard and a mouse. */
+@media not all and (hover: hover) and (pointer: fine) {
+  #overlay .hint { display: none; }
 }

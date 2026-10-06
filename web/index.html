@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Жёлтый картридж</title>
+  <link rel="stylesheet" href="lib/ui.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="scores.css">
   <link rel="stylesheet" href="lib/wallet.css">
@@ -42,9 +43,11 @@
     <div id="overlay">
       <h1 id="ovTitle">ПРЫГ-СКОК</h1>
       <p id="ovText">Добеги до флага, собирай монеты,<br>прыгай на жуков.</p>
-      <button id="ovBtn">Играть</button>
-      <button id="ovLooks">🎨 Внешний вид</button>
-      <button id="ovMenu">← Все игры</button>
+      <div class="ui-stack" id="ovActs">
+        <button id="ovBtn" class="ui-btn primary">Играть</button>
+        <button id="ovLooks" class="ui-btn">🎨 Внешний вид</button>
+        <button id="ovMenu" class="ui-btn ghost">← Все игры</button>
+      </div>
       <p class="hint" id="ovHint">Клавиатура: стрелки, A — Z/пробел, B (бег и огонь) — X/Shift, турбо A — A, турбо B — S</p>
     </div>
   </div>

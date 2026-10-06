@@ -266,8 +266,8 @@ function renderResult() {
       : `<p>${esc(T('lost_n'))}</p><p class="answer">${esc(game.answer || '')}</p>`) +
     `<p>${esc(T('streak', { n: game.streak, best: game.bestStreak }))}</p>` +
     (game.today.players > 1 ? `<p>${esc(T('today', { solved: game.today.solved, players: game.today.players }))}</p>` : '') +
-    `<div class="acts"><button data-act="share">${esc(T('share'))}</button>` +
-    `<button class="ghost" data-act="chat">${esc(T('chat_btn'))}</button></div>`;
+    `<div class="acts"><button class="ui-btn primary" data-act="share">${esc(T('share'))}</button>` +
+    `<button class="ui-btn" data-act="chat">${esc(T('chat_btn'))}</button></div>`;
   box.classList.remove('hidden');
 }
 
@@ -301,7 +301,7 @@ function stop(e) {
   else if (server.online === false) { text = T('moved'); reopen = true; }
   else if (e && e.status === 401) { text = T('expired'); reopen = true; }
   const box = $('result');
-  box.innerHTML = `<p>${esc(text)}</p>` + (reopen && botName() ? `<div class="acts"><button data-act="reopen">${esc(T('reopen'))}</button></div>` : '');
+  box.innerHTML = `<p>${esc(text)}</p>` + (reopen && botName() ? `<div class="acts"><button class="ui-btn primary" data-act="reopen">${esc(T('reopen'))}</button></div>` : '');
   box.classList.remove('hidden');
   $('keys').innerHTML = '';
 }
@@ -428,21 +428,28 @@ function rules() {
     r.slice(2).map((p) => `<p>${esc(p)}</p>`).join('') + '</div>');
 }
 
+// The last answer is shown at once while the new one loads.
+let lastChat = null;
 function chatTable() {
   const body = openPanel(T('chat_t'), `<p class="wNote">${esc(T('loading'))}</p>`);
   const mine = panel;
+  if (lastChat) drawChat(body, lastChat);
   server.request('GET', '/api/word/chat').then((t) => {
-    if (panel !== mine) return;
-    if (!t.chat) { body.innerHTML = `<p class="wNote">${esc(T('chat_none'))}</p>`; return; }
-    const today = t.today.length ? '<ol class="wTop">' + t.today.map((p, i) =>
-      `<li class="${p.me ? 'me' : ''}"><span>${i + 1}</span><span>${esc(p.name)}<small>${p.lang.toUpperCase()}</small></span>` +
-      `<b>${esc(p.won ? T('tries', { n: p.tries }) : T('fail'))}</b></li>`).join('') + '</ol>'
-      : `<p class="wNote">${esc(T('chat_empty'))}</p>`;
-    const week = t.week.length ? '<ol class="wTop">' + t.week.map((p) =>
-      `<li class="${p.me ? 'me' : ''}"><span>${p.place}</span><span>${esc(p.name)}</span><b>${p.value}</b></li>`).join('') + '</ol>' : '';
-    body.innerHTML = `<h2 class="wSec">${esc(T('chat_today'))}</h2>${today}` +
-      (week ? `<h2 class="wSec">${esc(T('chat_week'))}</h2>${week}` : '');
-  }, () => { if (panel === mine) body.innerHTML = `<p class="wNote">${esc(T('offline'))}</p>`; });
+    lastChat = t;
+    if (panel === mine) drawChat(body, t);
+  }, () => { if (panel === mine && !lastChat) body.innerHTML = `<p class="wNote">${esc(T('offline'))}</p>`; });
+}
+
+function drawChat(body, t) {
+  if (!t.chat) { body.innerHTML = `<p class="wNote">${esc(T('chat_none'))}</p>`; return; }
+  const today = t.today.length ? '<ol class="wTop">' + t.today.map((p, i) =>
+    `<li class="${p.me ? 'me' : ''}"><span>${i + 1}</span><span>${esc(p.name)}<small>${p.lang.toUpperCase()}</small></span>` +
+    `<b>${esc(p.won ? T('tries', { n: p.tries }) : T('fail'))}</b></li>`).join('') + '</ol>'
+    : `<p class="wNote">${esc(T('chat_empty'))}</p>`;
+  const week = t.week.length ? '<ol class="wTop">' + t.week.map((p) =>
+    `<li class="${p.me ? 'me' : ''}"><span>${p.place}</span><span>${esc(p.name)}</span><b>${p.value}</b></li>`).join('') + '</ol>' : '';
+  body.innerHTML = `<h2 class="wSec">${esc(T('chat_today'))}</h2>${today}` +
+    (week ? `<h2 class="wSec">${esc(T('chat_week'))}</h2>${week}` : '');
 }
 
 function looks() {

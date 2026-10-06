@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Танкодром</title>
+  <link rel="stylesheet" href="../lib/ui.css">
   <link rel="stylesheet" href="tanks.css">
   <link rel="stylesheet" href="../lib/looks.css">
   <link rel="stylesheet" href="../lib/wallet.css">
@@ -38,29 +39,31 @@
     <div id="overlay">
       <h1 id="ovTitle">ТАНКОДРОМ</h1>
       <p id="ovText">Защити штаб от вражеских танков.<br>Кирпич пробивается, сталь держит.</p>
-      <div id="menu">
-        <button data-players="1" data-t="menu_1p">1 игрок</button>
-        <button data-players="2" class="desk" data-t="menu_2p">2 игрока за одной клавиатурой</button>
-        <button id="btnOnline" data-t="menu_online">Онлайн вдвоём</button>
-        <button id="btnLook" class="ghost" data-t="menu_look">Внешний вид</button>
-        <button id="btnWallet" class="ghost wGameBtn" data-wallet-game="tanks">◆ Жетоны</button>
+      <div id="menu" class="ui-stack">
+        <button data-players="1" class="ui-btn primary" data-t="menu_1p">1 игрок</button>
+        <button data-players="2" class="ui-btn desk" data-t="menu_2p">2 игрока за одной клавиатурой</button>
+        <button id="btnOnline" class="ui-btn" data-t="menu_online">Онлайн вдвоём</button>
+        <button id="btnWallet" class="ui-btn teal wGameBtn" data-wallet-game="tanks">◆ Жетоны</button>
+        <button id="btnLook" class="ui-btn" data-t="menu_look">🎨 Внешний вид</button>
       </div>
-      <div id="online" class="hidden">
+      <div id="online" class="ui-stack hidden">
         <div id="onlineStart">
-          <button id="btnCreate" data-t="btn_create">Создать комнату</button>
+          <button id="btnCreate" class="ui-btn primary" data-t="btn_create">Создать комнату</button>
           <div class="join">
             <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="код" data-tp="code_placeholder" autocomplete="off">
-            <button id="btnJoin" data-t="btn_join">Войти</button>
+            <button id="btnJoin" class="ui-btn" data-t="btn_join">Войти</button>
           </div>
         </div>
-        <button id="btnInvite" class="hidden" data-t="btn_invite">Позвать друга в Telegram</button>
-        <button id="btnCancel" class="ghost" data-t="btn_back">Назад</button>
+        <button id="btnInvite" class="ui-btn primary hidden" data-t="btn_invite">Позвать друга в Telegram</button>
+        <button id="btnCancel" class="ui-btn ghost" data-t="btn_back">Назад</button>
       </div>
-      <button id="ovBtn" class="hidden">Дальше</button>
-      <button id="ovShare" class="hidden ghost">Поделиться итогом</button>
-      <button id="ovMenu" class="hidden" data-t="btn_all_games">← Все игры</button>
+      <div class="ui-stack" id="ovActs">
+        <button id="ovBtn" class="ui-btn primary hidden">Дальше</button>
+        <button id="ovShare" class="ui-btn hidden">Поделиться итогом</button>
+        <button id="ovMenu" class="ui-btn ghost hidden" data-t="btn_all_games">← Все игры</button>
+      </div>
       <p class="hint" id="ovHint" data-th="hint">Крестовина — ехать, A и B — огонь, ТУРБО — очередь.<br>Клавиатура: стрелки или WASD, огонь — пробел/Z, турбо — C.<br>Вдвоём: 1-й WASD + пробел (турбо G), 2-й стрелки + Enter (турбо K).</p>
-      <a id="back" href="../" data-t="back">← к выбору игр</a>
+      <a id="back" class="ui-btn ghost" href="../" data-t="back">← Все игры</a>
     </div>
   </div>
   <script src="../config.js"></script>

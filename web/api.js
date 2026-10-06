@@ -97,7 +97,7 @@ function showAchievements(list) {
 {
   const btn = document.createElement('button');
   btn.id = 'ovWallet';
-  btn.className = 'wGameBtn';
+  btn.className = 'ui-btn teal wGameBtn';
   btn.dataset.walletGame = 'mario';
   btn.textContent = '◆ Жетоны';
   const ov = document.getElementById('ovBtn');

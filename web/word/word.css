@@ -41,15 +41,17 @@ html, body {
 #tools { display: flex; gap: 6px; justify-content: center; }
 #tools button {
   min-width: 40px;
-  height: 34px;
+  height: 36px;
   padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  background: #222;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
   font: bold 15px "Courier New", monospace;
+  white-space: nowrap;
 }
-#tools .wGameBtn { color: #7fe8ec; }
+#tools button:active { transform: scale(0.95); }
+#tools .wGameBtn { border-color: rgba(127, 232, 236, 0.5); background: rgba(31, 162, 168, 0.18); color: #7fe8ec; }
 
 #board {
   flex: 1;
@@ -120,17 +122,7 @@ html, body {
 #result p { margin: 2px 0; font-size: 14px; }
 #result .answer { font-size: 22px; letter-spacing: 4px; text-transform: uppercase; }
 #result .acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
-#result button {
-  flex: 1 1 140px;
-  max-width: 220px;
-  padding: 12px 8px;
-  border: 0;
-  border-radius: 8px;
-  background: #f8d020;
-  color: #000;
-  font: bold 15px "Courier New", monospace;
-}
-#result button.ghost { background: #222; color: #fff; }
+#result .ui-btn { flex: 1 1 140px; max-width: 220px; width: auto; font-size: 15px; }
 .hidden { display: none !important; }
 
 /* Rules and the chat table use the panel look of lib/wallet.css (.wallet). */

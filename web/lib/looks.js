@@ -98,8 +98,12 @@ function open(opts) {
       if (!open) {
         const price = document.createElement('i');
         const st = it.shop && window.Wallet && window.Wallet.stars(it.shop);
-        price.textContent = it.shop ? '◆ ' + ((window.Wallet && window.Wallet.price(it.shop)) || it.tokens || '') + (st ? '\n⭐ ' + st : '')
-          : '★ ' + it.stars;
+        price.textContent = it.shop ? '◆ ' + ((window.Wallet && window.Wallet.price(it.shop)) || it.tokens || '') : '★ ' + it.stars;
+        if (st) {
+          const star = document.createElement('b');
+          star.textContent = ' ⭐' + st;
+          price.append(star);
+        }
         b.append(price);
       }
       b.addEventListener('click', () => {

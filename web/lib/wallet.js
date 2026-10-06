@@ -241,7 +241,10 @@ let badgeEl = null;
 function badge() {
   // Only the collection's menu (with its game list); a game page keeps its own screen.
   if (!enabled) return;
-  for (const b of gameButtons) b.textContent = '◆ ' + (me ? me.balance + ' ' + word(me.balance) : T('title').toLowerCase());
+  // A narrow button (data-short) shows only the number.
+  for (const b of gameButtons) {
+    b.textContent = '◆' + (me ? ' ' + me.balance + (b.dataset.short ? '' : ' ' + word(me.balance)) : b.dataset.short ? '' : ' ' + T('title').toLowerCase());
+  }
   const menu = document.getElementById('menuList') && document.getElementById('menu');
   if (!menu) return;
   if (!badgeEl) {

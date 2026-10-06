@@ -131,7 +131,7 @@ html, body {
   justify-content: center;
   padding: 16px;
   text-align: center;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.9);
 }
 
 #overlay.hidden { display: none; }
@@ -139,9 +139,9 @@ html, body {
 #overlay p { margin: 0 0 20px; font-size: 15px; line-height: 1.5; }
 #overlay .hint { margin-top: 20px; font-size: 12px; opacity: 0.6; }
 
-#menu { display: flex; flex-direction: column; gap: 10px; }
 
-#overlay button {
+
+#overlay button:not(.ui-btn) {
   padding: 12px 28px;
   border: 0;
   border-radius: 10px;
@@ -149,16 +149,17 @@ html, body {
   color: #fff;
   font: bold 17px "Courier New", monospace;
 }
-#overlay button:disabled { background: #333; color: #888; }
+#overlay button:not(.ui-btn):disabled { background: #333; color: #888; }
 
-#online, #onlineStart { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
-#online.hidden { display: none; }
+#onlineStart { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .join { display: flex; gap: 8px; }
 .join input {
-  width: 110px;
-  padding: 10px;
-  border: 2px solid #3a8a3a;
-  border-radius: 10px;
+  box-sizing: border-box;
+  width: 120px;
+  min-height: 46px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
   background: #111;
   color: #fff;
   font: bold 20px "Courier New", monospace;
@@ -168,10 +169,7 @@ html, body {
   user-select: text;
 }
 .join button { flex: 1; }
-#overlay button.ghost { background: #333; }
-#overlay b.code { font-size: 28px; color: #f8d020; letter-spacing: 4px; }
-
-#overlay button.ghost { background: #333; }
+#overlay button.ghost:not(.ui-btn) { background: #333; }
 #overlay b.code { font-size: 28px; color: #f8d020; letter-spacing: 4px; }
 
 /* «Внешний вид» */
@@ -189,9 +187,9 @@ html, body {
 .lname { text-align: left; font-size: 14px; opacity: 0.8; }
 .lval { font-weight: bold; font-size: 15px; color: #f8d020; }
 #overlay button.arr { padding: 6px 0; background: #333; font-size: 16px; }
-#overlay button.ghost { background: #333; }
+#overlay button.ghost:not(.ui-btn) { background: #333; }
 
-#back { margin-top: 8px; color: #8ab; font-size: 14px; text-decoration: none; }
+#back { margin-top: 8px; width: min(280px, 100%); }
 
 @media (max-width: 420px) {
   #controls { padding-left: 12px; padding-right: 12px; }
@@ -220,10 +218,10 @@ html, body {
   #overlay h1 { font-size: 22px; margin-bottom: 6px; }
   #overlay p { margin-bottom: 10px; font-size: 13px; }
   #overlay .hint { display: none; }
-  #overlay button { padding: 8px 22px; font-size: 15px; }
+  #overlay button:not(.ui-btn) { padding: 8px 22px; font-size: 15px; }
   #menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 }
-#ovShare { margin-top: 10px; }
+
 
 /* «Назад» (../lib/back.js): a small button in the top-left corner */
 #backBtn {
@@ -242,7 +240,12 @@ html, body {
 }
 .withBack #hud { padding-left: 40px; }
 #overlay { z-index: 4; }
-#overlay #ovMenu { margin-top: 12px; padding: 8px 16px; background: transparent; font-size: 14px; opacity: 0.8; }
+
 @media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
   .withBack #hud { padding-left: 0; }
+}
+
+/* Keyboard help only where there is a keyboard and a mouse. */
+@media not all and (hover: hover) and (pointer: fine) {
+  #overlay .hint { display: none; }
 }
