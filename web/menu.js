@@ -154,6 +154,25 @@ function onKey(e) {
   e.stopPropagation();
 }
 
+// While the player looks at the menu, the first game on this page (the engine is the heavy
+// part) downloads quietly, so choosing it starts at once; the offline cache (sw.js) keeps it.
+// Not on a data-saving or very slow line.
+function prefetch() {
+  const net = typeof navigator !== 'undefined' && navigator.connection;
+  if (net && (net.saveData || /2g/.test(net.effectiveType || ''))) return;
+  const g = games.find((x) => x.scripts);
+  if (!g) return;
+  for (const href of [...g.scripts, ...(g.styles || [])]) {
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = href;
+    document.head.append(link);
+  }
+}
+if (typeof window.addEventListener === 'function') {
+  window.addEventListener('load', () => setTimeout(prefetch, 1000));
+}
+
 document.addEventListener('keydown', onKey, true);
 render();
 if (startGame) {
