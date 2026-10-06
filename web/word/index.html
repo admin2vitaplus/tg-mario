@@ -29,6 +29,8 @@
     <div id="keys"></div>
   </div>
   <script src="../config.js"></script>
+  <!-- Switched off in config.js: an old link or bookmark goes to the menu instead. -->
+  <script>if (window.CARTRIDGE && !window.CARTRIDGE.isEnabled('word')) location.replace('../' + location.search);</script>
   <script src="../sw-register.js"></script>
   <script src="../lib/server.js"></script>
   <script src="../lib/wallet.js"></script>
