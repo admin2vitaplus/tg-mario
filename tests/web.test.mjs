@@ -78,7 +78,7 @@ function fakePage() {
     id, children: [], className: '', textContent: '', removed: false,
     classList: { add() {}, remove() {}, toggle() {} },
     set innerHTML(v) { this.children = []; },
-    append(c) { this.children.push(c); },
+    append(...c) { this.children.push(...c); },
     addEventListener() {},
     querySelector() { return el('hint'); },
     remove() { this.removed = true; },
@@ -101,7 +101,8 @@ function runMenu(patch, search = '') {
   const page = fakePage();
   const ctx = { window: { CARTRIDGE: cfg }, document: page.document, location: { search }, URLSearchParams };
   vm.runInNewContext(read(path.join(WEB, 'menu.js')), ctx);
-  return { lines: page.byId.menuList.children.map((li) => li.textContent), location: ctx.location };
+  const text = (el) => [el.textContent, ...el.children.map(text)].filter(Boolean).join(' ');
+  return { lines: page.byId.menuList.children.map(text), location: ctx.location };
 }
 
 // A shared «Слово дня» result (startapp=ref_<id>-word) opens that game straight from the menu.
@@ -133,6 +134,7 @@ test('every game in the config has what the menu needs', () => {
   }
 });
 
+// The lobby: a card per enabled game, «скоро» cards only to even out the grid.
 test('the menu lists exactly the enabled games', () => {
   const cfg = loadConfig();
   const { lines } = runMenu();
@@ -145,7 +147,7 @@ test('the menu lists exactly the enabled games', () => {
 test('old links to a switched-off game land on the menu', () => {
   const r = runMenu((c) => { c.game('word').enabled = false; }, '?tgWebAppStartParam=ref_42-word');
   assert.equal(r.location.href, undefined);
-  assert.equal(r.lines.length, loadConfig().slots);
+  assert.equal(r.lines.filter((l) => !l.includes('СКОРО')).length, loadConfig().enabledGames().length);
   for (const g of loadConfig().games.filter((x) => x.url)) {
     const dir = path.join(WEB, g.url);
     const own = fs.readdirSync(dir).filter((f) => /\.(html|js)$/.test(f)).map((f) => read(path.join(dir, f))).join('\n');
@@ -159,7 +161,7 @@ for (const id of ['pryg-skok', 'tanks', 'word']) {
     const title = cfg.game(id).title;
     const { lines } = runMenu((c) => { c.game(id).enabled = false; });
     assert.ok(!lines.some((l) => l.includes(title)));
-    assert.equal(lines.length, cfg.slots);
+    assert.equal(lines.length % 2, 0, 'cards fill the two-column grid');
     assert.ok(lines.some((l) => !l.includes('СКОРО')), 'the other game stays');
   });
 }

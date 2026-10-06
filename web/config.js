@@ -9,8 +9,6 @@
 const config = {
   // The bot that invite and "open again" links point to; ?bot= overrides it.
   bot: 'yellow_cartridge_bot',
-  // Menu lines; unused lines show «СКОРО», like empty slots on a cartridge.
-  slots: 5,
   games: [
     {
       id: 'pryg-skok',

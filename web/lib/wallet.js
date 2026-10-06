@@ -47,6 +47,7 @@ const STR = {
     prizes: 'Призы недели за 1–{n} места: {list}.',
     me_place: 'Твоё место: {place} ({value})', me_none: 'Тебя пока нет в этой таблице.',
     table_empty: 'Пока пусто. Будь первым!', you: 'Ты',
+    banner_sub: 'Задания · Топ-100 · Магазин',
     shop_game: 'Товары этой игры. Все товары — в «◆ Жетоны» на главной.',
     close: 'Закрыть', loading: 'Загрузка…',
     offline: 'Сервер сейчас недоступен. Попробуйте позже.',
@@ -97,6 +98,7 @@ const STR = {
     prizes: 'Weekly prizes for places 1–{n}: {list}.',
     me_place: 'Your place: {place} ({value})', me_none: 'You are not in this table yet.',
     table_empty: 'Empty so far. Be the first!', you: 'You',
+    banner_sub: 'Tasks · Top 100 · Shop',
     shop_game: 'This game\'s items. All items are in «◆ Tickets» on the main screen.',
     close: 'Close', loading: 'Loading…',
     offline: 'The server is not reachable right now. Try again later.',
@@ -249,15 +251,19 @@ function badge() {
   }
   const menu = document.getElementById('menuList') && document.getElementById('menu');
   if (!menu) return;
+  // The banner on top of the menu: the balance and the way into the tasks, tables and shop.
   if (!badgeEl) {
     badgeEl = document.createElement('button');
-    badgeEl.id = 'walletBadge';
+    badgeEl.id = 'walletBanner';
+    badgeEl.innerHTML = '<span class="wbLabel"></span><b class="wbValue"></b><span class="wbSub"></span><i>›</i>';
     badgeEl.addEventListener('click', () => (server.online === false ? reopen() : open('tasks')));
     const h1 = menu.querySelector('h1');
     if (h1) h1.insertAdjacentElement('afterend', badgeEl); else menu.prepend(badgeEl);
   }
-  badgeEl.textContent = '◆ ' + (server.online === false ? T('moved')
-    : me ? me.balance + ' ' + word(me.balance) : T('title').toLowerCase());
+  const moved = server.online === false;
+  badgeEl.querySelector('.wbLabel').textContent = '◆ ' + T('title');
+  badgeEl.querySelector('.wbValue').textContent = moved ? T('moved') : me ? me.balance + ' ' + word(me.balance) : '…';
+  badgeEl.querySelector('.wbSub').textContent = moved ? '' : T('banner_sub');
 }
 
 // A game's own «◆ Жетоны» button: its tasks, its table and its shop.

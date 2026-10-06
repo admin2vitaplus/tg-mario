@@ -1,15 +1,31 @@
 /* Жетоны (lib/wallet.js): balance in the menu, the panel and toasts. */
-#walletBadge {
-  margin: -12px 0 16px;
-  padding: 8px 16px;
-  border: 1px solid rgba(127, 232, 236, 0.5);
-  border-radius: 999px;
-  background: rgba(31, 162, 168, 0.18);
-  color: #7fe8ec;
-  font: bold 15px "Courier New", monospace;
+/* The banner on top of the menu (a big button into «◆ Жетоны»). */
+#walletBanner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 0 14px;
+  padding: 12px 36px 12px;
+  border: 1px solid rgba(127, 232, 236, 0.45);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #0f4a4d 0%, #0b2a2c 55%, #14140c 100%);
+  box-shadow: 0 6px 18px rgba(31, 162, 168, 0.18);
+  color: #fff;
+  font-family: "Courier New", monospace;
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease;
 }
-#walletBadge:active { background: rgba(31, 162, 168, 0.32); }
+#walletBanner:active { transform: scale(0.98); }
+#walletBanner .wbLabel { font-size: 12px; font-weight: bold; letter-spacing: 2px; color: #7fe8ec; }
+#walletBanner .wbValue { font-size: 24px; color: #fff; }
+#walletBanner .wbSub { font-size: 11px; color: rgba(255, 255, 255, 0.65); }
+#walletBanner i { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 26px; color: #7fe8ec; }
 
 .wallet {
   position: fixed;
