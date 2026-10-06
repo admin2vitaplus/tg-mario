@@ -1070,6 +1070,8 @@ class Play extends Phaser.Scene {
     // Past the checkpoint the hero restarts from it after losing a life.
     this.fromCheckpoint = this.s.checkpoint === this.s.level;
     delete this.s.checkpoint;
+    // The scene object is reused by restarts, so a checkpoint passed earlier must not carry over.
+    this.passedCheckpoint = false;
     this.def = WORLD_MAPS[this.s.world - 1][this.s.level];
     this.s.timeLeft = this.def.time;
     this.big = !!this.s.big;
@@ -1684,7 +1686,8 @@ class Play extends Phaser.Scene {
 
     if (p.y > VIEW_H + 24) { this.die(true); return; }
     const cp = this.lvl.checkpoint;
-    if (cp && p.x > cp.x * TILE) this.passedCheckpoint = true;
+    // Only the main course counts: bonus rooms lie further right on the map.
+    if (cp && this.area === 0 && p.x > cp.x * TILE) this.passedCheckpoint = true;
     // Walking (or running over the ceiling) into the next area moves the camera there.
     const here = this.lvl.areas[this.area];
     if (p.x >= here.x1 * TILE) {
