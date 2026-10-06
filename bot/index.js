@@ -6,6 +6,7 @@ import { addSecret, installSafeConsole } from "./log.js";
 import { statsReport } from "./stats.js";
 import { economyReport } from "./economy.js";
 import { installWalletCommands, starsInvoice, walletNotifier } from "./wallet-bot.js";
+import { groupPlay, inlineResults, watchEnabledGames } from "./invites.js";
 
 installSafeConsole();
 
@@ -113,7 +114,18 @@ const playKeyboard = () => new InlineKeyboard().webApp("🎮 Играть", game
 
 const medal = (place) => ["🥇", "🥈", "🥉"][place - 1] || `${place}.`;
 
+// Выключенная в web/config.js игра не попадает ни в /play, ни в инлайн-режим.
+const enabledGames = watchEnabledGames(baseGameUrl);
+const playInGroup = (ctx) => groupPlay({
+  botName: bot.botInfo.username, apiUrl, userId: ctx.from?.id, languageCode: ctx.from?.language_code,
+  enabled: enabledGames.get(),
+});
+
 bot.command("start", (ctx) => {
+  if (ctx.chat?.type !== "private") {
+    const { text, reply_markup } = playInGroup(ctx);
+    return ctx.reply(text, { reply_markup });
+  }
   if (ctx.from) tracker.arrive(ctx.from.id, ctx.match);
   const room = /^(?:tanks|room)_(\d{4,6})$/.exec(ctx.match || "");
   if (room) {
@@ -129,7 +141,21 @@ bot.command("start", (ctx) => {
   );
 });
 
-bot.command("play", (ctx) => ctx.reply("Поехали!", { reply_markup: playKeyboard() }));
+// В группе кнопка web_app не работает: там /play даёт ссылки на игры (invites.js, ТЗ P1-3).
+bot.command("play", (ctx) => {
+  if (ctx.chat?.type === "private") return ctx.reply("Поехали!", { reply_markup: playKeyboard() });
+  if (ctx.from) tracker.event(ctx.from.id, "invite_created");
+  const { text, reply_markup } = playInGroup(ctx);
+  return ctx.reply(text, { reply_markup });
+});
+
+// Инлайн-режим: в любом чате набрать @бот — и выбрать игру. Включается в BotFather (/setinline).
+bot.on("inline_query", (ctx) => ctx.answerInlineQuery(inlineResults({
+  botName: bot.botInfo.username, apiUrl, userId: ctx.from.id, languageCode: ctx.from.language_code, query: ctx.inlineQuery.query,
+  enabled: enabledGames.get(),
+}), { cache_time: 60, is_personal: true }));
+// Отправленная карточка — приглашение (приходит, только если в BotFather включён /setinlinefeedback).
+bot.on("chosen_inline_result", (ctx) => tracker.event(ctx.from.id, "invite_created"));
 
 bot.command("top", (ctx) => {
   const top = store.top(10);
@@ -174,11 +200,14 @@ installWalletCommands(bot, { economy: app.economy, admins });
 bot.command("help", (ctx) =>
   ctx.reply(
     "Управление: кнопки на экране или клавиатура (← →, прыжок Z/пробел, бег X/Shift).\n" +
-      "/play — открыть игру\n/top — таблица рекордов\n/me — мои достижения\n/invite — позвать друга",
+      "/play — открыть игру\n/top — таблица рекордов\n/me — мои достижения\n/invite — позвать друга\n\n" +
+      `Игра в чате с друзьями: добавьте бота в группу и напишите /play, или в любом чате наберите @${bot.botInfo.username} и выберите игру.`,
   ),
 );
 
-bot.on("message", (ctx) => ctx.reply("Нажми кнопку, чтобы играть:", { reply_markup: playKeyboard() }));
+// В группах бот молчит на обычные сообщения: игры там зовут через /play и инлайн-режим.
+bot.on("message", (ctx) => (ctx.chat.type === "private"
+  ? ctx.reply("Нажми кнопку, чтобы играть:", { reply_markup: playKeyboard() }) : undefined));
 
 bot.catch((err) => console.error("Ошибка бота:", err.error));
 
