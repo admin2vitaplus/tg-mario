@@ -65,6 +65,9 @@ test("a game switched off in web/config.js is not offered in chats", async () =>
     assert.equal(off.size, all.size - (on ? 1 : 0));
     if (on) assert.ok(!off.has(g.start), `${g.start} switched off`);
   }
+  // Слово «enabled: true» в комментарии выключенной игры её не включает.
+  assert.deepEqual([...enabledStarts("{ id: 'word',\n // enabled: true brings it back.\n enabled: false,\n start: 'word' }")], []);
+  assert.equal(enabledStarts(config).has("word"), /id: 'word'[^}]*?\n\s*enabled: true/.test(config));
   const enabled = new Set(["tanks", "mario"]);
   assert.deepEqual(inlineResults({ botName: "b", userId: 1, enabled }).map((r) => r.id), ["tanks", "mario"]);
   assert.deepEqual(groupPlay({ botName: "b", userId: 1, enabled }).reply_markup.inline_keyboard.map((r) => r[0].url),

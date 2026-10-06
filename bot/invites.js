@@ -30,7 +30,9 @@ const PLAY = { ru: "▶ Играть", en: "▶ Play" };
 export function enabledStarts(configText) {
   const out = new Set();
   // Каждая игра в config.js — блок от «id:» до следующего «id:».
-  for (const block of String(configText).split(/\bid:\s*'/).slice(1)) {
+  // Комментарии убираются: в них тоже бывает «enabled: true» («… enabled: true brings it back»).
+  const code = String(configText).replace(/\/\*[^]*?\*\/|\/\/[^\n]*/g, "");
+  for (const block of code.split(/\bid:\s*'/).slice(1)) {
     const start = /\bstart:\s*'([a-z]+)'/.exec(block)?.[1];
     if (start && /\benabled:\s*true\b/.test(block)) out.add(start);
   }
