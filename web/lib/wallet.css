@@ -127,6 +127,7 @@
 }
 .wTop li span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wTop li.me { background: rgba(31, 162, 168, 0.3); }
+.wTop li.wGap { display: block; padding: 2px; text-align: center; color: #888; border: 0; }
 .wTop b { color: #7fe8ec; }
 
 /* A game's own «◆» button in its menu. */

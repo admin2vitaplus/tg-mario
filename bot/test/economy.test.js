@@ -132,6 +132,33 @@ test("game tasks: play, clear a level and a record close once a day per game and
   store.close();
 });
 
+test("tables are kept in memory until a result that can change them, or a minute", () => {
+  const { store, economy, clock } = setup();
+  run(store, economy, clock, 1, 5000);
+  assert.deepEqual(economy.top("mario", "all", 1).rows.map((r) => r.value), [5000]);
+  // Written past the economy (not a real path): the kept table does not see it...
+  store.touchPlayer(user(2));
+  store.addRun(2, { score: 7000, coins: 0, levels: 1, deaths: 0, completed: false, bossFire: false }, clock.t);
+  assert.deepEqual(economy.top("mario", "all", 1).rows.map((r) => r.value), [5000]);
+  // ...another game's result does not drop it either...
+  economy.run(3, { newRecord: false, game: "tanks" });
+  assert.deepEqual(economy.top("mario", "all", 1).rows.map((r) => r.value), [5000]);
+  // ...a result of this game does, and the player's place moves with it.
+  run(store, economy, clock, 1, 6000);
+  const t = economy.top("mario", "all", 1);
+  assert.deepEqual(t.rows.map((r) => r.value), [7000, 6000]);
+  assert.deepEqual(t.me, { place: 2, value: 6000 });
+  // The overall table follows every new ledger entry.
+  const before = economy.top("overall", "week", 1).me.value;
+  economy.achievements(1, [{ code: "z" }]);
+  assert.equal(economy.top("overall", "week", 1).me.value, before + CFG.achievement);
+  // Names and the like catch up within a minute.
+  store.addRun(2, { score: 9000, coins: 0, levels: 1, deaths: 0, completed: false, bossFire: false }, clock.t);
+  clock.t += 61_000;
+  assert.equal(economy.top("mario", "all", 1).rows[0].value, 9000);
+  store.close();
+});
+
 test("tables: top-100 of the week and of all time, with the player's own place", () => {
   const { store, economy, clock } = setup();
   run(store, economy, clock, 1, 5000);
@@ -358,6 +385,10 @@ test("HTTP: only verified results pay; the client can look and buy, not credit",
     // Вход за день: один раз.
     r = await call("POST", "/api/wallet/checkin");
     assert.deepEqual(r.json.grants, [{ reason: "daily", amount: CFG.daily.base }]);
+    // The whole panel comes with it, the visit already crossed off: no second request for /me.
+    assert.equal(r.json.me.balance, r.json.balance);
+    assert.equal(r.json.me.tasks.main.find((t) => t.id === "login").done, true);
+    assert.ok(r.json.me.tasks.mario.some((t) => t.period === "once"), "Hop-Skip achievements included");
     assert.deepEqual((await call("POST", "/api/wallet/checkin")).json.grants, []);
 
     // Невозможный итог: ничего не начисляется, после нескольких — пометка.

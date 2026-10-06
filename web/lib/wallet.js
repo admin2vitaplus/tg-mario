@@ -46,7 +46,7 @@ const STR = {
     p_week: 'неделю', p_all: 'всё время',
     prizes: 'Призы недели за 1–{n} места: {list}.',
     me_place: 'Твоё место: {place} ({value})', me_none: 'Тебя пока нет в этой таблице.',
-    table_empty: 'Пока пусто. Будь первым!',
+    table_empty: 'Пока пусто. Будь первым!', you: 'Ты',
     shop_game: 'Товары этой игры. Все товары — в «◆ Жетоны» на главной.',
     close: 'Закрыть', loading: 'Загрузка…',
     offline: 'Сервер сейчас недоступен. Попробуйте позже.',
@@ -95,7 +95,7 @@ const STR = {
     p_week: 'this week', p_all: 'all time',
     prizes: 'Weekly prizes for places 1–{n}: {list}.',
     me_place: 'Your place: {place} ({value})', me_none: 'You are not in this table yet.',
-    table_empty: 'Empty so far. Be the first!',
+    table_empty: 'Empty so far. Be the first!', you: 'You',
     shop_game: 'This game\'s items. All items are in «◆ Tickets» on the main screen.',
     close: 'Close', loading: 'Loading…',
     offline: 'The server is not reachable right now. Try again later.',
@@ -157,6 +157,9 @@ let owned = (() => {
 })();
 let me = null;
 let info = null;
+let meAt = 0;          // when `me` came from the server (0: from the phone or not yet)
+let infoFresh = false; // the shop list was asked for in this launch
+const tables = {};     // board:period -> { data: answer of /top, at, loading }
 
 const request = (method, path, body) => server.request(method, '/api/wallet' + path, body);
 
@@ -165,19 +168,72 @@ function keepOwned(list) {
   try { localStorage.setItem(OWNED_KEY, JSON.stringify(owned)); } catch (e) { /* private mode */ }
 }
 
-// One refresh at a time: opening tabs quickly does not pile up requests.
+// The last balance, tasks and tables are kept on the phone: the panel opens at once with them
+// and catches up when the server answers (the server is behind a tunnel and can be slow).
+const CACHE_KEY = 'wallet_cache_' + (myId || 0);
+const CACHE_VERSION = 1;
+function save() {
+  if (!enabled) return;
+  const keep = {};
+  for (const k of Object.keys(tables)) if (tables[k].data) keep[k] = { data: tables[k].data, at: tables[k].at };
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ v: CACHE_VERSION, me, info, tables: keep }));
+  } catch (e) { /* private mode or full */ }
+}
+if (enabled) {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY));
+    if (c && c.v === CACHE_VERSION && c.me && c.info) {
+      me = c.me;
+      info = c.info;
+      for (const k of Object.keys(c.tables || {})) tables[k] = c.tables[k];
+    }
+  } catch (e) { /* nothing saved */ }
+}
+
+function setMe(m) {
+  me = m;
+  meAt = Date.now();
+  keepOwned(m.owned || []);
+  badge();
+  save();
+}
+
+// One refresh at a time: opening tabs quickly does not pile up requests. Without `force`, an
+// answer younger than FRESH_MS is reused (switching tabs asks nothing).
+const FRESH_MS = 20000;
 let loading = null;
-function refresh() {
+function refresh(force) {
   if (!enabled) return Promise.resolve(null);
   if (loading) return loading;
-  loading = Promise.all([info ? info : request('GET', '/info'), request('GET', '/me')]).then(([i, m]) => {
+  if (!force && infoFresh && me && Date.now() - meAt < FRESH_MS) return Promise.resolve(me);
+  loading = Promise.all([infoFresh ? info : request('GET', '/info'), request('GET', '/me')]).then(([i, m]) => {
     info = i;
-    me = m;
-    keepOwned(m.owned || []);
-    badge();
+    infoFresh = true;
+    setMe(m);
     return m;
   }).finally(() => { loading = null; });
   return loading;
+}
+
+// A table, from memory when it is younger than TABLE_FRESH_MS; an older one stays on screen
+// while the new one loads.
+const TABLE_FRESH_MS = 30000;
+function loadTable(board, period) {
+  const key = board + ':' + period;
+  const t = tables[key];
+  if (t && t.loading) return t.loading;
+  if (t && t.data && Date.now() - t.at < TABLE_FRESH_MS) return Promise.resolve(t.data);
+  const p = request('GET', `/top?board=${board}&period=${period}`).then((r) => {
+    tables[key] = { data: r, at: Date.now() };
+    save();
+    return r;
+  }, (e) => {
+    if (tables[key]) delete tables[key].loading;
+    throw e;
+  });
+  tables[key] = Object.assign({}, t, { loading: p });
+  return p;
 }
 
 // ---------- Balance in the menu ----------
@@ -195,8 +251,8 @@ function badge() {
     const h1 = menu.querySelector('h1');
     if (h1) h1.insertAdjacentElement('afterend', badgeEl); else menu.prepend(badgeEl);
   }
-  badgeEl.textContent = '◆ ' + (me ? me.balance + ' ' + word(me.balance)
-    : server.online === false ? T('moved') : T('title').toLowerCase());
+  badgeEl.textContent = '◆ ' + (server.online === false ? T('moved')
+    : me ? me.balance + ' ' + word(me.balance) : T('title').toLowerCase());
 }
 
 // A game's own «◆ Жетоны» button: its tasks, its table and its shop.
@@ -212,9 +268,10 @@ function button(el, game) {
 // ---------- Toasts after a game result ----------
 function grants(w) {
   if (!w || !Array.isArray(w.grants)) return;
-  if (me && typeof w.balance === 'number') { me.balance = w.balance; badge(); }
+  if (w.me) setMe(w.me);
+  else if (me && typeof w.balance === 'number') { me.balance = w.balance; badge(); }
   // The tasks crossed off by this result show up the next time the panel opens.
-  if (w.grants.length) refreshSoon();
+  if (w.grants.length && !w.me) refreshSoon();
   let box = document.getElementById('walletToasts');
   if (!box) {
     box = document.createElement('div');
@@ -245,7 +302,6 @@ let panel = null;
 let current = 'tasks';
 let scope = null;      // null — the collection; 'mario' | 'tanks' | 'word' — that game
 let period = 'week';   // tables: 'week' | 'all'
-const tables = {};     // board:period -> answer of /top
 
 function tabsOf(game) { return game ? ['tasks', 'table', 'shop'] : ['tasks', 'top', 'shop', 'history']; }
 
@@ -287,8 +343,7 @@ function renderTasks(body) {
 
 function renderTable(body) {
   const board = scope || 'overall';
-  const key = board + ':' + period;
-  const t = tables[key];
+  const t = tables[board + ':' + period] && tables[board + ':' + period].data;
   const prizes = (info.season.boards[board] || []).filter((n) => n > 0);
   let html = '<div class="wTabs wPeriod">' + ['week', 'all'].map((p) =>
     `<button data-period="${p}" class="${p === period ? 'on' : ''}">${esc(T('period_' + p))}</button>`).join('') + '</div>' +
@@ -296,17 +351,26 @@ function renderTable(body) {
   if (period === 'week' && prizes.length) {
     html += `<p class="wNote">${esc(T('prizes', { n: prizes.length, list: prizes.join(', ') }))}</p>`;
   }
+  // Load (or refresh) this table, and the other period too, so switching it is instant.
+  const want = { scope, period };
+  loadTable(board, period).then((r) => {
+    if (r !== t && panel && current === 'table' && want.scope === scope && want.period === period) renderTable(body);
+  }, () => {
+    if (!t && panel && current === 'table' && want.scope === scope && want.period === period) {
+      body.innerHTML = html + `<p class="wNote">${esc(T('offline'))}</p>`;
+    }
+  });
+  loadTable(board, period === 'week' ? 'all' : 'week').catch(() => {});
   if (!t) {
     body.innerHTML = html + `<p class="wNote">${esc(T('loading'))}</p>`;
-    request('GET', `/top?board=${board}&period=${period}`).then((r) => {
-      tables[key] = r;
-      if (panel && current === 'table') renderTable(body);
-    }, () => { if (panel && current === 'table') body.innerHTML = html + `<p class="wNote">${esc(T('offline'))}</p>`; });
     return;
   }
   html += `<p class="wNote">${esc(t.me ? T('me_place', { place: t.me.place, value: t.me.value }) : T('me_none'))}</p>`;
+  // Below the top 100 the player still sees their own row, at the end.
+  const mine = t.me && !t.rows.some((p) => p.me)
+    ? `<li class="wGap">…</li><li class="me"><span>${t.me.place}</span><span>${esc(T('you'))}</span><b>${t.me.value}</b></li>` : '';
   html += t.rows.length ? '<ol class="wTop">' + t.rows.map((p) =>
-    `<li class="${p.me ? 'me' : ''}"><span>${p.place}</span><span>${esc(p.name)}</span><b>${p.value}</b></li>`).join('') + '</ol>'
+    `<li class="${p.me ? 'me' : ''}"><span>${p.place}</span><span>${esc(p.name)}</span><b>${p.value}</b></li>`).join('') + mine + '</ol>'
     : `<p class="wNote">${esc(T('table_empty'))}</p>`;
   body.innerHTML = html;
 }
@@ -353,9 +417,11 @@ function show(tab) {
   const body = panel.querySelector('.wBody');
   if (me && info) render(body);
   else body.innerHTML = `<p class="wNote">${esc(T('loading'))}</p>`;
-  refresh().then(() => { if (panel && current === (tab === 'top' ? 'table' : tab)) render(body); })
+  const before = me;
+  refresh().then(() => { if (me !== before && panel && current === (tab === 'top' ? 'table' : tab)) render(body); })
     .catch((e) => {
-      if (!panel || me) return;
+      // A saved copy stays on screen only while the server has not refused this launch.
+      if (!panel || (me && (meAt || (e && e.status === 0 && server.online !== false)))) return;
       // Which of the failures it was, so the player (and whoever reads the report) can tell.
       let html = `<p class="wNote">${esc(T('offline'))}</p>`;
       if (server.online === false && botName) {
@@ -386,7 +452,6 @@ function open(tab, opts) {
   close();
   scope = opts && ['mario', 'tanks', 'word'].includes(opts.game) ? opts.game : null;
   period = 'week';
-  for (const k of Object.keys(tables)) delete tables[k]; // fresh tables on every opening
   const tabs = tabsOf(scope);
   if (tab === 'how' || !tabs.includes(tab)) tab = 'tasks';
   panel = document.createElement('div');
@@ -412,6 +477,8 @@ function open(tab, opts) {
   document.addEventListener('keydown', onKey, true);
   document.body.append(panel);
   show(tab);
+  // The table is what takes the server longest: start loading it while the player looks around.
+  if (current !== 'table') loadTable(scope || 'overall', 'week').catch(() => {});
 }
 
 // The bot's /start answers with a button that carries the server's current address.
@@ -472,6 +539,7 @@ function bought(id, r) {
   keepOwned((r && r.owned) || owned.concat(id));
   if (me && r && typeof r.balance === 'number') me.balance = r.balance;
   badge();
+  save();
   try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch (e) { /* ignore */ }
   return true;
 }
@@ -491,7 +559,7 @@ function buyStars(it) {
     tg.openInvoice(r.link, (status) => {
       if (status !== 'paid') { resolve(false); return; }
       let tries = 0;
-      const check = () => refresh().then(() => {
+      const check = () => refresh(true).then(() => {
         if (owned.includes(it.id)) resolve(bought(it.id));
         else if (++tries < 8) setTimeout(check, 1500);
         else { tell(T('paid_wait')); resolve(false); }
@@ -513,7 +581,7 @@ function buy(id, via) {
       return false;
     });
   }).catch((e) => {
-    if (e && e.status === 409) return refresh().then(() => owned.includes(id), () => false);
+    if (e && e.status === 409) return refresh(true).then(() => owned.includes(id), () => false);
     tell(T('buy_failed'));
     return false;
   });
@@ -522,19 +590,27 @@ function buy(id, via) {
 let soon = null;
 function refreshSoon() {
   clearTimeout(soon);
-  soon = setTimeout(() => refresh().catch(() => {}), 500);
+  soon = setTimeout(() => refresh(true).catch(() => {}), 500);
 }
 
 // The collection's daily task «open it today» is done by opening it: once a day, the
 // server decides (UTC days), and a repeat gives nothing.
+// Its answer carries the whole panel (`me`), so a launch costs one request for it, not two.
 const CHECKIN_KEY = 'wallet_checkin';
-function checkin() {
+function start() {
   const day = Math.floor(Date.now() / 86400000);
-  try { if (localStorage.getItem(CHECKIN_KEY) === day + ':' + myId) return; } catch (e) { /* private mode */ }
-  request('POST', '/checkin').then((w) => {
+  let done = false;
+  try { done = localStorage.getItem(CHECKIN_KEY) === day + ':' + myId; } catch (e) { /* private mode */ }
+  if (done) return refresh(true);
+  loading = Promise.all([infoFresh ? info : request('GET', '/info'), request('POST', '/checkin')]).then(([i, w]) => {
+    info = i;
+    infoFresh = true;
     try { localStorage.setItem(CHECKIN_KEY, day + ':' + myId); } catch (e) { /* private mode */ }
     grants(w);
-  }, () => {});
+    return w.me ? me : null;
+  }).finally(() => { loading = null; });
+  // An older server answers without `me`; a failed check-in is tried again next launch.
+  return loading.then((m) => m || refresh(true), () => refresh(true));
 }
 
 window.Wallet = {
@@ -554,7 +630,6 @@ document.querySelectorAll('[data-wallet-game]').forEach((el) => button(el, el.da
 
 if (enabled) {
   badge();
-  refresh().catch(() => badge());
-  checkin();
+  start().catch(() => badge());
 }
 })();

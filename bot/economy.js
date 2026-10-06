@@ -40,6 +40,8 @@ const CAPPED_SQL = CAPPED.map((r) => `'${r}'`).join(", ");
 export const BOARDS = ["mario", "tanks", "word", "overall"];
 // Таблица принятых игр для каждой игры: у «Прыг-Скока» runs, у «Танкодрома» tanks_runs.
 const RUN_TABLES = { mario: "runs", tanks: "tanks_runs" };
+// Сколько живёт посчитанная таблица, если в неё ничего не записали (имена игроков и т. п.).
+const TOP_TTL_MS = 60_000;
 // У «Слова дня» (word.js) в таблице не лучший счёт, а сумма очков по дням: за день берётся
 // лучший из результатов на двух языках; при равенстве выше тот, кто набрал сумму раньше.
 const wordSums = (from, to) => `SELECT player_id AS id, SUM(best) AS value, MAX(at) AS tie FROM (
@@ -199,6 +201,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       if (n === 0 || (CAPPED.includes(reason) && n < 0)) return 0; // потолок на сегодня исчерпан
       q.insert.run(playerId, n, reason, String(event), season ?? seasonOf(at), dayUtc(at), at);
       q.bump.run(playerId, n);
+      dropTop("overall");
       return n;
     });
   }
@@ -208,6 +211,31 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
   const loginAmount = (w, day) => {
     const streak = w.streak_day === day - 1 ? w.streak + 1 : w.streak_day === day ? w.streak : 1;
     return Math.min(cfg.daily.base + cfg.daily.perStreakDay * (streak - 1), cfg.daily.max);
+  };
+
+  // Таблица целиком (все места) — тяжёлый запрос по журналу и играм, поэтому результат хранится
+  // в памяти: до TOP_TTL_MS или до новой записи, которая может её изменить (dropTop).
+  function rank(board, period, season) {
+    const from = seasonStart(season);
+    let sql;
+    if (board === "overall") {
+      sql = `SELECT l.player_id AS id, SUM(l.amount) AS value, MAX(l.id) AS tie FROM ledger l
+        WHERE l.reason NOT IN ('prize', 'shop', 'annul') ${period === "week" ? `AND l.season = ${season}` : ""}
+        GROUP BY l.player_id HAVING value > 0`;
+    } else if (board === "word") {
+      sql = wordSums(period === "week" ? from : 0, Number.MAX_SAFE_INTEGER);
+    } else {
+      sql = `SELECT player_id AS id, MAX(score) AS value, MIN(created_at) AS tie FROM ${RUN_TABLES[board]}
+        WHERE score > 0 ${period === "week" ? `AND created_at >= ${from}` : ""} GROUP BY player_id`;
+    }
+    return db.prepare(`SELECT t.id, t.value, COALESCE(p.name, 'Игрок') AS name,
+        ROW_NUMBER() OVER (ORDER BY t.value DESC, t.tie ASC) AS place
+      FROM (${sql}) t LEFT JOIN players p ON p.id = t.id LEFT JOIN wallets w ON w.player_id = t.id
+      WHERE w.flagged IS NULL`).all();
+  }
+  const topCache = new Map();
+  const dropTop = (board) => {
+    for (const k of topCache.keys()) if (!board || k.startsWith(board + ":")) topCache.delete(k);
   };
 
   const economy = {
@@ -244,6 +272,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     // Принятый сервером итог игры (game — mario или tanks): задание «сыграть», «пройти уровень»
     // (levels — сколько пройдено в этой игре), личный рекорд в этой игре, награда за приглашение.
     run(playerId, { newRecord, game = "mario", levels = 0 }, out = []) {
+      dropTop(game); // новый результат игры может поменять её таблицу
       const at = now();
       const day = dayUtc(at);
       this.task(playerId, game, "play", out, at);
@@ -278,11 +307,12 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       const { strikes } = q.strike.get(day, day, playerId);
       if (strikes >= cfg.suspicious.rejectedPerDay && !q.wallet.get(playerId).flagged) {
         q.flag.run("auto: отклонённые отчёты", now(), playerId);
+        dropTop();
       }
     },
 
-    flag(playerId, why = "admin") { wallet(playerId); q.flag.run(String(why).slice(0, 100), now(), playerId); },
-    unflag(playerId) { wallet(playerId); q.flag.run(null, null, playerId); q.clearStrikes.run(playerId); },
+    flag(playerId, why = "admin") { wallet(playerId); q.flag.run(String(why).slice(0, 100), now(), playerId); dropTop(); },
+    unflag(playerId) { wallet(playerId); q.flag.run(null, null, playerId); q.clearStrikes.run(playerId); dropTop(); },
 
     // Аннулировать всё, что игрок получил за сезон (начисления и призы), отдельной записью.
     // Повторная команда снимает только то, что пришло после прошлой.
@@ -382,22 +412,10 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     // лучший счёт (за неделю или за всё время). Топ-100 и место игрока.
     top(board, period, playerId = null, at = now()) {
       const season = seasonOf(at);
-      const from = seasonStart(season);
-      let sql;
-      if (board === "overall") {
-        sql = `SELECT l.player_id AS id, SUM(l.amount) AS value, MAX(l.id) AS tie FROM ledger l
-          WHERE l.reason NOT IN ('prize', 'shop', 'annul') ${period === "week" ? `AND l.season = ${season}` : ""}
-          GROUP BY l.player_id HAVING value > 0`;
-      } else if (board === "word") {
-        sql = wordSums(period === "week" ? from : 0, Number.MAX_SAFE_INTEGER);
-      } else {
-        sql = `SELECT player_id AS id, MAX(score) AS value, MIN(created_at) AS tie FROM ${RUN_TABLES[board]}
-          WHERE score > 0 ${period === "week" ? `AND created_at >= ${from}` : ""} GROUP BY player_id`;
-      }
-      const ranked = db.prepare(`SELECT t.id, t.value, COALESCE(p.name, 'Игрок') AS name,
-          ROW_NUMBER() OVER (ORDER BY t.value DESC, t.tie ASC) AS place
-        FROM (${sql}) t LEFT JOIN players p ON p.id = t.id LEFT JOIN wallets w ON w.player_id = t.id
-        WHERE w.flagged IS NULL`).all();
+      const key = `${board}:${period}:${season}`;
+      const hit = topCache.get(key);
+      const ranked = hit && at - hit.at < TOP_TTL_MS ? hit.ranked : rank(board, period, season);
+      if (ranked !== hit?.ranked) topCache.set(key, { at, ranked });
       const rows = ranked.slice(0, 100).map((r) => ({ place: r.place, name: r.name, value: r.value, me: r.id === playerId }));
       const mine = playerId == null ? null : ranked.find((r) => r.id === playerId);
       return { board, period, rows, me: mine ? { place: mine.place, value: mine.value } : null };

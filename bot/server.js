@@ -193,18 +193,21 @@ export function createApiServer({
   // лишь посмотреть баланс и потратить жетоны в магазине.
   if (economy) {
     routes["GET /api/wallet/info"] = () => [200, publicRules(economy.cfg)];
-    routes["GET /api/wallet/me"] = (_body, user) => {
-      if (!user) return [401, { error: "unauthorized" }];
-      store.touchPlayer(user);
-      economy.setLang(user.id, user.language_code);
-      const me = economy.me(user.id);
+    const walletMe = (id) => {
+      const me = economy.me(id);
       // Достижения «Прыг-Скока» — разовые задания этой игры.
-      const got = economy.achievementsDone(user.id);
+      const got = economy.achievementsDone(id);
       me.tasks.mario.push(...publicList().map((a) => ({
         id: `ach:${a.code}`, period: "once", amount: economy.cfg.achievement, done: got.has(a.code),
         icon: a.icon, title: a.title, text: a.text,
       })));
-      return [200, me];
+      return me;
+    };
+    routes["GET /api/wallet/me"] = (_body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      store.touchPlayer(user);
+      economy.setLang(user.id, user.language_code);
+      return [200, walletMe(user.id)];
     };
     // Вход в сборник за день: общее задание главной (раз в день по UTC, с серией дней).
     routes["POST /api/wallet/checkin"] = (_body, user) => {
@@ -213,7 +216,9 @@ export function createApiServer({
       economy.setLang(user.id, user.language_code);
       const grants = economy.checkin(user.id);
       economy.inviteCheck(user.id, grants);
-      return [200, walletBody(user.id, grants).wallet];
+      // Вместе с начислением — всё, что показывает панель жетонов: странице не нужен второй запрос /me.
+      const me = walletMe(user.id);
+      return [200, { grants, balance: me.balance, me }];
     };
     // Таблицы: ?board=overall|mario|tanks&period=week|all — топ-100 и место игрока.
     routes["GET /api/wallet/top"] = (_body, user, url) => {

@@ -6,7 +6,7 @@
 //   1. ?api= in the launch link (the bot's buttons always carry the fresh one);
 //   2. the address that answered last time (localStorage);
 //   3. the tunnel name after «__» in startapp (a shared link, maybe days old).
-// All are checked at once and the best one that answers /api/health wins and is
+// All are checked at once and the first one that answers /api/health wins and is
 // remembered. A just-started tunnel can take a few seconds to become reachable,
 // so the check is retried before giving up.
 //
@@ -58,13 +58,24 @@ function healthy(base) {
     .catch(() => false);
 }
 
+// The first address that answers wins: there is one server, so any live address leads to it,
+// and an old dead one (it can hang until the timeout) is not waited for.
+function first(list) {
+  return new Promise((resolve) => {
+    let left = list.length;
+    list.forEach((base) => healthy(base).then((ok) => {
+      if (ok) resolve(base);
+      else if (--left === 0) resolve('');
+    }));
+  });
+}
+
 // Up to three rounds, with pauses for a tunnel that is still starting.
 async function pick(list) {
   for (const pause of [0, 2000, 5000]) {
     if (pause) await wait(pause);
-    const results = await Promise.all(list.map(healthy));
-    const i = results.indexOf(true);
-    if (i >= 0) return list[i];
+    const base = await first(list);
+    if (base) return base;
   }
   return '';
 }
