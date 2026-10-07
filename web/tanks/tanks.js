@@ -879,7 +879,7 @@ $('ovBtn').addEventListener('click', () => {
 });
 
 for (const b of document.querySelectorAll('#menu button[data-players]')) {
-  b.addEventListener('click', () => { audio(); begin(Number(b.dataset.players)); });
+  b.addEventListener('click', () => { audio(); beginLocal(Number(b.dataset.players)); });
 }
 
 function resultText(s) {
@@ -1376,18 +1376,45 @@ function remotePad() {
 // when repeated N times (N in base36 too); «n» is the move to the next stage.
 // Code: (direction + 1) × 2 + fire; for two players code1 × 10 + code2.
 const MAX_REC_FRAMES = 60 * 60 * 60; // the server takes up to an hour of play
-const ticket = { next: null, asking: false };
+const QUIT_FRAMES = 20 * 60; // a game left in the middle counts after 20 s (bot/tanks-replay.js)
+const ticket = { next: null, asking: false, waiters: [] };
 const rec = { seed: 0, players: 1, out: [], prev: -1, n: 0, frames: 0 };
 const canCheck = () => !!(window.Server && window.Server.hasServer && tg && tg.initData);
+// The unused ticket is kept on the phone: opening the game again does not ask for a new one.
+const TICKET_KEY = 'tanks_ticket_' + ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 0);
+try {
+  const t = JSON.parse(localStorage.getItem(TICKET_KEY));
+  if (t && Number.isSafeInteger(t.seed) && t.seed > 0 && Date.now() - t.at < 5 * 3600000) ticket.next = t;
+} catch (e) { /* nothing kept */ }
+function keepTicket() {
+  try {
+    if (ticket.next) localStorage.setItem(TICKET_KEY, JSON.stringify(ticket.next));
+    else localStorage.removeItem(TICKET_KEY);
+  } catch (e) { /* private mode */ }
+}
 
 function fetchTicket() {
   if (ticket.next && Date.now() - ticket.next.at > 5 * 3600000) ticket.next = null; // the server keeps it 6 hours
   if (!canCheck() || ticket.next || ticket.asking) return;
   ticket.asking = true;
   window.Server.request('POST', '/api/tanks/ticket')
-    .then((r) => { if (r && Number.isSafeInteger(r.seed) && r.seed > 0) ticket.next = { seed: r.seed, at: Date.now() }; })
+    .then((r) => { if (r && Number.isSafeInteger(r.seed) && r.seed > 0) { ticket.next = { seed: r.seed, at: Date.now() }; keepTicket(); } })
     .catch(() => {})
-    .then(() => { ticket.asking = false; });
+    .then(() => {
+      ticket.asking = false;
+      ticket.waiters.splice(0).forEach((f) => f());
+    });
+}
+
+// A game started before the ticket came would give no жетоны: wait for it a little.
+function withTicket(ms) {
+  if (!canCheck() || ticket.next) return Promise.resolve();
+  fetchTicket();
+  if (!ticket.asking) return Promise.resolve();
+  return new Promise((done) => {
+    ticket.waiters.push(done);
+    setTimeout(done, ms);
+  });
 }
 
 function recFlush() {
@@ -1415,18 +1442,26 @@ function recNext() {
 }
 
 // Only the one who runs the game sends it: alone, two on one phone, or the
-// online host (the server credits the guest by the room).
-function sendRun(s) {
-  if (!rec.seed || mode === 'guest') return;
+// online host (the server credits the guest by the room). quit — the player
+// leaves in the middle: the game so far is sent if it lasted QUIT_FRAMES.
+function sendRun(s, quit) {
+  if (!rec.seed || mode === 'guest' || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
   recFlush();
   const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(',') };
   if (mode === 'host' && /^\d{4,8}$/.test(net.code)) body.room = net.code;
   rec.seed = 0;
   rec.out = [];
-  window.Server.request('POST', '/api/tanks/run', body)
-    .then((r) => { if (window.Wallet && r) window.Wallet.grants(r.wallet); })
+  return window.Server.request('POST', '/api/tanks/run', body, { keepalive: quit })
+    .then((r) => {
+      if (!window.Wallet || !r) return;
+      window.Wallet.grants(r.wallet);
+      if (window.Wallet.achieved) window.Wallet.achieved(r.newAchievements);
+    })
     .catch(() => {});
 }
+// The game in progress, when the page is left or closed.
+const sendQuit = () => (state ? sendRun(state, true) : Promise.resolve());
+window.addEventListener('pagehide', () => { sendQuit(); });
 
 // ---------- Game flow ----------
 let state = null;
@@ -1441,8 +1476,11 @@ function begin(players) {
   net.cellsKey = '';
   net.events = [];
   clearPads();
+  // A game left unfinished is sent before the new one starts.
+  if (state) sendRun(state, true);
   const t = mode !== 'guest' && ticket.next;
   ticket.next = null;
+  keepTicket();
   Object.assign(rec, { seed: t ? t.seed : 0, players, out: [], prev: -1, n: 0, frames: 0 });
   state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1);
   fetchTicket();
@@ -1450,6 +1488,14 @@ function begin(players) {
   lastHud = '';
   $('overlay').classList.add('hidden');
   running = true;
+}
+
+// Alone or two on one phone: the game waits up to 3 s for its ticket.
+let starting = false;
+function beginLocal(players) {
+  if (starting) return;
+  starting = true;
+  withTicket(3000).then(() => { starting = false; begin(players); });
 }
 
 function afterStep(s) {
@@ -1474,7 +1520,7 @@ function afterStep(s) {
       track('match_finished', net.code);
       rematchScreen();
     } else {
-      showOverlay(T('game_over'), resultText(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => begin(s.players.length));
+      showOverlay(T('game_over'), resultText(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => beginLocal(s.players.length));
       showShare(s);
     }
   }
@@ -1526,8 +1572,12 @@ if (window.CARTRIDGE && !window.CARTRIDGE.isEnabled('tanks')) {
 // In a game it pauses (an online game keeps going for the friend); in the
 // online panel it returns to this game's menu; anywhere else to the list of games.
 function leave() {
-  netClose(); // leaving on purpose: the friend sees «вышел» at once
-  if (window.Back) window.Back.toMenu(); else location.href = '../';
+  // The game so far goes to the server first (up to 1.5 s), so it still counts.
+  const go = () => {
+    netClose(); // leaving on purpose: the friend sees «вышел» at once
+    if (window.Back) window.Back.toMenu(); else location.href = '../';
+  };
+  Promise.race([sendQuit(), new Promise((r) => setTimeout(r, 1500))]).then(go);
 }
 function back() {
   const looks = document.querySelector('.looks .looksDone');

@@ -7,7 +7,7 @@ import { openDb } from "../db.js";
 import { createApiServer } from "../server.js";
 import { createEconomy, loadEconomy } from "../economy.js";
 import { createBombsResults } from "../bombs-results.js";
-import { encode, replay } from "../bombs-replay.js";
+import { encode, MIN_QUIT_FRAMES, replay } from "../bombs-replay.js";
 import { startApp } from "../app.js";
 
 // «Бомбодром» на сервере: повтор записи нажатий, билеты, онлайн-дуэль, жетоны и таблица.
@@ -55,7 +55,24 @@ test("replay gives the same scores as the game, and a changed record is caught",
   }
   const g = play(11);
   assert.equal(replay({ seed: 11, players: 1, log: g.log + ",0x5" }).why, "steps after the end");
-  assert.equal(replay({ seed: 11, players: 1, log: g.log.split(",").slice(0, -3).join(",") }).why, "game not finished");
+  // Вышел из игры: засчитывается, если играли хотя бы MIN_QUIT_FRAMES, иначе — нет.
+  assert.equal(replay({ seed: 11, players: 1, log: "0x10" }).why, "game not finished");
+  // Первые MIN_QUIT_FRAMES кадров записи длинной игры и ещё один — игра брошена посередине.
+  const [qs, lg] = [11, 222, 3333, 44, 55, 66, 77, 88].map((sd) => [sd, play(sd)]).find(([, x]) => x.frames > MIN_QUIT_FRAMES + 300);
+  let left = MIN_QUIT_FRAMES + 1;
+  const cut = [];
+  for (const part of lg.log.split(",")) {
+    if (left <= 0) break;
+    if (part === "n") { cut.push(part); continue; }
+    const [, c, n = "1"] = /^(\w)(?:x(\w+))?$/.exec(part);
+    const k = Math.min(left, parseInt(n, 36));
+    cut.push(k > 1 ? `${c}x${k.toString(36)}` : c);
+    left -= k;
+  }
+  const quit = replay({ seed: qs, players: 1, log: cut.join(",") });
+  assert.equal(quit.ok, true, quit.why);
+  assert.equal(quit.quit, true);
+  assert.equal(replay({ seed: 11, players: 1, log: g.log }).quit, false);
   assert.equal(replay({ seed: 11, players: 1, log: "n," + g.log }).why, "next stage before clear");
   assert.equal(replay({ seed: 11, players: 1, log: "k" }).why, "bad step", "codes above 19 are not one player's");
   assert.equal(replay({ seed: 11, players: 2, log: "b4" }).why, "bad step", "codes above 399 are not two players'");
@@ -113,7 +130,8 @@ test("HTTP: a checked game closes the game's tasks, goes to its table; a forged 
     }
 
     const t2 = (await call("POST", "/api/bombs/ticket")).json.seed;
-    const forged = play(t2).log.split(",").slice(0, -2).join(",");
+    // Записи на пару секунд: игрой это не считается, жетонов не будет.
+    const forged = "0x78";
     clock.t += 3600_000;
     const before = economy.me(5).history.length;
     r = await call("POST", "/api/bombs/run", { seed: t2, players: 1, log: forged });

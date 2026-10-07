@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createHmac } from "node:crypto";
 import { openDb } from "../db.js";
 import { createApiServer } from "../server.js";
-import { publicList } from "../achievements.js";
+import { ACHIEVEMENTS_TOTAL, BY_GAME, publicList } from "../achievements.js";
 import {
   createEconomy, DAY_MS, economyReport, exportSeason, loadEconomy, maxWeeklyEmission,
   seasonOf, seasonStart, validateEconomy,
@@ -82,15 +82,28 @@ test("the ledger is append-only", () => {
 
 test("daily cap per player, with the next day open again", () => {
   const { store, economy, clock } = setup();
-  const codes = Array.from({ length: 12 }, (_, i) => ({ code: `a${i}` }));
-  const got = economy.achievements(1, codes).reduce((a, g) => a + g.amount, 0);
-  assert.equal(got, CFG.dailyCap);
-  assert.equal(economy.me(1).today, CFG.dailyCap);
+  economy.post(1, CFG.dailyCap - 5, "daily", "fill");
   run(store, economy, clock, 1, 500);
-  assert.equal(economy.me(1).balance, CFG.dailyCap, "bonus and record are capped too");
+  assert.equal(economy.me(1).today, CFG.dailyCap);
+  assert.equal(economy.me(1).balance, CFG.dailyCap, "tasks and record are capped");
   clock.t += DAY_MS;
   run(store, economy, clock, 1, 600);
   assert.equal(economy.me(1).balance, CFG.dailyCap + CFG.tasks.play + CFG.record);
+  store.close();
+});
+
+test("achievements are one-off: the daily cap neither cuts them nor is used up by them", () => {
+  const { store, economy, clock } = setup();
+  const codes = Array.from({ length: 12 }, (_, i) => ({ code: `a${i}` }));
+  const got = economy.achievements(1, codes, [], "tanks").reduce((a, g) => a + g.amount, 0);
+  assert.equal(got, 12 * CFG.achievement);
+  assert.equal(economy.me(1).today, 0);
+  run(store, economy, clock, 1, 500);
+  assert.equal(economy.me(1).balance, got + CFG.tasks.play + CFG.record, "the game's tasks still count that day");
+  assert.ok(economy.achievementsDone(1).has("a0"));
+  economy.flag(1);
+  assert.equal(economy.achievements(1, [{ code: "z" }]).length, 0, "a flagged player gets none");
+  assert.equal(maxWeeklyEmission(CFG, 10, ACHIEVEMENTS_TOTAL), 7 * CFG.dailyCap * 10 + CFG.season.pool + ACHIEVEMENTS_TOTAL * CFG.achievement * 10);
   store.close();
 });
 
@@ -403,13 +416,13 @@ test("HTTP: only verified results pay; the client can look and buy, not credit",
   try {
     let r = await call("POST", "/api/mario/level", { level: 0, score: 3000, timeLeft: 250, deaths: 0 });
     assert.equal(r.status, 200);
-    assert.equal(r.json.wallet.grants.filter((g) => g.reason === "achievement").length, 3);
+    assert.equal(r.json.wallet.grants.filter((g) => g.reason === "achievement").length, 4);
     assert.equal(r.json.wallet.grants.filter((g) => g.reason === "task").length, 1, "a level cleared today");
     clock.t += 90_000;
     r = await call("POST", "/api/mario/run", { score: 3000, coins: 0, levels: 1, deaths: 0 });
     assert.equal(r.status, 200);
     assert.deepEqual(r.json.wallet.grants.map((g) => g.reason).sort(), ["record", "task"]);
-    assert.equal(r.json.wallet.balance, 3 * CFG.achievement + CFG.tasks.level + CFG.tasks.play + CFG.record);
+    assert.equal(r.json.wallet.balance, 4 * CFG.achievement + CFG.tasks.level + CFG.tasks.play + CFG.record);
     // Вход за день: один раз.
     r = await call("POST", "/api/wallet/checkin");
     assert.deepEqual(r.json.grants, [{ reason: "daily", amount: CFG.daily.base }]);
@@ -429,12 +442,12 @@ test("HTTP: only verified results pay; the client can look and buy, not credit",
     assert.equal((await call("POST", "/api/wallet/credit", { amount: 100 })).status, 404);
     r = await call("GET", "/api/wallet/me");
     assert.equal(r.status, 200);
-    assert.equal(r.json.balance, 3 * CFG.achievement + CFG.tasks.level + CFG.tasks.play + CFG.record + CFG.daily.base);
+    assert.equal(r.json.balance, 4 * CFG.achievement + CFG.tasks.level + CFG.tasks.play + CFG.record + CFG.daily.base);
     // Задания: вход и задания игры закрыты, достижения «Прыг-Скока» — разовые задания.
     assert.deepEqual(r.json.tasks.main.map((t) => [t.id, t.done]), [["login", true], ["invite", false]]);
     assert.deepEqual(r.json.tasks.mario.filter((t) => t.period === "day").map((t) => [t.id, t.done]),
       [["play", true], ["level", true], ["record", true]]);
-    assert.equal(r.json.tasks.mario.filter((t) => t.period === "once" && t.done).length, 3);
+    assert.equal(r.json.tasks.mario.filter((t) => t.period === "once" && t.done).length, 4);
     r = await call("GET", "/api/wallet/top?board=mario&period=all");
     assert.equal(r.status, 200);
     assert.equal(r.json.me, null, "a flagged player is not in the tables");
@@ -462,7 +475,7 @@ test("interface texts avoid the words the spec forbids", () => {
     readFileSync(new URL("../wallet-bot.js", import.meta.url), "utf8").match(/"[^"]*"|`[^`]*`/g).join("\n"),
     economyReport(openDb(":memory:").db, CFG),
     // Hop-Skip's achievements are tasks in its «◆» panel.
-    publicList().map((a) => [a.title, a.text, a.titleEn, a.textEn].join("\n")).join("\n"),
+    Object.keys(BY_GAME).flatMap((g) => publicList(g)).map((a) => [a.title, a.text, a.titleEn, a.textEn].join("\n")).join("\n"),
     // The page's own words (its dictionary).
     readFileSync(new URL("../../web/lib/wallet.js", import.meta.url), "utf8").split("const STR = {")[1].split("\n};")[0],
   ];

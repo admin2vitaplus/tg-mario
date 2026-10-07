@@ -1,4 +1,5 @@
 import "./bombs-sim.js";
+import { MIN_QUIT_FRAMES } from "./tanks-replay.js";
 
 // Проверка результата «Бомбодрома» повтором: правила игры детерминированы (bombs-sim.js —
 // точная копия web/bombs/sim.js, это проверяет тест), поэтому сервер проигрывает записанные
@@ -13,12 +14,18 @@ const S = globalThis.BombSim;
 
 export const MAX_FRAMES = 60 * 60 * 60; // час игры
 export const MAX_LOG = 400_000; // символов
+export { MIN_QUIT_FRAMES };
 
 const inputOf = (code) => ({ dir: Math.floor(code / 4) - 1, a: (code & 2) > 0, b: (code & 1) > 0 });
 
 export { encode } from "./tanks-replay.js";
 
-// → { ok, why?, scores: [p0, p1?], stages, frames, phase }
+// Статистика игрока за игру для достижений (achievements.js): победы над врагами, лучший
+// взрыв (врагов за один кадр), найденные предметы, этапы без потери жизни, победа в дуэли.
+const newStats = () => ({ kills: 0, blast: 0, items: 0, clean: 0, deaths: 0, duelWin: false });
+
+// → { ok, why?, scores: [p0, p1?], stages, frames, phase, won, quit, stats: [p0, p1?] }
+// quit — игра не закончена (игрок вышел), но в неё играли не меньше MIN_QUIT_FRAMES.
 export function replay({ seed, players, log }) {
   const bad = (why) => ({ ok: false, why });
   if (!Number.isSafeInteger(seed) || seed <= 0) return bad("bad seed");
@@ -26,11 +33,15 @@ export function replay({ seed, players, log }) {
   if (typeof log !== "string" || !log.length || log.length > MAX_LOG) return bad("bad log");
   const maxCode = players === 1 ? 19 : 399;
   const s = S.newGame(players, seed);
+  const stats = s.players.map(newStats);
+  let stageDeaths = s.players.map(() => 0);
+  const kills = s.players.map(() => 0), lives = s.players.map(() => 0);
   let frames = 0;
   for (const part of log.split(",")) {
     if (part === "n") {
       if (s.phase !== "clearDone") return bad("next stage before clear");
       S.startStage(s, s.stage + 1);
+      stageDeaths = s.players.map(() => 0);
       continue;
     }
     const m = /^([0-9a-z]{1,2})(?:x([0-9a-z]{1,6}))?$/.exec(part);
@@ -43,12 +54,28 @@ export function replay({ seed, players, log }) {
     const inputs = players === 1 ? [inputOf(code)] : [inputOf(Math.floor(code / 20)), inputOf(code % 20)];
     for (let i = 0; i < n; i++) {
       if (s.phase === "clearDone" || s.phase === "overDone") return bad("steps after the end");
+      for (let k = 0; k < s.players.length; k++) { kills[k] = s.players[k].kills; lives[k] = s.players[k].lives; }
+      const item = s.item, taken = !!(item && item.taken), wins = s.players.map((p) => p.wins);
       S.step(s, inputs);
       s.events.length = 0;
+      for (let k = 0; k < s.players.length; k++) {
+        const p = s.players[k], st = stats[k];
+        const d = p.kills - kills[k];
+        if (d > 0) { st.kills += d; st.blast = Math.max(st.blast, d); }
+        if (p.lives < lives[k]) { st.deaths += lives[k] - p.lives; stageDeaths[k] += lives[k] - p.lives; }
+        // Вышел в дверь этапа и ни разу не погиб на нём.
+        if (p.wins > wins[k] && stageDeaths[k] === 0) st.clean++;
+      }
+      if (item && !taken && item.taken && stats[item.by]) stats[item.by].items++;
     }
   }
-  if (s.phase !== "overDone" && s.phase !== "clearDone") return bad("game not finished");
+  const finished = s.phase === "overDone" || s.phase === "clearDone";
+  if (!finished && frames < MIN_QUIT_FRAMES) return bad("game not finished");
+  // Дуэль выиграна, когда у соперника кончились жизни.
+  if (s.duel && (s.phase === "over" || s.phase === "overDone") && s.winner >= 0 && s.players[1 - s.winner].out) {
+    stats[s.winner].duelWin = true;
+  }
   // Пройденные этапы: текущий засчитывается, если из него вышли (или пройдена вся игра).
-  const stages = s.stage + (s.phase === "clearDone" || s.won ? 1 : 0);
-  return { ok: true, scores: s.players.map((p) => p.score), stages, frames, phase: s.phase };
+  const stages = s.stage + (s.phase === "clearDone" || s.phase === "clear" || s.won ? 1 : 0);
+  return { ok: true, scores: s.players.map((p) => p.score), stages, frames, phase: s.phase, won: !!s.won, quit: !finished, stats };
 }

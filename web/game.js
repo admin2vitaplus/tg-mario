@@ -42,7 +42,7 @@ const EN_NAMES = {
 const nameOf = (ru) => L(ru, EN_NAMES[ru] || ru);
 
 // Server scores and achievements (api.js). The stub keeps the game working without it.
-const api = window.GameAPI || { track() {}, levelDone() {}, runDone() { return Promise.resolve(null); }, newRun() {} };
+const api = window.GameAPI || { track() {}, levelDone() {}, runDone() { return Promise.resolve(null); }, newRun() {}, begin() {}, quit() { return Promise.resolve(null); } };
 
 function haptic(kind) {
   try {
@@ -2319,7 +2319,8 @@ class Play extends Phaser.Scene {
       ended = true;
       endRun = null;
       window.removeEventListener('pagehide', end);
-      api.runDone(this.s.score, this.s.cleared, !!completed).then((r) => {
+      // keepalive: the result is sent on leaving the page too.
+      return api.runDone(this.s.score, this.s.cleared, !!completed, true).then((r) => {
         if (!r || !showResult || shown !== overlayShown) return;
         const place = r.rank ? `<br>${L('Место в таблице', 'Place in the table')}: ${r.rank}` : '';
         $('ovText').innerHTML = `${scoreLine}<br>${r.newRecord ? L('Новый рекорд!', 'New best!') : `${L('Рекорд', 'Best')}: ${r.best}`}${place}`;
@@ -2329,7 +2330,7 @@ class Play extends Phaser.Scene {
     // goes on from the same place; otherwise a new game starts from 1-1.
     const offer = !completed && window.Wallet && window.Wallet.enabled && window.Wallet.lifeOffer(this.s.level);
     if (!offer) {
-      showOverlay(title, `${scoreLine}<br>${L('Рекорд', 'Best')}: ${best}`, L('Играть снова', 'Play again'), () => this.scene.restart({}));
+      showOverlay(title, `${scoreLine}<br>${L('Рекорд', 'Best')}: ${best}`, L('Играть снова', 'Play again'), () => { api.begin(); this.scene.restart({}); });
       shown = overlayShown;
       end(true);
       return;
@@ -2339,6 +2340,7 @@ class Play extends Phaser.Scene {
     showOverlay(title, `${scoreLine}<br>${L('Рекорд', 'Best')}: ${best}<br>${L('Ещё одна жизнь — и игра продолжится отсюда.', 'One more life and the game goes on from here.')}`,
       L('Начать заново с 1-1', 'Start over from 1-1'), () => {
         end(false);
+        api.begin();
         this.scene.restart({});
       });
     shown = overlayShown;
@@ -2485,16 +2487,29 @@ $('ovLooks').addEventListener('click', openLooks);
 
 // «Назад»: during a level it pauses the game; on the title, pause and
 // game-over screens it goes back to the list of games.
+// Leaving the game: a game over sends its result (endRun); a game in the middle sends what
+// was played so far (api.quit, after 20 s of play), waiting for it up to 1.5 s.
+function toMenu() {
+  const s = window.__scene && window.__scene.s;
+  const sent = endRun ? endRun() : s && started ? api.quit(s.score, s.cleared) : null;
+  if (!sent) { window.Back.toMenu(); return; }
+  Promise.race([sent, new Promise((r) => setTimeout(r, 1500))]).then(() => window.Back.toMenu());
+}
+window.addEventListener('pagehide', () => {
+  const s = window.__scene && window.__scene.s;
+  if (s && started && !endRun) api.quit(s.score, s.cleared);
+});
+
 function back() {
   const scene = window.__scene;
   const playing = started && $('overlay').classList.contains('hidden') && scene && !scene.scene.isPaused();
-  if (!playing) { if (endRun) endRun(); window.Back.toMenu(); return; }
+  if (!playing) { toMenu(); return; }
   scene.scene.pause();
   showOverlay(L('ПАУЗА', 'PAUSE'), L('Игра остановлена.', 'The game is paused.'), L('Продолжить', 'Continue'), () => scene.scene.resume());
 }
 if (window.Back) window.Back.attach(back);
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') back(); });
-$('ovMenu').addEventListener('click', () => { if (endRun) endRun(); window.Back.toMenu(); });
+$('ovMenu').addEventListener('click', toMenu);
 
 // «♥ Ещё жизнь» on the game over screen (see gameOver).
 {
@@ -2514,6 +2529,7 @@ $('ovBtn').addEventListener('click', () => {
   $('overlay').classList.add('hidden');
   if (!started) {
     started = true;
+    api.begin();
     game.scene.getScene('play').showIntro();
     return;
   }

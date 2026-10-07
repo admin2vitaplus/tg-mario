@@ -13,8 +13,9 @@
 //   Server.base            -> '' until known, then 'https://…'
 //   Server.ready           -> Promise<boolean>: true when a server answered
 //   Server.online          -> null while checking, then true / false
-//   Server.request(method, path, body) -> Promise<json>; times out; a GET is retried
-//                             once on a network error or a tunnel error page
+//   Server.request(method, path, body, { keepalive }) -> Promise<json>; times out; a GET is
+//                             retried once on a network error or a tunnel error page;
+//                             keepalive — the request outlives the page (a game sent on leaving)
 (() => {
 'use strict';
 
@@ -98,12 +99,16 @@ const RETRY = new Set([0, 502, 503, 504, 520, 521, 522, 523, 524, 530]);
 
 // JSON in and out with the player's Telegram signature. Rejects with an Error
 // whose .status is the HTTP status (0 for no answer) and .body the server's JSON.
-function request(method, path, body) {
+// Browsers take keepalive bodies up to 64 KB.
+const KEEPALIVE_MAX = 60000;
+function request(method, path, body, opts) {
   return api.ready.then((ok) => {
     if (!ok) throw Object.assign(new Error('offline'), { status: 0, offline: true });
     const headers = { 'Content-Type': 'application/json' };
     if (initData) headers.Authorization = 'tma ' + initData;
-    const once = () => fetchTimeout(api.base + path, { method, headers, body: body ? JSON.stringify(body) : undefined }, 10000)
+    const json = body ? JSON.stringify(body) : undefined;
+    const keepalive = !!(opts && opts.keepalive && json && json.length < KEEPALIVE_MAX);
+    const once = () => fetchTimeout(api.base + path, { method, headers, body: json, keepalive }, 10000)
       .then((r) => r.json().catch(() => null).then((j) => {
         if (r.ok && j) return j;
         if (r.ok && r.status === 204) return {};
