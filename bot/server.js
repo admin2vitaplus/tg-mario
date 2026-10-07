@@ -276,6 +276,16 @@ export function createApiServer({
   // Покупка за Telegram Stars: сервер создаёт счёт, игра открывает его (Telegram.WebApp.openInvoice),
   // а товар выдаёт бот, когда Telegram сообщит об оплате (successful_payment, wallet-bot.js).
   if (economy && createInvoice) {
+    // Telegram может отказать в счёте (сеть, лимиты, неверные данные): причина — в журнал бота,
+    // игре — понятный ответ 502 вместо безымянной «ошибки сервера».
+    const invoiceLink = async (item, user) => {
+      try {
+        return [200, { link: await createInvoice(item, user) }];
+      } catch (err) {
+        console.error(`Счёт в звёздах не создан (${item.id}): ${err.description || err.message}`);
+        return [502, { error: "invoice failed" }];
+      }
+    };
     routes["POST /api/wallet/invoice"] = async (body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
       if (typeof body.item !== "string") return [400, { error: "bad data" }];
@@ -283,8 +293,7 @@ export function createApiServer({
       if (!check.ok) return [check.error === "unknown item" ? 404 : 409, { error: check.error }];
       store.touchPlayer(user);
       economy.setLang(user.id, user.language_code);
-      const link = await createInvoice(check.item, user);
-      return [200, { link }];
+      return invoiceLink(check.item, user);
     };
     routes["POST /api/wallet/life-invoice"] = async (body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
@@ -292,8 +301,7 @@ export function createApiServer({
       if (!check.ok) return [check.error === "bad offer" ? 400 : 409, { error: check.error }];
       store.touchPlayer(user);
       economy.setLang(user.id, user.language_code);
-      const link = await createInvoice(check.item, user);
-      return [200, { link }];
+      return invoiceLink(check.item, user);
     };
   }
 

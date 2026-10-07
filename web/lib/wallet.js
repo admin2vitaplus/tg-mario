@@ -80,6 +80,7 @@ const STR = {
     paid_wait: 'Оплата прошла, товар появится через несколько секунд. Если нет — откройте игру заново.',
     not_enough: 'Не хватает жетонов: нужно {n}, есть {have}.',
     buy_failed: 'Не получилось купить. Проверьте связь и попробуйте ещё раз.',
+    pay_failed: 'Telegram не провёл оплату, звёзды не списаны. Попробуйте ещё раз; если повторится — напишите боту /paysupport.',
     toast: '+{n} {w}', days: '{n} д.', hours: '{n} ч', minutes: '{n} мин',
     task_play: 'сыграть игру', task_level: 'пройти уровень', invite_friend: 'друг доиграл', invite_from: 'по приглашению друга',
   },
@@ -134,6 +135,7 @@ const STR = {
     paid_wait: 'Paid. The item will appear in a few seconds; if not, open the game again.',
     not_enough: 'Not enough tickets: {n} needed, you have {have}.',
     buy_failed: 'Could not buy. Check the connection and try again.',
+    pay_failed: 'Telegram did not take the payment, no Stars were spent. Try again; if it repeats, send /paysupport to the bot.',
     toast: '+{n} {w}', days: '{n} d', hours: '{n} h', minutes: '{n} min',
     task_play: 'play a game', task_level: 'clear a level', invite_friend: 'your friend played', invite_from: 'invited by a friend',
   },
@@ -456,7 +458,7 @@ function render(body) {
         `${h.amount > 0 ? '+' : ''}${h.amount}</b></li>`;
     }).join('') + '</ul>';
   } else {
-    const items = info.shop.filter((it) => !scope || it.game === scope);
+    const items = info.shop.filter((it) => (scope ? it.game === scope : gameOn(it.game)));
     body.innerHTML = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` +
       note(scope ? T('shop_game') : T('shop_note')) +
       '<ul class="wShop">' + items.map((it) => {
@@ -573,6 +575,12 @@ function tell(text) {
   window.alert(text);
 }
 
+// Items of a game switched off in config.js (its id there is 'pryg-skok' for 'mario') are not sold.
+const gameOn = (game) => {
+  const c = window.CARTRIDGE;
+  return !c || typeof c.isEnabled !== 'function' || c.isEnabled(game === 'mario' ? 'pryg-skok' : game);
+};
+
 // Telegram Stars are paid inside Telegram only (6.1+ has openInvoice).
 const canStars = () => !!(tg && tg.openInvoice && tg.isVersionAtLeast && tg.isVersionAtLeast('6.1'));
 
@@ -610,12 +618,23 @@ function buyTokens(it) {
   });
 }
 
-// The server makes the invoice; the bot hands the item over once Telegram reports the
-// payment, so after «paid» the page waits for the item to show up.
+// The server makes the invoice; Telegram shows it. «paid» — the bot hands the item over once
+// Telegram reports the payment; «failed» — Telegram did not take the payment, so the player is
+// told (before, nothing happened and the purchase looked broken); «cancelled» — closed by the player.
+function openInvoice(link) {
+  return new Promise((resolve, reject) => {
+    try { tg.openInvoice(link, (status) => resolve(status)); } catch (e) { reject(Object.assign(e, { status: 0 })); }
+  });
+}
+function invoiceClosed(status) {
+  if (status === 'failed') tell(T('pay_failed'));
+  else if (status === 'pending') tell(T('paid_wait'));
+  return status === 'paid';
+}
 function buyStars(it) {
-  return request('POST', '/invoice', { item: it.id }).then((r) => new Promise((resolve) => {
-    tg.openInvoice(r.link, (status) => {
-      if (status !== 'paid') { resolve(false); return; }
+  return request('POST', '/invoice', { item: it.id }).then((r) => openInvoice(r.link)).then((status) => {
+    if (!invoiceClosed(status)) return false;
+    return new Promise((resolve) => {
       let tries = 0;
       const check = () => refresh(true).then(() => {
         if (owned.includes(it.id)) resolve(bought(it.id));
@@ -624,8 +643,12 @@ function buyStars(it) {
       }, () => (++tries < 8 ? setTimeout(check, 1500) : resolve(false)));
       check();
     });
-  }));
+  });
 }
+
+// What went wrong, with the server's answer: «HTTP 502: invoice failed» tells the owner where to look.
+const failed = (e) => tell(T('buy_failed') + (e && (e.status || e.message) ? ' (' +
+  (e.status ? 'HTTP ' + e.status + (e.body && e.body.error ? ': ' + e.body.error : '') : e.message) + ')' : ''));
 
 function buy(id, via) {
   if (!enabled) return Promise.resolve(false);
@@ -640,7 +663,7 @@ function buy(id, via) {
     });
   }).catch((e) => {
     if (e && e.status === 409) return refresh(true).then(() => owned.includes(id), () => false);
-    tell(T('buy_failed'));
+    failed(e);
     return false;
   });
 }
@@ -660,9 +683,7 @@ function buyLife(offer, level) {
     if (!o) return false;
     return choose(o, T('life_choose')).then((how) => {
       if (how === 'stars' && canStars()) {
-        return request('POST', '/life-invoice', { offer, level }).then((r) => new Promise((resolve) => {
-          tg.openInvoice(r.link, (status) => resolve(status === 'paid'));
-        }));
+        return request('POST', '/life-invoice', { offer, level }).then((r) => openInvoice(r.link)).then(invoiceClosed);
       }
       if (how !== 'tokens') return false;
       if (me.balance < o.price) { tell(T('not_enough', { n: o.price, have: me.balance })); return false; }
@@ -682,7 +703,7 @@ function buyLife(offer, level) {
       tell(T('not_enough', { n: (lifeOffer(level) || {}).price, have: e.body.balance }));
     } else if (e && e.status === 409 && e.body && e.body.error === 'already') {
       return true;
-    } else tell(T('buy_failed'));
+    } else failed(e);
     return false;
   });
 }
