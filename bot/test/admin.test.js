@@ -39,8 +39,8 @@ async function withPanel(fn, { authOpts = {}, enabled = true } = {}) {
   await new Promise((ok) => server.listen(0, ok));
   const base = `http://127.0.0.1:${server.address().port}`;
   let session = null;
-  const call = async (method, path, { user, body, origin, token } = {}) => {
-    const headers = { "Content-Type": "application/json" };
+  const call = async (method, path, { user, body, origin, token, headers: extra } = {}) => {
+    const headers = { "Content-Type": "application/json", ...extra };
     if (origin) headers.Origin = origin;
     if (user === OWNER) headers.Authorization = `Admin ${session ??= await loginToken()}`;
     else if (user) headers.Authorization = `tma ${initData(user)}`;
@@ -118,22 +118,38 @@ test("password hash: salted, checked, garbage rejected", () => {
   assert.equal(createAdminAuth({ login: "a", passwordHash: "plain" }).enabled, false);
 });
 
-test("serves the page from the server itself with a strict CSP", () =>
+test("serves the page in one request: inline code allowed only by hash, gzip and ETag", () =>
   withPanel(async ({ call }) => {
     const page = await call("GET", "/admin");
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-type"), /text\/html/);
-    assert.match(page.headers.get("content-security-policy"), /default-src 'self'.*frame-ancestors 'none'/);
-    assert.match(page.raw, /admin\/admin\.js/);
+    const csp = page.headers.get("content-security-policy");
+    assert.match(csp, /default-src 'self'.*frame-ancestors 'none'/);
+    assert.match(csp, /script-src 'sha256-[A-Za-z0-9+/=]+'/);
+    assert.doesNotMatch(csp, /unsafe-inline/);
+    // Стили и скрипт уже внутри страницы: отдельных запросов за ними нет.
+    assert.match(page.raw, /<style>[\s\S]*\.card[\s\S]*<\/style>/);
+    assert.match(page.raw, /<script>[\s\S]*api\/admin\/[\s\S]*<\/script>/);
+    assert.doesNotMatch(page.raw, /src="|href="/, "nothing to load separately");
     assert.doesNotMatch(page.raw, /https?:\/\//, "no outside hosts on the page");
-    for (const p of ["/admin/admin.js", "/admin/admin.css", "/admin/admin/admin.js"]) {
-      assert.equal((await call("GET", p)).status, 200, p);
+    assert.doesNotMatch(page.raw, /innerHTML/, "player names go in as text only");
+    // fetch сам распаковывает gzip; заголовок показывает, что страница пришла сжатой.
+    assert.equal(page.headers.get("content-encoding"), "gzip");
+    const etag = page.headers.get("etag");
+    assert.ok(etag);
+    const again = await call("GET", "/admin", { headers: { "If-None-Match": etag } });
+    assert.equal(again.status, 304);
+    for (const p of ["/admin/admin.js", "/admin/admin.css", "/admin/../db.js", "/admin/index.html"]) {
+      assert.equal((await call("GET", p)).status, 404, p);
     }
-    const js = (await call("GET", "/admin/admin.js")).raw;
-    assert.doesNotMatch(js, /https?:\/\//, "no outside hosts in the script");
-    assert.doesNotMatch(js, /innerHTML/, "player names go in as text only");
-    assert.equal((await call("GET", "/admin/../db.js")).status, 404);
-    assert.equal((await call("GET", "/admin/index.html")).status, 404);
+  }));
+
+test("panel API answers are gzipped, game API answers are not", () =>
+  withPanel(async ({ call }) => {
+    const o = await call("GET", "/api/admin/overview", { user: OWNER });
+    assert.equal(o.status, 200);
+    assert.equal(o.headers.get("content-encoding"), "gzip");
+    assert.equal((await call("GET", "/api/mario/top")).headers.get("content-encoding"), null);
   }));
 
 test("the panel's own origin works, other sites get no CORS", () =>

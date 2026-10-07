@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
 import { verifyInitData } from "./auth.js";
 import { ACHIEVEMENTS, publicList } from "./achievements.js";
 import { createRateLimiter } from "./ratelimit.js";
@@ -18,10 +19,16 @@ const int = (v, max) => {
   return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
 };
 
-function send(res, status, body) {
+function send(res, status, body, gzip = false) {
   if (body == null) return res.writeHead(status).end();
+  const json = JSON.stringify(body);
+  // Ответы панели (сводка, списки) через туннель уходят сжатыми; игре это не нужно — у неё ответы маленькие.
+  if (gzip && json.length > 1024) {
+    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Content-Encoding": "gzip", Vary: "Accept-Encoding" });
+    return res.end(gzipSync(json));
+  }
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(JSON.stringify(body));
+  res.end(json);
 }
 
 export const MAX_BODY = 4096;
@@ -380,10 +387,10 @@ export function createApiServer({
     }
     if (req.method === "OPTIONS") return res.writeHead(204).end();
 
-    const page = own && req.method === "GET" ? adminPage(path) : null;
+    const page = own && req.method === "GET" ? adminPage(path, req) : null;
     if (page) {
-      res.writeHead(200, page.headers);
-      return res.end(page.body);
+      res.writeHead(page.status, page.headers);
+      return res.end(page.body ?? undefined);
     }
     const handler = routes[`${req.method} ${path}`];
     if (!handler) return send(res, 404, { error: "not found" });
@@ -401,7 +408,7 @@ export function createApiServer({
         return send(res, 429, { error: "too many requests" });
       }
       const [status, out] = await handler(body, user, url, { req, ip });
-      send(res, status, out);
+      send(res, status, out, own && /\bgzip\b/.test(req.headers["accept-encoding"] || ""));
     } catch (err) {
       if (err instanceof HttpError) {
         if (err.status === 413) res.setHeader("Connection", "close");

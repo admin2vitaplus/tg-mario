@@ -66,7 +66,13 @@
   // ---------- Сессия ----------
   var token = '';
   try { token = sessionStorage.getItem('admin-token') || ''; } catch (e) { /* без хранилища — до перезагрузки */ }
-  function setToken(t) { token = t; try { if (t) sessionStorage.setItem('admin-token', t); else sessionStorage.removeItem('admin-token'); } catch (e) { /* ничего */ } }
+  function setToken(t) {
+    token = t;
+    try {
+      if (t) sessionStorage.setItem('admin-token', t);
+      else { sessionStorage.removeItem('admin-token'); sessionStorage.removeItem('admin-overview'); }
+    } catch (e) { /* ничего */ }
+  }
   var lang = /^(ru|uk|be|kk)/i.test(navigator.language || 'ru') ? 'ru' : 'en';
   document.documentElement.lang = lang;
   function T(key, vars) {
@@ -171,8 +177,16 @@
     tabs();
     if (tab === 'players') return players('');
     if (overview && !force) return render();
-    main.replaceChildren(note(T('loading')));
-    api('GET', 'overview').then(function (o) { overview = o; render(); }).catch(fail);
+    // Пока свежая сводка идёт через туннель, показываем прошлую из этой вкладки (если есть).
+    var saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem('admin-overview') || 'null'); } catch (e) { saved = null; }
+    if (saved && !overview) { overview = saved; render(); } else if (!overview) main.replaceChildren(note(T('loading')));
+    api('GET', 'overview').then(function (o) {
+      overview = o;
+      try { sessionStorage.setItem('admin-overview', JSON.stringify(o)); } catch (e) { /* без хранилища */ }
+      out.hidden = false;
+      if (current !== 'players') render();
+    }).catch(fail);
   }
   function render() {
     var view = { overview: viewOverview, economy: viewEconomy, stars: viewStars, server: viewServer }[current];
@@ -356,7 +370,11 @@
 
   // ---------- Старт ----------
   var out = h('button', { type: 'button', class: 'ghost', hidden: '', on: { click: function () {
-    api('POST', 'logout', {}).catch(function () {}).then(function () { setToken(''); overview = null; loginForm(''); });
+    api('POST', 'logout', {}).catch(function () {}).then(function () {
+      setToken(''); overview = null;
+      try { sessionStorage.removeItem('admin-overview'); } catch (e) { /* ничего */ }
+      loginForm('');
+    });
   } } }, T('sign_out'));
   document.querySelector('.top').insertBefore(out, document.getElementById('reload'));
   function start() {
@@ -364,7 +382,8 @@
       return api('GET', 'status').then(function (r) { loginForm(r.enabled ? '' : T('disabled')); })
         .catch(function () { loginForm(''); });
     }
-    api('GET', 'me').then(function () { out.hidden = false; show('overview', true); }).catch(fail);
+    // Сразу сводка: без отдельной проверки входа (лишний запрос через туннель); 401 вернёт к форме входа.
+    show('overview', true);
   }
   document.getElementById('title').textContent = T('title');
   document.title = T('title').replace('◆ ', '');
