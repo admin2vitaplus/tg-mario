@@ -31,6 +31,14 @@ const config = {
       start: 'tanks',
     },
     {
+      id: 'bombs',
+      title: 'БОМБОДРОМ',
+      enabled: true,
+      // Its own page like tanks: alone, or an online duel through the same server (/ws/bombs).
+      url: 'bombs/',
+      start: 'bombs',
+    },
+    {
       id: 'word',
       title: 'СЛОВО ДНЯ',
       // Hidden 2026-10-06 (owner): the collection is classic cartridge games.

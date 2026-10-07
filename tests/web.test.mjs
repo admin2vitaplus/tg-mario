@@ -99,7 +99,7 @@ function fakePage() {
 function runMenu(patch, search = '') {
   const cfg = loadConfig(patch);
   const page = fakePage();
-  const ctx = { window: { CARTRIDGE: cfg }, document: page.document, location: { search }, URLSearchParams };
+  const ctx = { window: { CARTRIDGE: cfg }, document: page.document, location: { search, hash: '', replace(u) { this.href = u; } }, URLSearchParams };
   vm.runInNewContext(read(path.join(WEB, 'menu.js')), ctx);
   const text = (el) => [el.textContent, ...el.children.map(text)].filter(Boolean).join(' ');
   return { lines: page.byId.menuList.children.map(text), location: ctx.location };
@@ -114,6 +114,16 @@ test('a launch link to a game opens it', () => {
   assert.equal(r.location.href, undefined, 'a switched-off game is not opened');
   r = runMenu(null, '?tgWebAppStartParam=src_promo');
   assert.equal(r.location.href, undefined);
+});
+
+// An invite to a duel room goes straight to that game's page with the room code.
+test('room invites open the right game', () => {
+  let r = runMenu(null, '?tgWebAppStartParam=bomb_123456__abc-def');
+  assert.match(r.location.href || '', /^bombs\/\?.*room=123456/);
+  r = runMenu(null, '?tgWebAppStartParam=room_654321');
+  assert.match(r.location.href || '', /^tanks\/\?.*room=654321/);
+  r = runMenu((c) => { c.game('bombs').enabled = false; }, '?tgWebAppStartParam=bomb_123456');
+  assert.equal(r.location.href, undefined, 'a switched-off game is not opened');
 });
 
 test('every game in the config has what the menu needs', () => {
@@ -155,7 +165,7 @@ test('old links to a switched-off game land on the menu', () => {
   }
 });
 
-for (const id of ['pryg-skok', 'tanks', 'word']) {
+for (const id of ['pryg-skok', 'tanks', 'bombs', 'word']) {
   test(`switching off ${id} removes it from the menu and breaks nothing`, () => {
     const cfg = loadConfig();
     const title = cfg.game(id).title;
@@ -176,6 +186,7 @@ test('no separate records button: tables live in the tickets panels', () => {
   assert.ok(!read(path.join(WEB, 'index.html')).includes('Рекорды'));
   assert.match(read(path.join(WEB, 'tanks/index.html')), /data-wallet-game="tanks"/);
   assert.match(read(path.join(WEB, 'word/index.html')), /data-wallet-game="word"/);
+  assert.match(read(path.join(WEB, 'bombs/index.html')), /data-wallet-game="bombs"/);
   assert.match(read(path.join(WEB, 'api.js')), /walletGame = 'mario'/);
 });
 

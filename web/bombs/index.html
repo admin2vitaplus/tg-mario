@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>Бомбодром</title>
+  <link rel="stylesheet" href="../lib/ui.css">
+  <link rel="stylesheet" href="bombs.css">
+  <link rel="stylesheet" href="../lib/looks.css">
+  <link rel="stylesheet" href="../lib/wallet.css">
+  <script src="../lib/telegram-web-app.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="hud">
+      <div><span id="hudFirst" data-t="hud_score">СЧЁТ</span><br><span id="score">000000</span></div>
+      <div><span data-t="hud_lives">ЖИЗНИ</span><br><span id="lives">3</span></div>
+      <div><span data-t="hud_time">ВРЕМЯ</span><br><span id="time">200</span></div>
+      <div><span data-t="hud_stage">ЭТАП</span><br><span id="stage">1</span></div>
+    </div>
+    <div id="game">
+      <canvas id="screen" width="240" height="208"></canvas>
+      <div id="banner" class="hidden"></div>
+    </div>
+    <div id="controls">
+      <div id="dpad">
+        <div class="btn up">▲</div>
+        <div class="btn left">◀</div>
+        <div class="btn right">▶</div>
+        <div class="btn down">▼</div>
+      </div>
+      <div id="actions">
+        <div class="btn round bb" id="btnB">B</div>
+        <div class="btn round ab" id="btnA">A</div>
+      </div>
+    </div>
+    <div id="overlay">
+      <h1 id="ovTitle">БОМБОДРОМ</h1>
+      <p id="ovText">Взрывай блоки, найди дверь и уходи на следующий этап.</p>
+      <div id="menu" class="ui-stack">
+        <button id="btn1p" class="ui-btn primary" data-t="menu_1p">1 игрок</button>
+        <button id="btnOnline" class="ui-btn" data-t="menu_online">Дуэль онлайн</button>
+        <button id="btnWallet" class="ui-btn teal wGameBtn" data-wallet-game="bombs">◆ Жетоны</button>
+        <button id="btnLook" class="ui-btn" data-t="menu_look">🎨 Внешний вид</button>
+      </div>
+      <div id="online" class="ui-stack hidden">
+        <div id="onlineStart">
+          <button id="btnCreate" class="ui-btn primary" data-t="btn_create">Создать комнату</button>
+          <div class="join">
+            <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="код" data-tp="code_placeholder" autocomplete="off">
+            <button id="btnJoin" class="ui-btn" data-t="btn_join">Войти</button>
+          </div>
+        </div>
+        <button id="btnInvite" class="ui-btn primary hidden" data-t="btn_invite">Позвать друга в Telegram</button>
+        <button id="btnCancel" class="ui-btn ghost" data-t="btn_back">Назад</button>
+      </div>
+      <div class="ui-stack" id="ovActs">
+        <button id="ovBtn" class="ui-btn primary hidden">Дальше</button>
+        <button id="ovShare" class="ui-btn hidden">Поделиться итогом</button>
+        <button id="ovMenu" class="ui-btn ghost hidden" data-t="btn_all_games">← Все игры</button>
+      </div>
+      <p class="hint" id="ovHint" data-th="hint">Крестовина — идти, A — бомба, B — взорвать (с пультом).</p>
+      <a id="back" class="ui-btn ghost" href="../" data-t="back">← Все игры</a>
+    </div>
+  </div>
+  <script src="../config.js"></script>
+  <script src="../sw-register.js"></script>
+  <script src="../lib/server.js"></script>
+  <script src="../lib/wallet.js"></script>
+  <script src="../lib/looks.js"></script>
+  <script src="../lib/events.js"></script>
+  <script src="../lib/back.js"></script>
+  <script src="strings.js"></script>
+  <script src="sim.js"></script>
+  <script src="bombs.js"></script>
+</body>
+</html>

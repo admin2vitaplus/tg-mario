@@ -1,27 +1,31 @@
 import { randomInt } from "node:crypto";
-import { replay } from "./tanks-replay.js";
+import { replay as tanksReplay } from "./tanks-replay.js";
 
-// Итоги «Танкодрома», которые сервер проверил сам (ТЗ P0-4):
+// Итоги игр, которые сервер проверил сам повтором записи («Танкодром», «Бомбодром»; ТЗ P0-4):
 //  1. перед игрой игра берёт у сервера зерно (билет) — подобрать удобную раскладку нельзя;
 //  2. после игры присылает запись нажатий; сервер проигрывает её (tanks-replay.js) и сам
 //     считает очки; игра не может закончиться быстрее, чем прошло реального времени с выдачи билета;
 //  3. онлайн-матч присылает хозяин: очки гостя засчитываются гостю, если сервер видел его в комнате.
+// У каждой игры свои таблицы билетов и игр (tickets, runs) и свой повтор (replay).
 
 export const TICKET_TTL_MS = 6 * 3600_000;
 const OPEN_TICKETS = 5; // неиспользованных билетов на игрока
 const REAL_TIME_SHARE = 0.9; // запас на неточность таймера
 
-export function createTanksResults(store, { now = Date.now, members = () => null } = {}) {
+export const createTanksResults = (store, opts = {}) =>
+  createReplayResults(store, { ...opts, tickets: "tanks_tickets", runs: "tanks_runs", replay: tanksReplay });
+
+export function createReplayResults(store, { now = Date.now, members = () => null, tickets, runs, replay }) {
   const { db } = store;
   const q = {
-    ticket: db.prepare("SELECT * FROM tanks_tickets WHERE seed = ?"),
-    open: db.prepare("SELECT COUNT(*) AS n FROM tanks_tickets WHERE player_id = ? AND used_at IS NULL AND issued_at > ?"),
-    addTicket: db.prepare("INSERT OR IGNORE INTO tanks_tickets (seed, player_id, issued_at) VALUES (?, ?, ?)"),
-    use: db.prepare("UPDATE tanks_tickets SET used_at = ? WHERE seed = ? AND used_at IS NULL"),
-    best: db.prepare("SELECT COALESCE(MAX(score), 0) AS best FROM tanks_runs WHERE player_id = ?"),
-    addRun: db.prepare(`INSERT OR IGNORE INTO tanks_runs (player_id, seed, score, stages, frames, players, created_at)
+    ticket: db.prepare(`SELECT * FROM ${tickets} WHERE seed = ?`),
+    open: db.prepare(`SELECT COUNT(*) AS n FROM ${tickets} WHERE player_id = ? AND used_at IS NULL AND issued_at > ?`),
+    addTicket: db.prepare(`INSERT OR IGNORE INTO ${tickets} (seed, player_id, issued_at) VALUES (?, ?, ?)`),
+    use: db.prepare(`UPDATE ${tickets} SET used_at = ? WHERE seed = ? AND used_at IS NULL`),
+    best: db.prepare(`SELECT COALESCE(MAX(score), 0) AS best FROM ${runs} WHERE player_id = ?`),
+    addRun: db.prepare(`INSERT OR IGNORE INTO ${runs} (player_id, seed, score, stages, frames, players, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)`),
-    prune: db.prepare("DELETE FROM tanks_tickets WHERE used_at IS NULL AND issued_at < ?"),
+    prune: db.prepare(`DELETE FROM ${tickets} WHERE used_at IS NULL AND issued_at < ?`),
   };
 
   return {
