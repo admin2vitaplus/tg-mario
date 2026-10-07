@@ -16,6 +16,11 @@ export const GAME_LINKS = [
     en: { title: "Tank Field", about: "Tanks for two: guard the base", text: "Let's play «Tank Field»: a tank duel for two right in Telegram." },
   },
   {
+    start: "bombs", icon: "💣",
+    ru: { title: "Бомбодром", about: "Бомбы: найди дверь первым", text: "Сыграем в «Бомбодром»? Взрывай блоки и найди дверь раньше меня." },
+    en: { title: "Bomb Field", about: "Bombs: find the door first", text: "Let's play «Bomb Field»: blow up the blocks and find the door before me." },
+  },
+  {
     start: "mario", icon: "🏃",
     ru: { title: "Прыг-Скок", about: "Платформер: добеги до флага", text: "Сыграем в «Прыг-Скок»? Платформер прямо в Telegram — кто наберёт больше?" },
     en: { title: "Hop-Skip", about: "Platformer: run to the flag", text: "Let's play «Hop-Skip»: a platformer right in Telegram. Who scores more?" },

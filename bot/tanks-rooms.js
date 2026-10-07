@@ -19,6 +19,8 @@ import { verifyInitData } from "./auth.js";
 //   в это время, получает { t: "joined" } и сразу { t: "wait" }.
 //   Ошибки — { t: "error", code, msg }: code для перевода в игре, msg — текст по-русски.
 //
+// Те же комнаты служат дуэли «Бомбодрома» на своём пути (path: "/ws/bombs", см. app.js).
+//
 // Подключение: wss://<сервер>/ws/tanks?auth=<initData> (initData необязателен,
 // с ним лимит соединений считается на игрока Telegram, без него — на адрес).
 
@@ -40,7 +42,7 @@ export const LIMITS = {
   pingMs: 25_000, // как часто проверять, живо ли соединение
 };
 
-export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = "", limits = {} } = {}) {
+export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = "", limits = {}, path = PATH } = {}) {
   const L = { ...LIMITS, ...limits };
   const wss = new WebSocketServer({ noServer: true, maxPayload: L.maxMessage });
   const rooms = new Map(); // code -> { code, seats: [{ ws, token }, { ws, token } | null], created, gone }
@@ -66,7 +68,7 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
 
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname.replace(/\/+$/, "") !== PATH) return; // другие пути не наши
+    if (url.pathname.replace(/\/+$/, "") !== path) return; // другие пути не наши
     const origin = req.headers.origin;
     if (origin && !allowedOrigins.includes("*") && !allowedOrigins.includes(origin)) return reject(socket, 403, "Forbidden");
     const ip = clientIp(req);

@@ -157,6 +157,7 @@ export function createAdmin({
       lastActive: one("SELECT MAX(at) AS at FROM events WHERE user_id = ?").at,
       mario: { games: p?.games ?? 0, best: p?.best_score ?? 0, rank: store.rank(p), achievements: store.earned(pid).length },
       tanks: one("SELECT COUNT(*) AS games, COALESCE(MAX(score), 0) AS best FROM tanks_runs WHERE player_id = ?"),
+      bombs: one("SELECT COUNT(*) AS games, COALESCE(MAX(score), 0) AS best FROM bombs_runs WHERE player_id = ?"),
       word: one("SELECT COUNT(*) AS games, COALESCE(SUM(score), 0) AS score FROM word_plays WHERE player_id = ? AND state != 'play'"),
       invited: one("SELECT COUNT(*) AS n FROM users_seen WHERE inviter = ?").n,
       wallet: w ? { balance: w.balance, flagged: w.flagged, flaggedAt: w.flagged_at, streak: w.streak, notify: !!w.notify, lang: w.lang } : null,

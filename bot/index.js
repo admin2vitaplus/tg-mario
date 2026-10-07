@@ -106,11 +106,13 @@ const withBot = (url) => {
 const gameUrl = withBot(withApi(baseGameUrl));
 
 // Приглашение в «Танкодром»: t.me/<бот>?start=room_123456 (и старое tanks_) открывает комнату 123456.
-const tanksRoomUrl = (code) => {
-  const u = new URL(withBot(withApi(new URL("tanks/", baseGameUrl).toString())));
+// Дуэль «Бомбодрома»: t.me/<бот>?start=bomb_123456.
+const roomUrl = (page, code) => {
+  const u = new URL(withBot(withApi(new URL(page, baseGameUrl).toString())));
   u.searchParams.set("room", code);
   return u.toString();
 };
+const tanksRoomUrl = (code) => roomUrl("tanks/", code);
 
 // ---------- Бот ----------
 const playKeyboard = () => new InlineKeyboard().webApp("🎮 Играть", gameUrl);
@@ -130,6 +132,12 @@ bot.command("start", (ctx) => {
     return ctx.reply(text, { reply_markup });
   }
   if (ctx.from) tracker.arrive(ctx.from.id, ctx.match);
+  const duel = /^bomb_(\d{4,6})$/.exec(ctx.match || "");
+  if (duel) {
+    return ctx.reply(`Тебя позвали на дуэль в «Бомбодром», комната ${duel[1]}.`, {
+      reply_markup: new InlineKeyboard().webApp("💣 В бой", roomUrl("bombs/", duel[1])),
+    });
+  }
   const room = /^(?:tanks|room)_(\d{4,6})$/.exec(ctx.match || "");
   if (room) {
     return ctx.reply(`Тебя позвали в «Танкодром», комната ${room[1]}.`, {
