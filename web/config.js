@@ -29,6 +29,8 @@ const config = {
       // A game with its own page, relative to the menu.
       url: 'tanks/',
       start: 'tanks',
+      // The page's files, fetched ahead by the menu (menu.js prefetch) so the game opens fast.
+      preload: ['tanks/tanks.css', 'tanks/strings.js', 'tanks/sim.js', 'tanks/tanks.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js'],
     },
     {
       id: 'bombs',
@@ -37,6 +39,7 @@ const config = {
       // Its own page like tanks: alone, or an online duel through the same server (/ws/bombs).
       url: 'bombs/',
       start: 'bombs',
+      preload: ['bombs/bombs.css', 'bombs/strings.js', 'bombs/sim.js', 'bombs/bombs.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js'],
     },
     {
       id: 'word',
