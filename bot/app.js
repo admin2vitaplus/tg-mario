@@ -62,7 +62,7 @@ export async function startApp({
     live: () => (tanks ? { rooms: tanks.rooms.size + (bombs?.rooms.size ?? 0), sockets: tanks.wss.clients.size + (bombs?.wss.clients.size ?? 0) } : null),
   });
   const server = createApiServer({
-    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, bombs: bombsResults, createInvoice, word, admin: auth.enabled ? admin : null,
+    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, bombs: bombsResults, createInvoice, word, admin,
   });
   tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
   // Дуэль «Бомбодрома» — такие же комнаты на своём пути.
@@ -91,5 +91,8 @@ export async function startApp({
     store.close();
   })();
 
-  return { server, store, tanks, bombs, tracker, economy, word, commit, gameUrl, allowedOrigins, port: server.address().port, close };
+  return {
+    server, store, tanks, bombs, tracker, economy, word, commit, gameUrl, allowedOrigins, port: server.address().port, close,
+    adminEnabled: auth.enabled,
+  };
 }
