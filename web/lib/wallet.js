@@ -17,7 +17,7 @@
 //   Wallet.button(el, game)   -> turns a button into «◆ balance», opening the game's panel
 //
 // The collection's tasks (a visit a day, friends) and each game's own tasks (play, clear
-// a level, beat your best; Hop-Skip's achievements once) are crossed off when done; the
+// a level, beat your best; each game's achievements once) are crossed off when done; the
 // daily ones open again at 00:00 UTC.
 (() => {
 'use strict';
@@ -35,7 +35,7 @@ const STR = {
     game_mario: 'Прыг-Скок', game_tanks: 'Танкодром', game_bombs: 'Бомбодром', game_word: 'Слово дня',
     sec_day: 'Каждый день · обновятся через {left} (00:00 UTC)',
     sec_week: 'Каждую неделю · новая неделя через {left}',
-    sec_once: 'Достижения · один раз',
+    sec_once: 'Достижения · один раз', achieved: 'Достижение',
     t_login: 'Зайти в сборник сегодня',
     t_login_note: 'Дней подряд: {streak}. Каждый следующий день +{step}, до {max}.',
     t_invite: 'Позвать друга: {count} из {max} за неделю',
@@ -89,7 +89,7 @@ const STR = {
     game_mario: 'Hop-Skip', game_tanks: 'Tank Field', game_bombs: 'Bomb Field', game_word: 'Word of the Day',
     sec_day: 'Every day · new ones in {left} (00:00 UTC)',
     sec_week: 'Every week · new week in {left}',
-    sec_once: 'Achievements · once',
+    sec_once: 'Achievements · once', achieved: 'Achievement',
     t_login: 'Open the collection today',
     t_login_note: 'Days in a row: {streak}. Each next day +{step}, up to {max}.',
     t_invite: 'Invite a friend: {count} of {max} this week',
@@ -307,6 +307,24 @@ function grants(w) {
   }, i * 900));
 }
 
+// New achievements of a game (the server sends them with its result).
+function achieved(list) {
+  if (!Array.isArray(list) || !list.length) return;
+  let box = document.getElementById('walletToasts');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'walletToasts';
+    document.body.append(box);
+  }
+  list.forEach((a, i) => setTimeout(() => {
+    const el = document.createElement('div');
+    el.className = 'walletToast';
+    el.textContent = (a.icon || '★') + ' ' + T('achieved') + ': ' + achTitle(a);
+    box.append(el);
+    setTimeout(() => el.remove(), 3500);
+  }, i * 1200));
+}
+
 // ---------- Panel ----------
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const itemName = (id) => {
@@ -424,7 +442,7 @@ function render(body) {
         if (h.reason === 'task' && STR.ru['task_' + task]) what += ' · ' + T('task_' + task);
       }
       if (h.reason === 'achievement') {
-        const a = me.tasks && me.tasks.mario && me.tasks.mario.find((t) => t.id === 'ach:' + task);
+        const a = me.tasks && me.tasks[g] && me.tasks[g].find((t) => t.id === 'ach:' + task);
         if (a) what += ': ' + achTitle(a);
       }
       if (h.reason === 'invite' && STR.ru['invite_' + g]) what += ': ' + T('invite_' + g);
@@ -705,6 +723,7 @@ window.Wallet = {
   lifeOffer,
   buyLife,
   grants,
+  achieved,
   open,
   refresh,
 };

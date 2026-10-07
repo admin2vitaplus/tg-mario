@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { verifyInitData } from "./auth.js";
-import { ACHIEVEMENTS, publicList } from "./achievements.js";
+import { BY_GAME, GAME_OF, byCode, publicList, publicOf } from "./achievements.js";
 import { createRateLimiter } from "./ratelimit.js";
 import { checkLevel, checkRun, currentGame, LAST_LEVEL, PER_WORLD, SEQUENCE_TTL_MS, WORLD_TIMES } from "./plausibility.js";
 import { CLIENT_EVENTS, GAMES } from "./stats.js";
@@ -90,15 +90,18 @@ export function createApiServer({
   // Отчёты об уровнях текущей игры: после последнего итога игры (plausibility.js, currentGame).
   const sequence = (id) => currentGame(store.levelsSince(id, Math.max(store.lastRunAt(id), now() - SEQUENCE_TTL_MS)));
 
-  const newAchievements = (playerId, event, grants = []) => {
-    const player = store.getPlayer(playerId);
+  // Новые достижения игры (game — mario, tanks, bombs) по проверенному итогу event; totals —
+  // статистика игрока за все игры (у «Прыг-Скока» — его строка players).
+  const newAchievements = (playerId, event, grants = [], game = "mario", totals = null) => {
+    const stats = totals ?? store.getPlayer(playerId);
     const won = [];
-    for (const a of ACHIEVEMENTS) {
-      if (a.check(event, player) && store.earn(playerId, a.code)) won.push(a);
+    if (!store.getPlayer(playerId)) return won; // достижения хранятся у известных игроков (players)
+    for (const a of BY_GAME[game] || []) {
+      if (a.check(event, stats) && store.earn(playerId, a.code)) won.push(a);
     }
-    const out = won.map(({ code, icon, title, text, titleEn, textEn }) => ({ code, icon, title, text, titleEn, textEn }));
+    const out = won.map(publicOf);
     if (out.length && onAchievements) onAchievements(playerId, out);
-    if (out.length && economy) economy.achievements(playerId, out, grants);
+    if (out.length && economy) economy.achievements(playerId, out, grants, game);
     return out;
   };
 
@@ -196,13 +199,26 @@ export function createApiServer({
     routes["GET /api/wallet/info"] = () => [200, publicRules(economy.cfg)];
     const walletMe = (id) => {
       const me = economy.me(id);
-      // Достижения «Прыг-Скока» — разовые задания этой игры.
-      const got = economy.achievementsDone(id);
-      me.tasks.mario.push(...publicList().map((a) => ({
-        id: `ach:${a.code}`, period: "once", amount: economy.cfg.achievement, done: got.has(a.code),
-        icon: a.icon, title: a.title, text: a.text, titleEn: a.titleEn, textEn: a.textEn,
-      })));
+      // Достижения каждой игры — её разовые задания. Выполнено — то, что игрок получил
+      // (таблица achievements), даже если жетоны за него ещё не начислены.
+      const got = new Set(store.earned(id).map((a) => a.code));
+      for (const game of Object.keys(BY_GAME)) {
+        me.tasks[game]?.push(...publicList(game).map((a) => ({
+          id: `ach:${a.code}`, period: "once", amount: economy.cfg.achievement, done: got.has(a.code), ...a,
+        })));
+      }
       return me;
+    };
+    // Достижения, полученные без жетонов (раньше их съедал дневной потолок), начисляются теперь.
+    const payEarned = (id, grants) => {
+      const paid = economy.achievementsDone(id);
+      const owed = {};
+      for (const { code } of store.earned(id)) {
+        const game = GAME_OF.get(code);
+        if (game && !paid.has(code)) (owed[game] ??= []).push(byCode.get(code));
+      }
+      for (const [game, list] of Object.entries(owed)) economy.achievements(id, list, grants, game);
+      return grants;
     };
     routes["GET /api/wallet/me"] = (_body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
@@ -217,6 +233,7 @@ export function createApiServer({
       economy.setLang(user.id, user.language_code);
       const grants = economy.checkin(user.id);
       economy.inviteCheck(user.id, grants);
+      payEarned(user.id, grants);
       // Вместе с начислением — всё, что показывает панель жетонов: странице не нужен второй запрос /me.
       const me = walletMe(user.id);
       return [200, { grants, balance: me.balance, me }];
@@ -301,15 +318,18 @@ export function createApiServer({
       }
       const grants = [];
       let mine = null;
+      let won = [];
       for (const res of r.results) {
         const out = res.playerId === user.id ? grants : [];
         economy?.run(res.playerId, { newRecord: res.newRecord, game, levels: res.stages }, out);
+        const e = { type: "run", ...res.stats, ...r.replay, score: res.score, stages: res.stages };
+        const got = newAchievements(res.playerId, e, out, game, results.totals(res.playerId));
         tracker?.event(res.playerId, "game_finish", game);
-        if (res.playerId === user.id) mine = res;
+        if (res.playerId === user.id) { mine = res; won = got; }
       }
       economy?.setLang(user.id, user.language_code);
       return [200, { score: mine?.score ?? 0, best: mine?.best ?? results.best(user.id), newRecord: !!mine?.newRecord,
-        ...walletBody(user.id, grants) }];
+        newAchievements: won, ...walletBody(user.id, grants) }];
     };
   }
 

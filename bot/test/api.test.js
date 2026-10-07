@@ -76,7 +76,7 @@ test("records levels and runs, awards achievements once, ranks players", () =>
     let r = await call("POST", "/api/mario/level", { user: alice, body: { level: 0, score: 3000, timeLeft: 250, deaths: 0 } });
     assert.equal(r.status, 200);
     assert.equal(r.cors, "https://game.example");
-    assert.deepEqual(r.json.newAchievements.map((a) => a.code).sort(), ["first_level", "no_death_level", "speedrun"]);
+    assert.deepEqual(r.json.newAchievements.map((a) => a.code).sort(), ["first_level", "lightning", "no_death_level", "speedrun"]);
     wait(90);
 
     // Новая игра с начала: те же достижения второй раз не выдаются.
@@ -92,10 +92,11 @@ test("records levels and runs, awards achievements once, ranks players", () =>
     assert.equal(r.json.rank, 1);
     assert.equal(r.json.newRecord, true);
     assert.deepEqual(r.json.newAchievements.map((a) => a.code).sort(),
-      ["boss_fire", "coins_run_50", "no_death_world", "score_50k"]);
+      ["all_worlds", "boss_fire", "coins_run_50", "levels_run_8", "no_death_world", "score_50k"]);
     assert.deepEqual(notified.flatMap(([, list]) => list.map((a) => a.code)).sort(), [
-      "boss_fire", "coins_run_50", "first_level", "no_death_level", "no_death_world",
-      "score_50k", "speedrun", "treetops", "underground", "world_clear",
+      "all_worlds", "boss_fire", "castle_clean", "coins_run_50", "first_level", "levels_run_8", "lightning",
+      "no_death_level", "no_death_world", "score_50k", "speedrun", "treetops", "underground",
+      "world2_clear", "world3_clear", "world_clear",
     ]);
 
     await playLevels(call, wait, bob, [[20000, 300], [45000, 300]]);
@@ -111,7 +112,7 @@ test("records levels and runs, awards achievements once, ranks players", () =>
 
     const me = await call("GET", "/api/mario/me", { user: alice });
     assert.equal(me.json.games, 2);
-    assert.equal(me.json.achievements.length, 10);
+    assert.equal(me.json.achievements.length, 16);
   }));
 
 test("rejects out-of-range or inconsistent results", () =>

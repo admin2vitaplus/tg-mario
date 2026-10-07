@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { ACHIEVEMENTS_TOTAL } from "./achievements.js";
 
 // Жетоны (ТЗ P1-7): игровая валюта, которую начисляет только сервер и только за результаты,
 // которые он сам проверил (P0-4): уровни и итоги «Прыг-Скока» (проверка правдоподобия), игры
@@ -31,8 +32,12 @@ export function seasonLabel(season) {
 // daily — вход в сборник за день (с серией дней), task — ежедневное задание в игре,
 // admin — ручное начисление или списание владельцем из панели (admin.js).
 export const REASONS = ["achievement", "record", "daily", "task", "invite", "prize", "shop", "annul", "admin"];
-// Начисления с дневным потолком на игрока. Призы недели ограничены своим фондом.
-const CAPPED = ["achievement", "record", "daily", "task", "invite"];
+// Начисления с дневным потолком на игрока. Призы недели ограничены своим фондом, достижения —
+// своим числом (каждое один раз навсегда), поэтому потолок их не режет и не занимает: раньше
+// пачка достижений за день выбирала потолок, и задания других игр в тот день не засчитывались.
+const CAPPED = ["record", "daily", "task", "invite"];
+// Помеченному игроку не начисляется ничего из этого.
+const EARNED = ["achievement", ...CAPPED];
 // Игры с жетонами и их ежедневные задания (сбрасываются в 00:00 UTC).
 export const GAMES = ["mario", "tanks", "bombs", "word"];
 export const DAILY_TASKS = ["play", "level", "record"];
@@ -100,7 +105,10 @@ export function loadEconomy(file = new URL("./economy.json", import.meta.url)) {
 
 // Сколько жетонов максимум может появиться за неделю при players активных игроках:
 // у каждого не больше dailyCap в день за 7 дней плюс весь призовой фонд недели.
-export const maxWeeklyEmission = (cfg, players) => 7 * cfg.dailyCap * players + cfg.season.pool;
+// Сверху — ещё разовые достижения: achievements (их число, achievements.js) × cfg.achievement на
+// игрока один раз за всё время.
+export const maxWeeklyEmission = (cfg, players, achievements = 0) =>
+  7 * cfg.dailyCap * players + cfg.season.pool + achievements * cfg.achievement * players;
 
 // Публичная часть настроек: правила для экрана «Как получить» и витрина магазина.
 export const publicRules = (cfg) => ({
@@ -209,11 +217,8 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     return tx(() => {
       if (q.has.get(playerId, reason, String(event))) return 0;
       let n = amount;
-      if (CAPPED.includes(reason)) {
-        const w = wallet(playerId);
-        if (w.flagged) return 0;
-        n = Math.min(n, cfg.dailyCap - q.today.get(playerId, dayUtc(at)).n);
-      }
+      if (EARNED.includes(reason) && wallet(playerId).flagged) return 0;
+      if (CAPPED.includes(reason)) n = Math.min(n, cfg.dailyCap - q.today.get(playerId, dayUtc(at)).n);
       if (n === 0 || (CAPPED.includes(reason) && n < 0)) return 0; // потолок на сегодня исчерпан
       q.insert.run(playerId, n, reason, String(event), season ?? seasonOf(at), dayUtc(at), at);
       q.bump.run(playerId, n);
@@ -259,9 +264,9 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     tx,
     post,
 
-    // Новые достижения «Прыг-Скока» (каждое — один раз навсегда).
-    achievements(playerId, list, out = []) {
-      for (const a of list) grant(out, "achievement", post(playerId, cfg.achievement, "achievement", `mario:${a.code}`));
+    // Новые достижения игры game (каждое — один раз навсегда; achievements.js).
+    achievements(playerId, list, out = [], game = "mario") {
+      for (const a of list) grant(out, "achievement", post(playerId, cfg.achievement, "achievement", `${game}:${a.code}`));
       return out;
     },
 
@@ -444,7 +449,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     },
 
     achievementsDone: (playerId) => new Set(db.prepare(`SELECT event FROM ledger
-      WHERE player_id = ? AND reason = 'achievement'`).all(playerId).map((r) => r.event.replace(/^mario:/, ""))),
+      WHERE player_id = ? AND reason = 'achievement'`).all(playerId).map((r) => r.event.replace(/^[a-z]+:/, ""))),
 
     // Таблицы: overall — жетоны (за неделю без призов и покупок или всего полученных), mario и tanks —
     // лучший счёт (за неделю или за всё время). Топ-100 и место игрока.
@@ -601,7 +606,8 @@ export function economyReport(db, cfg, at = Date.now()) {
     `Потрачено в магазине: ${-of("shop")}, аннулировано: ${-of("annul")}`,
     `Покупки за звёзды за неделю: ${s.stars.n} на ${s.stars.sum} ⭐`,
     `Предел недели: ${cfg.dailyCap} × 7 × игроков + фонд ${cfg.season.pool} = ` +
-      `${maxWeeklyEmission(cfg, s.players)} при ${s.players} игроках`,
+      `${maxWeeklyEmission(cfg, s.players)} при ${s.players} игроках; ` +
+      `плюс разово достижения: ${ACHIEVEMENTS_TOTAL} × ${cfg.achievement} на игрока за всё время`,
     `Топ получателей: ${s.top.length ? s.top.map((t) => `${t.name || "?"} (${t.player_id}) ${t.n}`).join(", ") : "нет"}`,
     `Помечены как подозрительные: ${s.flagged}`,
   ].join("\n");

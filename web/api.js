@@ -33,12 +33,17 @@ function reopenViaBot() {
   location.href = link;
 }
 
-const request = (method, path, body) => server.request(method, '/api/mario' + path, body);
+const request = (method, path, body, opts) => server.request(method, '/api/mario' + path, body, opts);
 
-// Счётчики текущей игры.
+// Счётчики текущей игры. at — когда она началась (0 — игры нет или итог уже отправлен),
+// reported — сколько отчётов об уровнях сервер принял, pending — отчёт, который ещё в пути.
 let run;
-function newRun() { run = { deaths: 0, levelDeaths: 0, coins: 0, bossFire: false }; }
+function newRun() { run = { deaths: 0, levelDeaths: 0, coins: 0, bossFire: false, at: 0, reported: 0, pending: Promise.resolve() }; }
 newRun();
+// Новая игра с 1-1 (или с начала мира).
+function begin() { newRun(); run.at = Date.now(); }
+// Брошенная посередине игра засчитывается, если в неё играли хотя бы 20 секунд.
+const QUIT_MS = 20000;
 
 function track(kind) {
   if (kind === 'coin') run.coins++;
@@ -52,19 +57,22 @@ function levelDone(level, score, timeLeft, world) {
   const deaths = run.levelDeaths;
   run.levelDeaths = 0;
   if (!canSave()) return;
-  request('POST', '/level', { world: world || 1, level, score, timeLeft, deaths })
-    .then((r) => { showAchievements(r.newAchievements); if (window.Wallet) window.Wallet.grants(r.wallet); })
+  const r0 = run;
+  r0.pending = request('POST', '/level', { world: world || 1, level, score, timeLeft, deaths })
+    .then((r) => { r0.reported++; showAchievements(r.newAchievements); if (window.Wallet) window.Wallet.grants(r.wallet); })
     .catch(() => {});
 }
 
 // Возвращает Promise с { best, rank, newRecord } или null, если сохранить нельзя.
-function runDone(score, levels, completed) {
+// Сервер сверяет число уровней с отчётами, которые он принял, поэтому итог ждёт отчёт в пути
+// и называет столько уровней, сколько отчётов дошло: один потерянный отчёт не губит всю игру.
+function runDone(score, levels, completed, keepalive) {
   const r = run;
   newRun();
   if (!canSave()) return Promise.resolve(null);
-  return request('POST', '/run', {
-    score, levels, completed, coins: r.coins, deaths: r.deaths, bossFire: r.bossFire,
-  }).then((res) => {
+  return r.pending.then(() => request('POST', '/run', {
+    score, levels: Math.min(levels, r.reported), completed, coins: r.coins, deaths: r.deaths, bossFire: r.bossFire,
+  }, { keepalive })).then((res) => {
     showAchievements(res.newAchievements);
     if (window.Wallet) window.Wallet.grants(res.wallet);
     return res;
@@ -125,5 +133,11 @@ function openScores() {
   if (play) play.addEventListener('click', () => stat('game_start'));
 }
 
-window.GameAPI = { enabled: !!base, ready, track, levelDone, runDone, newRun, openScores, reopenViaBot };
+// Игрок уходит в меню или закрывает игру посередине: итог того, что сыграно.
+function quit(score, levels) {
+  if (!run.at || Date.now() - run.at < QUIT_MS) return Promise.resolve(null);
+  return runDone(score, levels, false, true);
+}
+
+window.GameAPI = { enabled: !!base, ready, track, levelDone, runDone, newRun, begin, quit, openScores, reopenViaBot };
 })();

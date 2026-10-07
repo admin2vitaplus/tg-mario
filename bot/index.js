@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from "grammy";
-import { ACHIEVEMENTS } from "./achievements.js";
+import { ACHIEVEMENTS_TOTAL, BY_GAME } from "./achievements.js";
 import { startApp } from "./app.js";
 import { startTunnel, watchTunnel } from "./tunnel.js";
 import { addSecret, installSafeConsole } from "./log.js";
@@ -183,10 +183,12 @@ bot.command("me", (ctx) => {
   if (!player) return ctx.reply("Ты ещё не играл. Нажми «Играть»!", { reply_markup: playKeyboard() });
   const earned = new Set(store.earned(player.id).map((a) => a.code));
   const rank = store.rank(player);
-  const lines = ACHIEVEMENTS.map((a) => `${earned.has(a.code) ? a.icon : "🔒"} ${a.title} — ${a.text}`);
+  const names = { mario: "Прыг-Скок", tanks: "Танкодром", bombs: "Бомбодром" };
+  const lines = Object.entries(BY_GAME).map(([game, list]) => `${names[game]}:\n` +
+    list.map((a) => `${earned.has(a.code) ? a.icon : "🔒"} ${a.title} — ${a.text}`).join("\n"));
   return ctx.reply(
-    `Рекорд: ${player.best_score}${rank ? ` (место ${rank})` : ""}\nИгр: ${player.games}\n` +
-      `Достижения ${earned.size}/${ACHIEVEMENTS.length}:\n\n${lines.join("\n")}`,
+    `Рекорд в «Прыг-Скоке»: ${player.best_score}${rank ? ` (место ${rank})` : ""}\nИгр: ${player.games}\n` +
+      `Достижения ${earned.size}/${ACHIEVEMENTS_TOTAL}:\n\n${lines.join("\n\n")}`,
   );
 });
 

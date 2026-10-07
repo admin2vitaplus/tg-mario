@@ -1,4 +1,9 @@
-// Достижения. check получает итог (уровня или всей игры) и статистику игрока после его учёта.
+// Достижения каждой игры (разовые задания в её разделе «◆ Жетоны»). check получает итог,
+// который сервер проверил сам (уровня или всей игры), и статистику игрока после его учёта.
+// Коды уникальны во всех играх: в базе (achievements) хранится только код.
+
+// «Прыг-Скок»: e — уровень { level (сквозной 0…15), score, timeLeft, deaths } или игра
+// { score, coins, levels, deaths, completed, bossFire }; p — игрок (games, total_coins).
 export const ACHIEVEMENTS = [
   { code: "first_level", icon: "🚩", title: "Первый флаг", text: "Пройти уровень 1-1",
     titleEn: "First flag", textEn: "Clear level 1-1",
@@ -36,7 +41,128 @@ export const ACHIEVEMENTS = [
   { code: "games_10", icon: "🎮", title: "Завсегдатай", text: "Сыграть 10 игр",
     titleEn: "Regular", textEn: "Play 10 games",
     check: (_e, p) => p.games >= 10 },
+  { code: "world2_clear", icon: "🌊", title: "Водолаз", text: "Пройти весь мир 2",
+    titleEn: "Diver", textEn: "Clear the whole world 2",
+    check: (e) => e.type === "level" && e.level === 7 },
+  { code: "world3_clear", icon: "🌙", title: "Ночной дозор", text: "Пройти весь мир 3",
+    titleEn: "Night watch", textEn: "Clear the whole world 3",
+    check: (e) => e.type === "level" && e.level === 11 },
+  { code: "all_worlds", icon: "🏆", title: "Чемпион", text: "Пройти все четыре мира за одну игру",
+    titleEn: "Champion", textEn: "Clear all four worlds in one game",
+    check: (e) => e.type === "run" && e.completed },
+  { code: "castle_clean", icon: "🗡️", title: "Рыцарь без страха", text: "Пройти замок (уровень X-4), не потеряв жизнь",
+    titleEn: "Fearless knight", textEn: "Clear a castle (level X-4) without losing a life",
+    check: (e) => e.type === "level" && e.level % 4 === 3 && e.deaths === 0 },
+  { code: "lightning", icon: "⏱️", title: "Молния", text: "Пройти уровень, когда на таймере осталось 250 и больше",
+    titleEn: "Lightning", textEn: "Clear a level with 250 or more left on the timer",
+    check: (e) => e.type === "level" && e.timeLeft >= 250 },
+  { code: "levels_run_8", icon: "🗺️", title: "Путешественник", text: "Пройти 8 уровней за одну игру",
+    titleEn: "Traveller", textEn: "Clear 8 levels in one game",
+    check: (e) => e.type === "run" && e.levels >= 8 },
+  { code: "coins_run_100", icon: "💎", title: "Сундук", text: "Собрать 100 золотых за одну игру",
+    titleEn: "Treasure chest", textEn: "Collect 100 gold in one game",
+    check: (e) => e.type === "run" && e.coins >= 100 },
+  { code: "coins_total_2000", icon: "🏛️", title: "Казна", text: "Собрать 2000 золотых за всё время",
+    titleEn: "Treasury", textEn: "Collect 2000 gold in all",
+    check: (_e, p) => p.total_coins >= 2000 },
+  { code: "score_100k", icon: "🎯", title: "100 000", text: "Набрать 100 000 очков за одну игру",
+    titleEn: "100 000", textEn: "Score 100 000 in one game",
+    check: (e) => e.type === "run" && e.score >= 100000 },
+  { code: "score_200k", icon: "🌟", title: "200 000", text: "Набрать 200 000 очков за одну игру",
+    titleEn: "200 000", textEn: "Score 200 000 in one game",
+    check: (e) => e.type === "run" && e.score >= 200000 },
+  { code: "games_50", icon: "🕹️", title: "Ветеран", text: "Сыграть 50 игр",
+    titleEn: "Veteran", textEn: "Play 50 games",
+    check: (_e, p) => p.games >= 50 },
 ];
 
+// «Танкодром» и «Бомбодром»: e — игра, которую сервер проиграл по записи нажатий
+// (tanks-replay.js, bombs-replay.js): { score, stages, players, online, quit, won } и статистика
+// этого игрока за игру; p — все его принятые игры { games, stages }.
+export const TANKS_ACHIEVEMENTS = [
+  { code: "tanks_stage1", icon: "🎖️", title: "Боевое крещение", text: "Пройти первый уровень",
+    titleEn: "Baptism of fire", textEn: "Clear the first stage",
+    check: (e) => e.stages >= 1 },
+  { code: "tanks_stages5", icon: "🛡️", title: "Оборона", text: "Пройти 5 уровней за одну игру",
+    titleEn: "Defence", textEn: "Clear 5 stages in one game",
+    check: (e) => e.stages >= 5 },
+  { code: "tanks_stages10", icon: "🏰", title: "Крепость", text: "Пройти 10 уровней за одну игру",
+    titleEn: "Fortress", textEn: "Clear 10 stages in one game",
+    check: (e) => e.stages >= 10 },
+  { code: "tanks_kills20", icon: "💥", title: "Охотник", text: "Подбить 20 танков за одну игру",
+    titleEn: "Hunter", textEn: "Destroy 20 tanks in one game",
+    check: (e) => e.kills >= 20 },
+  { code: "tanks_kills60", icon: "🔥", title: "Гроза полигона", text: "Подбить 60 танков за одну игру",
+    titleEn: "Terror of the range", textEn: "Destroy 60 tanks in one game",
+    check: (e) => e.kills >= 60 },
+  { code: "tanks_armored5", icon: "🔩", title: "Бронебой", text: "Подбить 5 броневиков за одну игру",
+    titleEn: "Armour piercer", textEn: "Destroy 5 armoured tanks in one game",
+    check: (e) => e.armored >= 5 },
+  { code: "tanks_clean", icon: "❤️", title: "Ни царапины", text: "Пройти уровень, не потеряв жизнь",
+    titleEn: "Not a scratch", textEn: "Clear a stage without losing a life",
+    check: (e) => e.clean >= 1 },
+  { code: "tanks_picks5", icon: "🎁", title: "Снабженец", text: "Подобрать 5 бонусов за одну игру",
+    titleEn: "Quartermaster", textEn: "Pick up 5 bonuses in one game",
+    check: (e) => e.picks >= 5 },
+  { code: "tanks_score10k", icon: "🎯", title: "10 000", text: "Набрать 10 000 очков за одну игру",
+    titleEn: "10 000", textEn: "Score 10 000 in one game",
+    check: (e) => e.score >= 10000 },
+  { code: "tanks_score30k", icon: "🌟", title: "30 000", text: "Набрать 30 000 очков за одну игру",
+    titleEn: "30 000", textEn: "Score 30 000 in one game",
+    check: (e) => e.score >= 30000 },
+  { code: "tanks_online", icon: "🤝", title: "Напарник", text: "Сыграть онлайн вдвоём с другом",
+    titleEn: "Wingman", textEn: "Play online together with a friend",
+    check: (e) => e.online },
+  { code: "tanks_games25", icon: "🎮", title: "Танкист", text: "Сыграть 25 игр",
+    titleEn: "Tanker", textEn: "Play 25 games",
+    check: (_e, p) => p.games >= 25 },
+];
+
+export const BOMBS_ACHIEVEMENTS = [
+  { code: "bombs_stage1", icon: "💣", title: "Сапёр", text: "Пройти первый этап",
+    titleEn: "Sapper", textEn: "Clear the first stage",
+    check: (e) => !e.online && e.stages >= 1 },
+  { code: "bombs_stages5", icon: "🚪", title: "Пять дверей", text: "Пройти 5 этапов за одну игру",
+    titleEn: "Five doors", textEn: "Clear 5 stages in one game",
+    check: (e) => !e.online && e.stages >= 5 },
+  { code: "bombs_stages10", icon: "🔟", title: "Десятка", text: "Пройти 10 этапов за одну игру",
+    titleEn: "Top ten", textEn: "Clear 10 stages in one game",
+    check: (e) => !e.online && e.stages >= 10 },
+  { code: "bombs_all", icon: "🏆", title: "Мастер подрыва", text: "Пройти все 20 этапов",
+    titleEn: "Blast master", textEn: "Clear all 20 stages",
+    check: (e) => !e.online && e.won },
+  { code: "bombs_kills25", icon: "👾", title: "Чистильщик", text: "Победить 25 врагов за одну игру",
+    titleEn: "Cleaner", textEn: "Defeat 25 enemies in one game",
+    check: (e) => e.kills >= 25 },
+  { code: "bombs_blast3", icon: "🧨", title: "Цепная реакция", text: "Победить трёх врагов одним взрывом",
+    titleEn: "Chain reaction", textEn: "Defeat three enemies with one blast",
+    check: (e) => e.blast >= 3 },
+  { code: "bombs_items3", icon: "🎁", title: "Добытчик", text: "Найти 3 предмета за одну игру",
+    titleEn: "Scavenger", textEn: "Find 3 items in one game",
+    check: (e) => e.items >= 3 },
+  { code: "bombs_clean", icon: "❤️", title: "Чистая работа", text: "Пройти этап, не потеряв жизнь",
+    titleEn: "Clean job", textEn: "Clear a stage without losing a life",
+    check: (e) => e.clean >= 1 },
+  { code: "bombs_duel", icon: "⚔️", title: "Дуэлянт", text: "Победить друга в онлайн-дуэли",
+    titleEn: "Duellist", textEn: "Beat a friend in an online duel",
+    check: (e) => e.duelWin },
+  { code: "bombs_score20k", icon: "🎯", title: "20 000", text: "Набрать 20 000 очков за одну игру",
+    titleEn: "20 000", textEn: "Score 20 000 in one game",
+    check: (e) => e.score >= 20000 },
+  { code: "bombs_score100k", icon: "🌟", title: "100 000", text: "Набрать 100 000 очков за одну игру",
+    titleEn: "100 000", textEn: "Score 100 000 in one game",
+    check: (e) => e.score >= 100000 },
+  { code: "bombs_games25", icon: "🎮", title: "Подрывник", text: "Сыграть 25 игр",
+    titleEn: "Demolition expert", textEn: "Play 25 games",
+    check: (_e, p) => p.games >= 25 },
+];
+
+// Списки по играм и все коды разом (код → игра).
+export const BY_GAME = { mario: ACHIEVEMENTS, tanks: TANKS_ACHIEVEMENTS, bombs: BOMBS_ACHIEVEMENTS };
+export const GAME_OF = new Map(Object.entries(BY_GAME).flatMap(([g, list]) => list.map((a) => [a.code, g])));
+export const byCode = new Map(Object.values(BY_GAME).flat().map((a) => [a.code, a]));
+export const ACHIEVEMENTS_TOTAL = byCode.size;
+
 // titleEn/textEn — для игроков с английским Telegram (страница выбирает сама).
-export const publicList = () => ACHIEVEMENTS.map(({ code, icon, title, text, titleEn, textEn }) => ({ code, icon, title, text, titleEn, textEn }));
+export const publicOf = ({ code, icon, title, text, titleEn, textEn }) => ({ code, icon, title, text, titleEn, textEn });
+export const publicList = (game = "mario") => (BY_GAME[game] || []).map(({ code, icon, title, text, titleEn, textEn }) => ({ code, icon, title, text, titleEn, textEn }));
