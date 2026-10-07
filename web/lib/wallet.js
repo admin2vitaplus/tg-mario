@@ -80,6 +80,7 @@ const STR = {
     paid_wait: 'Оплата прошла, товар появится через несколько секунд. Если нет — откройте игру заново.',
     not_enough: 'Не хватает жетонов: нужно {n}, есть {have}.',
     buy_failed: 'Не получилось купить. Проверьте связь и попробуйте ещё раз.',
+    no_shop: 'Покупки работают, когда игра открыта через бота: кнопка «Играть» в чате с ботом.',
     pay_failed: 'Telegram не провёл оплату, звёзды не списаны. Попробуйте ещё раз; если повторится — напишите боту /paysupport.',
     toast: '+{n} {w}', days: '{n} д.', hours: '{n} ч', minutes: '{n} мин',
     task_play: 'сыграть игру', task_level: 'пройти уровень', invite_friend: 'друг доиграл', invite_from: 'по приглашению друга',
@@ -135,6 +136,7 @@ const STR = {
     paid_wait: 'Paid. The item will appear in a few seconds; if not, open the game again.',
     not_enough: 'Not enough tickets: {n} needed, you have {have}.',
     buy_failed: 'Could not buy. Check the connection and try again.',
+    no_shop: 'Purchases work when the game is opened through the bot: the «Play» button in the chat with the bot.',
     pay_failed: 'Telegram did not take the payment, no Stars were spent. Try again; if it repeats, send /paysupport to the bot.',
     toast: '+{n} {w}', days: '{n} d', hours: '{n} h', minutes: '{n} min',
     task_play: 'play a game', task_level: 'clear a level', invite_friend: 'your friend played', invite_from: 'invited by a friend',
@@ -584,9 +586,10 @@ const gameOn = (game) => {
 // Telegram Stars are paid inside Telegram only (6.1+ has openInvoice).
 const canStars = () => !!(tg && tg.openInvoice && tg.isVersionAtLeast && tg.isVersionAtLeast('6.1'));
 
-// A choice of how to pay: Telegram's own popup with up to three buttons.
+// A choice of how to pay: Telegram's own popup with up to three buttons. 'tokens' — picked
+// in the popup (that is the confirmation); 'tokens?' — no popup, so жетоны are asked about once more.
 function choose(it, message) {
-  if (!canStars()) return Promise.resolve('tokens');
+  if (!canStars()) return Promise.resolve('tokens?');
   return new Promise((resolve) => {
     try {
       tg.showPopup({
@@ -597,7 +600,7 @@ function choose(it, message) {
           { type: 'cancel' },
         ],
       }, (id) => resolve(id || null));
-    } catch (e) { resolve('tokens'); }
+    } catch (e) { resolve('tokens?'); }
   });
 }
 
@@ -610,11 +613,23 @@ function bought(id, r) {
   return true;
 }
 
-function buyTokens(it) {
-  if (me.balance < it.price) { tell(T('not_enough', { n: it.price, have: me.balance })); return Promise.resolve(false); }
-  return ask(T('confirm', { name: it[lang], n: it.price })).then((yes) => {
-    if (!yes) return false;
-    return request('POST', '/buy', { item: it.id }).then((r) => bought(it.id, r));
+// The balance on the phone can be behind the server's: before saying «not enough» it is asked again.
+function enough(price) {
+  if (me.balance >= price) return Promise.resolve(true);
+  return refresh(true).then(() => me.balance >= price, () => false).then((ok) => {
+    if (!ok) tell(T('not_enough', { n: price, have: me.balance }));
+    return ok;
+  });
+}
+// confirmed: the player already picked «◆ N жетонов» in the choice popup, so a second popup
+// right after the first is not shown (on some phones it did not open, and nothing happened).
+function buyTokens(it, confirmed) {
+  return enough(it.price).then((ok) => {
+    if (!ok) return false;
+    return (confirmed ? Promise.resolve(true) : ask(T('confirm', { name: it[lang], n: it.price }))).then((yes) => {
+      if (!yes) return false;
+      return request('POST', '/buy', { item: it.id }).then((r) => bought(it.id, r));
+    });
   });
 }
 
@@ -651,14 +666,15 @@ const failed = (e) => tell(T('buy_failed') + (e && (e.status || e.message) ? ' (
   (e.status ? 'HTTP ' + e.status + (e.body && e.body.error ? ': ' + e.body.error : '') : e.message) + ')' : ''));
 
 function buy(id, via) {
-  if (!enabled) return Promise.resolve(false);
+  // Without the server or Telegram's signature nothing can be bought: said aloud, not a dead tap.
+  if (!enabled) { tell(T('no_shop')); return Promise.resolve(false); }
   return (info && me ? Promise.resolve() : refresh()).then(() => {
     const it = info.shop.find((x) => x.id === id);
     if (!it) return false;
     if (owned.includes(id)) return true;
     return (via ? Promise.resolve(via) : choose(it)).then((how) => {
       if (how === 'stars' && canStars()) return buyStars(it);
-      if (how === 'tokens') return buyTokens(it);
+      if (how === 'tokens' || how === 'tokens?') return buyTokens(it, !via && how === 'tokens');
       return false;
     });
   }).catch((e) => {
@@ -685,9 +701,8 @@ function buyLife(offer, level) {
       if (how === 'stars' && canStars()) {
         return request('POST', '/life-invoice', { offer, level }).then((r) => openInvoice(r.link)).then(invoiceClosed);
       }
-      if (how !== 'tokens') return false;
-      if (me.balance < o.price) { tell(T('not_enough', { n: o.price, have: me.balance })); return false; }
-      return ask(T('life_confirm', { n: o.price })).then((yes) => {
+      if (how !== 'tokens' && how !== 'tokens?') return false;
+      return enough(o.price).then((ok) => ok && (how === 'tokens' || ask(T('life_confirm', { n: o.price })))).then((yes) => {
         if (!yes) return false;
         return request('POST', '/life', { offer, level }).then((r) => {
           if (typeof r.balance === 'number') me.balance = r.balance;
