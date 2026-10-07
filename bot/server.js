@@ -238,6 +238,14 @@ export function createApiServer({
       if (!r.ok) return [r.error === "unknown item" ? 404 : 409, r];
       return [200, { ...r, owned: economy.me(user.id).owned }];
     };
+    // «Прыг-Скок», жизни кончились: { offer, level } → { ok, balance }; повтор с тем же offer не списывает.
+    routes["POST /api/wallet/life"] = (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      store.touchPlayer(user);
+      const r = economy.buyLife(user.id, body.offer, body.level);
+      if (!r.ok) return [r.error === "bad offer" ? 400 : 409, r];
+      return [200, r];
+    };
   }
 
   // Покупка за Telegram Stars: сервер создаёт счёт, игра открывает его (Telegram.WebApp.openInvoice),
@@ -248,6 +256,15 @@ export function createApiServer({
       if (typeof body.item !== "string") return [400, { error: "bad data" }];
       const check = economy.starsCheck(user.id, body.item);
       if (!check.ok) return [check.error === "unknown item" ? 404 : 409, { error: check.error }];
+      store.touchPlayer(user);
+      economy.setLang(user.id, user.language_code);
+      const link = await createInvoice(check.item, user);
+      return [200, { link }];
+    };
+    routes["POST /api/wallet/life-invoice"] = async (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const check = economy.lifeCheck(user.id, body.offer, body.level);
+      if (!check.ok) return [check.error === "bad offer" ? 400 : 409, { error: check.error }];
       store.touchPlayer(user);
       economy.setLang(user.id, user.language_code);
       const link = await createInvoice(check.item, user);

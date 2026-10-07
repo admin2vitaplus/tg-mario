@@ -82,6 +82,13 @@ export function validateEconomy(cfg) {
     need(typeof it.ru === "string" && typeof it.en === "string", `shop ${it.id}: ru/en`);
   }
   need(ids.size >= 1, "shop пуст");
+  const life = cfg.life;
+  need(GAMES.includes(life?.game), "life.game");
+  for (const k of ["price", "stars"]) {
+    need(Array.isArray(life?.[k]) && life[k].length >= 1 && life[k].every((n) => isInt(n) && n > 0), `life.${k}`);
+  }
+  need(life?.price?.length === life?.stars?.length, "life: price и stars одной длины");
+  need(typeof life?.ru === "string" && typeof life?.en === "string", "life: ru/en");
   if (errors.length) throw new Error("economy.json: " + errors.join("; "));
   return cfg;
 }
@@ -104,7 +111,14 @@ export const publicRules = (cfg) => ({
   invite: { inviter: cfg.invite.inviter, newcomer: cfg.invite.newcomer, gamesNeeded: cfg.invite.gamesNeeded },
   season: { pool: cfg.season.pool, boards: cfg.season.boards },
   shop: cfg.shop.map(({ id, game, price, stars, ru, en }) => ({ id, game, price, stars, ru, en })),
+  life: { ...cfg.life },
 });
+
+// Ещё одна жизнь: offer — случайный номер конца игры от клиента (повтор с ним ничего не спишет),
+// level — номер уровня в мире с нуля, от него зависит цена.
+export const LIFE_OFFER = /^[a-z0-9]{8,32}$/;
+const lifeOffer = (cfg, offer, level) =>
+  typeof offer === "string" && LIFE_OFFER.test(offer) && Number.isInteger(level) && level >= 0 && level < cfg.life.price.length;
 
 // Текст сообщения с итогами недели.
 const SEASON_TEXT = {
@@ -148,8 +162,8 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       WHERE player_id = ? AND reason = 'invite' AND season = ? AND event LIKE 'friend:%'`),
     history: db.prepare(`SELECT id, amount, reason, event, at FROM ledger WHERE player_id = ?
       ORDER BY id DESC LIMIT ?`),
-    owned: db.prepare(`SELECT event AS item FROM ledger WHERE player_id = ? AND reason = 'shop'
-      UNION SELECT item FROM purchases WHERE player_id = ? AND refunded_at IS NULL`),
+    owned: db.prepare(`SELECT event AS item FROM ledger WHERE player_id = ? AND reason = 'shop' AND event NOT LIKE 'life:%'
+      UNION SELECT item FROM purchases WHERE player_id = ? AND refunded_at IS NULL AND item NOT LIKE 'life:%'`),
     paid: db.prepare("SELECT 1 FROM purchases WHERE player_id = ? AND item = ? AND refunded_at IS NULL"),
     addPurchase: db.prepare(`INSERT OR IGNORE INTO purchases (player_id, item, stars, charge_id, at)
       VALUES (?, ?, ?, ?, ?)`),
@@ -338,6 +352,28 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         post(playerId, -item.price, "shop", item.id);
         return { ok: true, balance: q.wallet.get(playerId).balance };
       });
+    },
+
+    // Ещё одна жизнь за жетоны: списывается сразу, раз на один конец игры (offer).
+    buyLife(playerId, offer, level) {
+      if (!lifeOffer(cfg, offer, level)) return { ok: false, error: "bad offer" };
+      const price = cfg.life.price[level];
+      return tx(() => {
+        if (q.has.get(playerId, "shop", `life:${offer}`)) return { ok: true, already: true, balance: wallet(playerId).balance };
+        const w = wallet(playerId);
+        if (w.balance < price) return { ok: false, error: "not enough", balance: w.balance };
+        post(playerId, -price, "shop", `life:${offer}`);
+        return { ok: true, balance: q.wallet.get(playerId).balance };
+      });
+    },
+    // Жизнь за звёзды: товар для счёта (wallet-bot.js) или ошибка. amount — сумма из pre_checkout_query.
+    lifeCheck(playerId, offer, level, amount) {
+      if (!lifeOffer(cfg, offer, level)) return { ok: false, error: "bad offer" };
+      const stars = cfg.life.stars[level];
+      if (amount != null && amount !== stars) return { ok: false, error: "price changed" };
+      if (q.has.get(playerId, "shop", `life:${offer}`) || q.paid.get(playerId, `life:${offer}`)) return { ok: false, error: "already" };
+      const { ru, en } = cfg.life;
+      return { ok: true, item: { id: `life:${offer}`, kind: "life", payload: `life:${level}:${offer}`, stars, ru, en } };
     },
 
     wallet,

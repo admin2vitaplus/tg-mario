@@ -234,6 +234,33 @@ test("shop: not enough, buy, no double charge, unknown item", () => {
   store.close();
 });
 
+test("one more life: price by level in the world, once per offer, not an owned item", () => {
+  const { store, economy } = setup();
+  assert.deepEqual(CFG.life.price, [100, 300, 500, 700]);
+  assert.deepEqual(CFG.life.stars, [10, 30, 50, 70]);
+  assert.equal(economy.buyLife(1, "abcd1234", 0).error, "not enough");
+  economy.post(1, 1000, "prize", "gift");
+  assert.deepEqual(economy.buyLife(1, "abcd1234", 2), { ok: true, balance: 500 });
+  assert.equal(economy.buyLife(1, "abcd1234", 2).already, true, "a repeat with the same offer");
+  assert.equal(economy.me(1).balance, 500);
+  assert.deepEqual(economy.buyLife(1, "efgh5678", 1), { ok: true, balance: 200 });
+  assert.equal(economy.buyLife(1, "ijkl9012", 1).error, "not enough");
+  for (const [offer, level] of [["short", 0], ["ABCD1234", 0], ["abcd1234", 4], ["abcd1234", -1], ["abcd1234", "1"], [5, 0]]) {
+    assert.equal(economy.buyLife(1, offer, level).error, "bad offer", `${offer} ${level}`);
+  }
+  assert.deepEqual(economy.me(1).owned, []);
+  assert.equal(economy.checkBalance(1).ledger, 200);
+
+  assert.equal(economy.lifeCheck(2, "mnop3456", 3, 70).item.payload, "life:3:mnop3456");
+  assert.equal(economy.lifeCheck(2, "mnop3456", 3, 50).error, "price changed");
+  assert.equal(economy.starsPaid(2, "life:mnop3456", 70, "ch_life"), true);
+  assert.equal(economy.lifeCheck(2, "mnop3456", 3, 70).error, "already");
+  assert.equal(economy.lifeCheck(1, "abcd1234", 2).error, "already", "paid with жетоны already");
+  assert.deepEqual(economy.me(2).owned, []);
+  assert.throws(() => validateEconomy({ ...CFG, life: { ...CFG.life, stars: [10, 30] } }), /life/);
+  store.close();
+});
+
 // Неделя: двое в «Прыг-Скоке», третий только с достижениями, четвёртый помечен.
 function playWeek(store, economy, clock) {
   run(store, economy, clock, 1, 5000);

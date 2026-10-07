@@ -195,4 +195,22 @@ test("Stars: invoice only for items not owned; payment once per charge; refund t
     assert.deepEqual(economy.me(5).owned, []);
     const info = (await call("GET", "/api/wallet/info")).json;
     assert.ok(info.shop.every((it) => it.stars > 0 && it.price > 0));
+    assert.deepEqual(info.life.stars, CFG.life.stars);
+  }));
+
+test("One more life: жетоны once per offer, Stars invoice by level", () =>
+  withServer(async ({ call, economy, invoices }) => {
+    assert.equal((await call("POST", "/api/wallet/life", { offer: "run12345", level: 0 })).status, 409);
+    economy.post(5, 150, "prize", "gift");
+    let r = await call("POST", "/api/wallet/life", { offer: "run12345", level: 0 });
+    assert.deepEqual([r.status, r.json.balance], [200, 50]);
+    r = await call("POST", "/api/wallet/life", { offer: "run12345", level: 0 });
+    assert.deepEqual([r.status, r.json.already, r.json.balance], [200, true, 50]);
+    assert.equal((await call("POST", "/api/wallet/life", { offer: "x", level: 0 })).status, 400);
+
+    r = await call("POST", "/api/wallet/life-invoice", { offer: "run67890", level: 1 });
+    assert.equal(r.status, 200);
+    assert.deepEqual(invoices.at(-1), ["life:run67890", 5]);
+    assert.equal((await call("POST", "/api/wallet/life-invoice", { offer: "run12345", level: 0 })).status, 409);
+    assert.equal((await call("POST", "/api/wallet/life-invoice", { offer: "run67890", level: 9 })).status, 400);
   }));
