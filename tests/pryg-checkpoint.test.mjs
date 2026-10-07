@@ -29,3 +29,21 @@ test('only the main course counts for the checkpoint, not a bonus room', () => {
 test('a lost life restarts from the checkpoint only when it was passed in this level', () => {
   assert.match(body('die'), /checkpoint: this\.passedCheckpoint \? this\.s\.level : undefined/);
 });
+
+// Owner's bug: in 1-3 the hero came back at the midpoint right on top of two beetles and died at once.
+test('no foe is placed next to where the hero appears', () => {
+  const create = body('create');
+  assert.match(src, /const SPAWN_CLEAR = [5-9];/);
+  assert.match(create, /const clear = \(\[x\]\) => Math\.abs\(x - sx\) > SPAWN_CLEAR;/);
+  for (const spots of ['enemySpots', 'throwerSpots', 'spikySpots', 'fishSpots']) {
+    assert.match(create, new RegExp(`of ${spots}\\.filter\\(clear\\)`), spots);
+  }
+});
+
+test('game over: no «continue from world»; a bought life goes on, otherwise a new game from 1-1', () => {
+  const over = body('gameOver');
+  assert.doesNotMatch(over, /restart\(\{ world/);
+  assert.match(over, /this\.scene\.restart\(\{\}\)/);
+  assert.match(over, /Wallet\.buyLife\(id, this\.s\.level\)/);
+  assert.match(over, /lives: 1, score: this\.s\.score/);
+});

@@ -6,6 +6,8 @@ const TILE = 16;
 const VIEW_W = 256;
 const VIEW_H = 240;
 const BEST_KEY = 'prygskok_best';
+// Foes whose spot is this many tiles or fewer from where the hero appears are not placed.
+const SPAWN_CLEAR = 6;
 
 // ---------- Telegram ----------
 const tg = window.Telegram && window.Telegram.WebApp;
@@ -198,7 +200,16 @@ function saveBest(score) {
 }
 
 let overlayAction = null;
+// Game over with lives to buy: the purchase (lifeAction), the game result still to be sent
+// (endRun, also sent when the player leaves), and a counter of shown screens.
+let lifeAction = null;
+let endRun = null;
+let overlayShown = 0;
 function showOverlay(title, text, button, action) {
+  overlayShown++;
+  lifeAction = null;
+  $('ovLife').classList.add('hidden');
+  $('ovBtn').classList.add('primary');
   $('ovTitle').textContent = title;
   $('ovText').innerHTML = text;
   $('ovBtn').textContent = button;
@@ -1224,19 +1235,22 @@ class Play extends Phaser.Scene {
     this.coinItems = this.physics.add.staticGroup();
     for (const [x, y] of coinSpots) this.coinItems.create(x * TILE + 8, y * TILE + 8, 'coin');
 
+    // No foe is placed right next to where the hero appears, so a respawn never lands on an enemy.
+    const clear = ([x]) => Math.abs(x - sx) > SPAWN_CLEAR;
+
     this.enemies = this.physics.add.group();
-    for (const [x, y] of enemySpots) {
+    for (const [x, y] of enemySpots.filter(clear)) {
       const e = this.enemies.create(x * TILE + 8, y * TILE + 8, 'bug0').setDepth(DEPTH.ENEMY);
       e.body.setSize(14, 14).setOffset(1, 2);
       e.setData('state', 'idle');
       e.setData('kind', 'bug');
     }
-    for (const [x, y] of throwerSpots) this.addThrower(x, y);
-    for (const [x, y] of spikySpots) this.addSpiky(x * TILE + 8, y * TILE + 8, false);
+    for (const [x, y] of throwerSpots.filter(clear)) this.addThrower(x, y);
+    for (const [x, y] of spikySpots.filter(clear)) this.addSpiky(x * TILE + 8, y * TILE + 8, false);
 
     // Creatures that fly or swim through walls: fish, bolts, the cloud rider.
     this.foes = this.physics.add.group();
-    for (const [x, y] of fishSpots) this.addFish(x, y);
+    for (const [x, y] of fishSpots.filter(clear)) this.addFish(x, y);
     this.rider = null;
     this.riderBack = 0;
     this.leapNext = 0;
@@ -2295,19 +2309,57 @@ class Play extends Phaser.Scene {
   gameOver(title, completed) {
     const best = saveBest(this.s.score);
     this.physics.pause();
-    // The score server checks this against the levels it was told about in this game.
-    const levels = this.s.cleared;
-    // As on the console, a lost game continues from the start of the current world.
-    const world = completed ? 1 : this.s.world;
     const scoreLine = `${L('Счёт', 'Score')}: ${this.s.score}`;
-    showOverlay(title, `${scoreLine}<br>${L('Рекорд', 'Best')}: ${best}`,
-      world > 1 ? L(`Продолжить с мира ${world}`, `Continue from world ${world}`) : L('Играть снова', 'Play again'), () => {
-      this.scene.restart({ world });
-    });
-    api.runDone(this.s.score, levels, !!completed).then((r) => {
-      if (!r) return;
-      const place = r.rank ? `<br>${L('Место в таблице', 'Place in the table')}: ${r.rank}` : '';
-      $('ovText').innerHTML = `${scoreLine}<br>${r.newRecord ? L('Новый рекорд!', 'New best!') : `${L('Рекорд', 'Best')}: ${r.best}`}${place}`;
+    // The game goes to the score server once it is really over: a bought life carries it on.
+    // The server checks it against the levels it was told about in this game.
+    let shown = 0; // this screen in showOverlay's count
+    let ended = false;
+    const end = (showResult) => {
+      if (ended) return;
+      ended = true;
+      endRun = null;
+      window.removeEventListener('pagehide', end);
+      api.runDone(this.s.score, this.s.cleared, !!completed).then((r) => {
+        if (!r || !showResult || shown !== overlayShown) return;
+        const place = r.rank ? `<br>${L('Место в таблице', 'Place in the table')}: ${r.rank}` : '';
+        $('ovText').innerHTML = `${scoreLine}<br>${r.newRecord ? L('Новый рекорд!', 'New best!') : `${L('Рекорд', 'Best')}: ${r.best}`}${place}`;
+      });
+    };
+    // Lives are over: one more life (жетоны or Telegram Stars, dearer further into the world)
+    // goes on from the same place; otherwise a new game starts from 1-1.
+    const offer = !completed && window.Wallet && window.Wallet.enabled && window.Wallet.lifeOffer(this.s.level);
+    if (!offer) {
+      showOverlay(title, `${scoreLine}<br>${L('Рекорд', 'Best')}: ${best}`, L('Играть снова', 'Play again'), () => this.scene.restart({}));
+      shown = overlayShown;
+      end(true);
+      return;
+    }
+    endRun = end;
+    window.addEventListener('pagehide', end);
+    showOverlay(title, `${scoreLine}<br>${L('Рекорд', 'Best')}: ${best}<br>${L('Ещё одна жизнь — и игра продолжится отсюда.', 'One more life and the game goes on from here.')}`,
+      L('Начать заново с 1-1', 'Start over from 1-1'), () => {
+        end(false);
+        this.scene.restart({});
+      });
+    shown = overlayShown;
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+    const btn = $('ovLife');
+    const cost = document.createElement('small');
+    cost.className = 'ovCost';
+    cost.textContent = `${offer.price} ◆ ${L('или', 'or')} ${offer.stars} ⭐`;
+    btn.replaceChildren(`♥ ${L('Ещё жизнь', 'One more life')}`, cost);
+    btn.classList.remove('hidden');
+    $('ovBtn').classList.remove('primary');
+    lifeAction = () => window.Wallet.buyLife(id, this.s.level).then((paid) => {
+      if (!paid || shown !== overlayShown) return;
+      endRun = null;
+      window.removeEventListener('pagehide', end);
+      overlayAction = null;
+      $('overlay').classList.add('hidden');
+      this.scene.restart({
+        lives: 1, score: this.s.score, coins: this.s.coins, level: this.s.level, world: this.s.world, cleared: this.s.cleared, lifeTaken: this.s.lifeTaken,
+        checkpoint: this.passedCheckpoint ? this.s.level : undefined,
+      });
     });
   }
 
@@ -2436,13 +2488,26 @@ $('ovLooks').addEventListener('click', openLooks);
 function back() {
   const scene = window.__scene;
   const playing = started && $('overlay').classList.contains('hidden') && scene && !scene.scene.isPaused();
-  if (!playing) { window.Back.toMenu(); return; }
+  if (!playing) { if (endRun) endRun(); window.Back.toMenu(); return; }
   scene.scene.pause();
   showOverlay(L('ПАУЗА', 'PAUSE'), L('Игра остановлена.', 'The game is paused.'), L('Продолжить', 'Continue'), () => scene.scene.resume());
 }
 if (window.Back) window.Back.attach(back);
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') back(); });
-$('ovMenu').addEventListener('click', () => window.Back.toMenu());
+$('ovMenu').addEventListener('click', () => { if (endRun) endRun(); window.Back.toMenu(); });
+
+// «♥ Ещё жизнь» on the game over screen (see gameOver).
+{
+  const btn = document.createElement('button');
+  btn.id = 'ovLife';
+  btn.className = 'ui-btn primary hidden';
+  btn.addEventListener('click', () => {
+    if (!lifeAction || btn.disabled) return;
+    btn.disabled = true;
+    lifeAction().finally(() => { btn.disabled = false; });
+  });
+  $('ovBtn').insertAdjacentElement('beforebegin', btn);
+}
 
 $('ovBtn').addEventListener('click', () => {
   audio();

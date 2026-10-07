@@ -8,6 +8,9 @@
 //   Wallet.buy(shopId, via)   -> Promise<boolean>; via 'tokens' (жетоны) or 'stars' (Telegram
 //                                Stars); without it the player picks one
 //   Wallet.stars(shopId)      -> price in Telegram Stars, or null
+//   Wallet.lifeOffer(level)   -> Hop-Skip's one more life for the level in the world (0-3):
+//                                { price, stars }, or null before the rules have loaded
+//   Wallet.buyLife(offer, level) -> Promise<boolean>, true when the life is paid
 //   Wallet.grants(res.wallet) -> shows «+10» toasts after a game result
 //   Wallet.open(tab, {game})  -> the collection's own panel (tabs: tasks, top, shop, history) or,
 //                                with game 'mario' | 'tanks' | 'word', that game's (tasks, top, shop)
@@ -71,6 +74,9 @@ const STR = {
     confirm: 'Купить «{name}» за {n} {w}?',
     choose: 'Как купить «{name}»?',
     pay_tokens: '◆ {n} {w}', pay_stars: '⭐ {n}', cancel: 'Отмена',
+    life_name: 'Прыг-Скок: ещё одна жизнь',
+    life_choose: 'Ещё одна жизнь: игра продолжится с этого места. Как оплатить?',
+    life_confirm: 'Купить ещё одну жизнь за {n} {w}? Игра продолжится с этого места.',
     paid_wait: 'Оплата прошла, товар появится через несколько секунд. Если нет — откройте игру заново.',
     not_enough: 'Не хватает жетонов: нужно {n}, есть {have}.',
     buy_failed: 'Не получилось купить. Проверьте связь и попробуйте ещё раз.',
@@ -122,6 +128,9 @@ const STR = {
     confirm: 'Buy «{name}» for {n} {w}?',
     choose: 'How to buy «{name}»?',
     pay_tokens: '◆ {n} {w}', pay_stars: '⭐ {n}', cancel: 'Cancel',
+    life_name: 'Hop-Skip: one more life',
+    life_choose: 'One more life: the game goes on from here. How to pay?',
+    life_confirm: 'Buy one more life for {n} {w}? The game goes on from here.',
     paid_wait: 'Paid. The item will appear in a few seconds; if not, open the game again.',
     not_enough: 'Not enough tickets: {n} needed, you have {have}.',
     buy_failed: 'Could not buy. Check the connection and try again.',
@@ -301,6 +310,7 @@ function grants(w) {
 // ---------- Panel ----------
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const itemName = (id) => {
+  if (String(id).startsWith('life:')) return T('life_name');
   const it = info && info.shop.find((x) => x.id === id);
   return it ? it[lang] : id;
 };
@@ -549,12 +559,12 @@ function tell(text) {
 const canStars = () => !!(tg && tg.openInvoice && tg.isVersionAtLeast && tg.isVersionAtLeast('6.1'));
 
 // A choice of how to pay: Telegram's own popup with up to three buttons.
-function choose(it) {
+function choose(it, message) {
   if (!canStars()) return Promise.resolve('tokens');
   return new Promise((resolve) => {
     try {
       tg.showPopup({
-        message: T('choose', { name: it[lang] }),
+        message: message || T('choose', { name: it[lang] }),
         buttons: [
           { id: 'tokens', type: 'default', text: T('pay_tokens', { n: it.price }) },
           { id: 'stars', type: 'default', text: T('pay_stars', { n: it.stars }) },
@@ -617,6 +627,48 @@ function buy(id, via) {
   });
 }
 
+// One more life in Hop-Skip once the lives are over (the price grows with the level in the
+// world). offer: a random id of this game over, so a repeated request is not charged twice.
+// Resolves true when paid: with жетоны at once, with Stars when Telegram says «paid».
+function lifeOffer(level) {
+  const l = info && info.life;
+  if (!l || !Number.isInteger(level) || level < 0 || level >= l.price.length) return null;
+  return { price: l.price[level], stars: l.stars[level] };
+}
+function buyLife(offer, level) {
+  if (!enabled) return Promise.resolve(false);
+  return (info && me ? Promise.resolve() : refresh()).then(() => {
+    const o = lifeOffer(level);
+    if (!o) return false;
+    return choose(o, T('life_choose')).then((how) => {
+      if (how === 'stars' && canStars()) {
+        return request('POST', '/life-invoice', { offer, level }).then((r) => new Promise((resolve) => {
+          tg.openInvoice(r.link, (status) => resolve(status === 'paid'));
+        }));
+      }
+      if (how !== 'tokens') return false;
+      if (me.balance < o.price) { tell(T('not_enough', { n: o.price, have: me.balance })); return false; }
+      return ask(T('life_confirm', { n: o.price })).then((yes) => {
+        if (!yes) return false;
+        return request('POST', '/life', { offer, level }).then((r) => {
+          if (typeof r.balance === 'number') me.balance = r.balance;
+          badge();
+          save();
+          try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch (e) { /* ignore */ }
+          return true;
+        });
+      });
+    });
+  }).catch((e) => {
+    if (e && e.status === 409 && e.body && e.body.error === 'not enough') {
+      tell(T('not_enough', { n: (lifeOffer(level) || {}).price, have: e.body.balance }));
+    } else if (e && e.status === 409 && e.body && e.body.error === 'already') {
+      return true;
+    } else tell(T('buy_failed'));
+    return false;
+  });
+}
+
 let soon = null;
 function refreshSoon() {
   clearTimeout(soon);
@@ -650,6 +702,8 @@ window.Wallet = {
   price: (id) => { const it = info && info.shop.find((x) => x.id === id); return it ? it.price : null; },
   stars: (id) => { const it = info && info.shop.find((x) => x.id === id); return it ? it.stars : null; },
   buy,
+  lifeOffer,
+  buyLife,
   grants,
   open,
   refresh,

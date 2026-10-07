@@ -1,5 +1,5 @@
 {
-  "_comment": "Жетоны (ТЗ P1-7). Все суммы — целые числа. Меняются только через PR; проверка — bot/test/economy.test.js. stars — цена товара в Telegram Stars. daily — вход в сборник за день (серия дней), tasks — ежедневные задания каждой игры, record — личный рекорд в игре раз в день.",
+  "_comment": "Жетоны (ТЗ P1-7). Все суммы — целые числа. Меняются только через PR; проверка — bot/test/economy.test.js. stars — цена товара в Telegram Stars. life — ещё одна жизнь в «Прыг-Скоке» после конца игры: цена по номеру уровня в мире (X-1, X-2, X-3, X-4). daily — вход в сборник за день (серия дней), tasks — ежедневные задания каждой игры, record — личный рекорд в игре раз в день.",
   "dailyCap": 150,
   "achievement": 20,
   "record": 10,
@@ -17,6 +17,7 @@
       "overall": [100, 70, 50, 40, 30, 20, 10, 10, 5, 5]
     }
   },
+  "life": { "game": "mario", "price": [100, 300, 500, 700], "stars": [10, 30, 50, 70], "ru": "Прыг-Скок: ещё одна жизнь", "en": "Hop-Skip: one more life" },
   "shop": [
     { "id": "pryg-hero-knight", "game": "mario", "price": 300, "stars": 25, "ru": "Прыг-Скок: герой «Рыцарь»", "en": "Hop-Skip: hero «Knight»" },
     { "id": "pryg-enemy-ruby", "game": "mario", "price": 150, "stars": 15, "ru": "Прыг-Скок: враги «Рубин»", "en": "Hop-Skip: «Ruby» enemies" },
