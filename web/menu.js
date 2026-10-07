@@ -30,7 +30,7 @@ if (EN) {
   document.title = 'Yellow Cartridge';
   document.querySelectorAll('[data-en]').forEach((el) => { el.innerHTML = el.dataset.en; });
 }
-const EN_TITLES = { 'pryg-skok': 'HOP-SKIP', tanks: 'TANK FIELD', word: 'WORD OF THE DAY' };
+const EN_TITLES = { 'pryg-skok': 'HOP-SKIP', tanks: 'TANK FIELD', bombs: 'BOMB FIELD', word: 'WORD OF THE DAY' };
 const title = (g) => (EN ? g.titleEn || EN_TITLES[g.id] || g.title : g.title);
 
 let startGame = null; // a game to open right away, from the launch link
@@ -48,16 +48,18 @@ let startGame = null; // a game to open right away, from the launch link
   // Coming back from a game (lib/back.js) the launch link has been followed already.
   try { if (sessionStorage.getItem('cartridge_start_done')) return; } catch (e) { /* ignore */ }
   const params = new URLSearchParams(location.search);
-  const room = /^(?:room|tanks)_(\d{4,8})$/.exec(m[1]);
-  if (room && window.CARTRIDGE && window.CARTRIDGE.isEnabled('tanks')) {
-    params.set('room', room[1]);
+  // room_<code> is a «Танкодром» room, bomb_<code> a «Бомбодром» duel.
+  const room = /^(room|tanks|bomb)_(\d{4,8})$/.exec(m[1]);
+  const roomGame = room && (room[1] === 'bomb' ? 'bombs' : 'tanks');
+  if (room && window.CARTRIDGE && window.CARTRIDGE.isEnabled(roomGame)) {
+    params.set('room', room[2]);
     // lib/server.js checks the tunnel from the link against the remembered address;
     // the room page gets the one that answered.
     const server = window.Server;
     const go = () => {
       try { sessionStorage.setItem('cartridge_start_done', '1'); } catch (e) { /* ignore */ }
       if (server && server.online) params.set('api', server.base);
-      location.replace('tanks/?' + params + location.hash);
+      location.replace(roomGame + '/?' + params + location.hash);
     };
     if (server) server.ready.then(go); else go();
     return;
@@ -110,6 +112,18 @@ const COVERS = {
     tank(44, 2, '#c8c8d0', '#606070', true);
     px(ctx, '#fff', 28, 8, 2, 4);
   },
+  bombs(ctx) {
+    px(ctx, '#2a7a2a', 0, 0, COVER_W, COVER_H);
+    const steel = (x, y) => { px(ctx, '#8a8a96', x, y, 8, 8); px(ctx, '#d8d8e4', x, y, 8, 1); px(ctx, '#d8d8e4', x, y, 1, 8); px(ctx, '#4a4a56', x, y + 7, 8, 1); px(ctx, '#4a4a56', x + 7, y, 1, 8); };
+    const brick = (x, y) => { px(ctx, '#b05020', x, y, 8, 8); px(ctx, '#4a2410', x, y + 3, 8, 1); px(ctx, '#4a2410', x, y + 7, 8, 1); px(ctx, '#4a2410', x + 3, y, 1, 3); px(ctx, '#4a2410', x + 6, y + 4, 1, 3); };
+    for (let x = 0; x < COVER_W; x += 8) { steel(x, 0); steel(x, 32); }
+    for (let x = 8; x < COVER_W; x += 16) steel(x, 16);
+    brick(40, 8); brick(48, 8); brick(56, 24); brick(0, 24);
+    // Flame across the middle row and a bomb.
+    px(ctx, '#e83800', 16, 10, 24, 4); px(ctx, '#f8a800', 16, 11, 24, 2); px(ctx, '#e83800', 26, 8, 4, 8); px(ctx, '#fff8d0', 27, 11, 2, 2);
+    sprite(ctx, ['..ff.', '.kk..', 'kkkk.', 'kkkkk', 'kkkkk', '.kkk.'], 50, 18, { f: '#f8a020', k: '#101018' }, 2);
+    sprite(ctx, ['.HHH.', 'HHHHH', '.FFF.', 'BBBBB', '.B.B.'], 6, 16, { H: '#e8e8f0', F: '#f8c890', B: '#f0f0f8' }, 2);
+  },
   word(ctx) {
     px(ctx, '#111', 0, 0, COVER_W, COVER_H);
     const rows = [['#555', '#c8a000', '#555', '#555', '#2e9e40'], ['#2e9e40', '#555', '#c8a000', '#2e9e40', '#2e9e40'], ['#2e9e40', '#2e9e40', '#2e9e40', '#2e9e40', '#2e9e40']];
@@ -124,6 +138,7 @@ const COVERS = {
 const SUBTITLES = {
   'pryg-skok': ['Платформер · 4 мира', 'Platformer · 4 worlds'],
   tanks: ['Танки · онлайн вдвоём', 'Tanks · online for two'],
+  bombs: ['Бомбы · дуэль онлайн', 'Bombs · online duel'],
   word: ['Слово из 5 букв', 'A five-letter word'],
 };
 

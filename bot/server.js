@@ -30,7 +30,7 @@ class HttpError extends Error {
   constructor(status, msg) { super(msg); this.status = status; }
 }
 
-// Запись игры «Танкодрома» (tanks-replay.js) длиннее обычного запроса.
+// Запись игры «Танкодрома» и «Бомбодрома» (tanks-replay.js, bombs-replay.js) длиннее обычного запроса.
 export const MAX_REPLAY_BODY = 512 * 1024;
 
 async function readJson(req, limit = MAX_BODY) {
@@ -66,7 +66,7 @@ export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
   store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
-  tanks = null, createInvoice = null, word = null, admin = null,
+  tanks = null, bombs = null, createInvoice = null, word = null, admin = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -225,7 +225,7 @@ export function createApiServer({
     routes["GET /api/wallet/top"] = (_body, user, url) => {
       const board = url.searchParams.get("board") || "overall";
       const period = url.searchParams.get("period") || "week";
-      if (!["overall", "mario", "tanks", "word"].includes(board) || !["week", "all"].includes(period)) {
+      if (!["overall", "mario", "tanks", "bombs", "word"].includes(board) || !["week", "all"].includes(period)) {
         return [400, { error: "bad data" }];
       }
       return [200, economy.top(board, period, user?.id ?? null)];
@@ -273,25 +273,28 @@ export function createApiServer({
     };
   }
 
-  // «Танкодром»: билет (зерно игры от сервера) и итог игры с записью нажатий (tanks-results.js).
-  if (tanks) {
-    routes["POST /api/tanks/ticket"] = (_body, user) => {
+  // «Танкодром» и «Бомбодром»: билет (зерно игры от сервера) и итог игры с записью нажатий
+  // (tanks-results.js; повтор — tanks-replay.js и bombs-replay.js).
+  const replayGames = [["tanks", tanks, "Танкодрома"], ["bombs", bombs, "Бомбодрома"]];
+  for (const [game, results, name] of replayGames) {
+    if (!results) continue;
+    routes[`POST /api/${game}/ticket`] = (_body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
       store.touchPlayer(user);
-      const t = tanks.ticket(user.id);
+      const t = results.ticket(user.id);
       return t.error ? [429, t] : [200, t];
     };
-    routes["POST /api/tanks/run"] = (body, user) => {
+    routes[`POST /api/${game}/run`] = (body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
       const seed = Number(body.seed);
       const players = Number(body.players);
       const room = body.room == null ? null : String(body.room);
       if (typeof body.log !== "string" || (room && !/^\d{4,8}$/.test(room))) return [400, { error: "bad data" }];
       store.touchPlayer(user);
-      const r = tanks.submit(user.id, { seed, players, log: body.log, room });
+      const r = results.submit(user.id, { seed, players, log: body.log, room });
       if (r.status !== 200) {
         if (r.status === 422) {
-          console.warn(`Отклонена игра «Танкодрома»: ${r.why}`);
+          console.warn(`Отклонена игра «${name}»: ${r.why}`);
           economy?.rejected(user.id);
         }
         return [r.status, { error: r.error }];
@@ -300,12 +303,12 @@ export function createApiServer({
       let mine = null;
       for (const res of r.results) {
         const out = res.playerId === user.id ? grants : [];
-        economy?.run(res.playerId, { newRecord: res.newRecord, game: "tanks", levels: res.stages }, out);
-        tracker?.event(res.playerId, "game_finish", "tanks");
+        economy?.run(res.playerId, { newRecord: res.newRecord, game, levels: res.stages }, out);
+        tracker?.event(res.playerId, "game_finish", game);
         if (res.playerId === user.id) mine = res;
       }
       economy?.setLang(user.id, user.language_code);
-      return [200, { score: mine?.score ?? 0, best: mine?.best ?? tanks.best(user.id), newRecord: !!mine?.newRecord,
+      return [200, { score: mine?.score ?? 0, best: mine?.best ?? results.best(user.id), newRecord: !!mine?.newRecord,
         ...walletBody(user.id, grants) }];
     };
   }
@@ -391,7 +394,7 @@ export function createApiServer({
       return send(res, 429, { error: "too many requests" });
     }
     try {
-      const body = req.method === "POST" ? await readJson(req, path === "/api/tanks/run" ? MAX_REPLAY_BODY : MAX_BODY) : null;
+      const body = req.method === "POST" ? await readJson(req, path === "/api/tanks/run" || path === "/api/bombs/run" ? MAX_REPLAY_BODY : MAX_BODY) : null;
       const user = userFrom(req);
       if (req.method === "POST" && user && !byUser.take(user.id)) {
         res.setHeader("Retry-After", String(byUser.retryAfter(user.id)));

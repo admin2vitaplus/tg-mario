@@ -222,6 +222,28 @@ export const MIGRATIONS = [
       PRIMARY KEY (chat, game, player_id)
     );
   `,
+  // 8. «Бомбодром»: билеты и принятые игры, как у «Танкодрома» (tanks-results.js, bombs-replay.js).
+  `
+    CREATE TABLE IF NOT EXISTS bombs_tickets (
+      seed INTEGER PRIMARY KEY,
+      player_id INTEGER NOT NULL,
+      issued_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS bombs_tickets_player ON bombs_tickets(player_id, issued_at);
+    CREATE TABLE IF NOT EXISTS bombs_runs (
+      id INTEGER PRIMARY KEY,
+      player_id INTEGER NOT NULL,
+      seed INTEGER NOT NULL,
+      score INTEGER NOT NULL,
+      stages INTEGER NOT NULL,
+      frames INTEGER NOT NULL,
+      players INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE (player_id, seed)
+    );
+    CREATE INDEX IF NOT EXISTS bombs_runs_time ON bombs_runs(created_at);
+  `,
 ];
 
 export function migrate(db) {

@@ -5,6 +5,7 @@ import { createTracker } from "./stats.js";
 import { currentCommit } from "./version.js";
 import { createEconomy, loadEconomy } from "./economy.js";
 import { createTanksResults } from "./tanks-results.js";
+import { createBombsResults } from "./bombs-results.js";
 import { createWord } from "./word.js";
 import { createAdmin } from "./admin.js";
 import { createAdminAuth } from "./admin-auth.js";
@@ -51,17 +52,21 @@ export async function startApp({
   // Онлайн-матч засчитывается обоим игрокам комнаты, поэтому итоги танков знают состав комнат.
   let tanks = null;
   const tanksResults = createTanksResults(store, { members: (code) => tanks?.members(code) ?? null });
+  let bombs = null;
+  const bombsResults = createBombsResults(store, { members: (code) => bombs?.members(code) ?? null });
   const word = createWord(store, { economy, tracker });
   const auth = createAdminAuth({ login: (env.ADMIN_LOGIN || "").trim(), passwordHash: (env.ADMIN_PASSWORD_HASH || "").trim() });
   if (!auth.enabled) console.log("Панель /admin выключена: не заданы ADMIN_LOGIN и ADMIN_PASSWORD_HASH.");
   const admin = createAdmin({
     store, economy, auth, refundStars, commit, dbFile,
-    live: () => (tanks ? { rooms: tanks.rooms.size, sockets: tanks.wss.clients.size } : null),
+    live: () => (tanks ? { rooms: tanks.rooms.size + (bombs?.rooms.size ?? 0), sockets: tanks.wss.clients.size + (bombs?.wss.clients.size ?? 0) } : null),
   });
   const server = createApiServer({
-    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, createInvoice, word, admin: auth.enabled ? admin : null,
+    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, bombs: bombsResults, createInvoice, word, admin: auth.enabled ? admin : null,
   });
   tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
+  // Дуэль «Бомбодрома» — такие же комнаты на своём пути.
+  bombs = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits, path: "/ws/bombs" });
 
   // Соединения держим в списке, чтобы при остановке закрыть и «живые» keep-alive.
   const sockets = new Set();
@@ -75,15 +80,16 @@ export async function startApp({
     clearInterval(pruneTimer);
     clearInterval(seasonTimer);
     await closing;
-    for (const ws of tanks.wss.clients) ws.close(1001, "server shutdown");
+    const roomSets = [tanks, bombs];
+    for (const r of roomSets) for (const ws of r.wss.clients) ws.close(1001, "server shutdown");
     await new Promise((ok) => {
       server.close(() => ok());
       server.closeIdleConnections?.();
-      setTimeout(() => { for (const s of sockets) s.destroy(); for (const ws of tanks.wss.clients) ws.terminate(); }, 2000).unref();
+      setTimeout(() => { for (const s of sockets) s.destroy(); for (const r of roomSets) for (const ws of r.wss.clients) ws.terminate(); }, 2000).unref();
     });
-    tanks.wss.close();
+    for (const r of roomSets) r.wss.close();
     store.close();
   })();
 
-  return { server, store, tanks, tracker, economy, word, commit, gameUrl, allowedOrigins, port: server.address().port, close };
+  return { server, store, tanks, bombs, tracker, economy, word, commit, gameUrl, allowedOrigins, port: server.address().port, close };
 }

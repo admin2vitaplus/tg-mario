@@ -1,0 +1,235 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: "Courier New", monospace;
+  overflow: hidden;
+  touch-action: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#hud {
+  display: flex;
+  justify-content: space-around;
+  padding: 6px 4px;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.3;
+}
+
+#game {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#screen {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #f8d020;
+  text-shadow: 2px 2px 0 #000;
+  pointer-events: none;
+}
+
+#banner.over { color: #e83820; animation: rise 2s ease-out both; }
+#banner.toast { top: 12%; transform: none; font-size: 15px; color: #fff; padding: 0 12px; }
+#time.low { color: #e83820; }
+.btn.bb { background: rgba(40, 90, 216, 0.6); font-size: 24px; }
+.btn.bb.on { background: rgba(90, 140, 255, 0.9); }
+@keyframes rise { from { top: 100%; } to { top: 50%; } }
+.hidden { display: none !important; }
+
+#controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 160px;
+  padding: 0 16px env(safe-area-inset-bottom);
+}
+
+#dpad, #actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  font-size: 26px;
+  font-weight: bold;
+}
+
+.btn.round { border-radius: 50%; }
+.btn.ab { background: rgba(216, 40, 0, 0.6); font-size: 24px; }
+.btn.on { background: rgba(255, 255, 255, 0.45); }
+.btn.ab.on { background: rgba(255, 90, 50, 0.9); }
+
+#dpad {
+  display: grid;
+  grid-template-areas: ". up ." "left . right" ". down .";
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 46px);
+  gap: 0;
+}
+#dpad .btn { width: 46px; height: 46px; border-radius: 8px; font-size: 20px; }
+#dpad .up { grid-area: up; }
+#dpad .down { grid-area: down; }
+#dpad .left { grid-area: left; }
+#dpad .right { grid-area: right; }
+
+/* Padding with a matching negative margin: touches at the button edges still land on the pad */
+#actions { display: grid; grid-template-columns: repeat(2, auto); gap: 14px; padding: 10px; margin: -10px; }
+#btnA { width: 76px; height: 76px; transform: translateY(-12px); }
+
+/* Mouse and keyboard: no on-screen buttons */
+@media (hover: hover) and (pointer: fine) {
+  #controls { display: none; }
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.9);
+}
+
+#overlay.hidden { display: none; }
+#overlay h1 { margin: 0 0 12px; font-size: 30px; color: #f8d020; letter-spacing: 2px; }
+#overlay p { margin: 0 0 20px; font-size: 15px; line-height: 1.5; }
+#overlay .hint { margin-top: 20px; font-size: 12px; opacity: 0.6; }
+
+
+
+#overlay button:not(.ui-btn) {
+  padding: 12px 28px;
+  border: 0;
+  border-radius: 10px;
+  background: #3a8a3a;
+  color: #fff;
+  font: bold 17px "Courier New", monospace;
+}
+#overlay button:not(.ui-btn):disabled { background: #333; color: #888; }
+
+#onlineStart { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.join { display: flex; gap: 8px; }
+.join input {
+  box-sizing: border-box;
+  width: 120px;
+  min-height: 46px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  background: #111;
+  color: #fff;
+  font: bold 20px "Courier New", monospace;
+  text-align: center;
+  letter-spacing: 4px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.join button { flex: 1; }
+#overlay button.ghost:not(.ui-btn) { background: #333; }
+#overlay b.code { font-size: 28px; color: #f8d020; letter-spacing: 4px; }
+
+
+
+#back { margin-top: 8px; width: min(280px, 100%); }
+
+@media (max-width: 420px) {
+  #controls { padding-left: 12px; padding-right: 12px; }
+  #dpad, #actions { gap: 8px; }
+  .btn { width: 56px; height: 56px; font-size: 22px; }
+  #dpad { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px); }
+  #dpad .btn { width: 42px; height: 42px; font-size: 18px; }
+}
+
+/* Phone turned sideways: d-pad on the left, buttons on the right, field in the middle */
+@media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
+  #app {
+    display: grid;
+    grid-template-columns: 1fr minmax(0, 1.7fr) 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "dpad hud actions" "dpad game actions";
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  #hud { grid-area: hud; padding: 3px 0; font-size: 10px; line-height: 1.2; }
+  #game { grid-area: game; }
+  #controls { display: contents; }
+  #dpad { grid-area: dpad; place-self: center; }
+  #actions { grid-area: actions; place-self: center; }
+  #overlay { justify-content: safe center; overflow-y: auto; padding: 8px 16px; }
+  #overlay h1 { font-size: 22px; margin-bottom: 6px; }
+  #overlay p { margin-bottom: 10px; font-size: 13px; }
+  #overlay .hint { display: none; }
+  #overlay button:not(.ui-btn) { padding: 8px 22px; font-size: 15px; }
+  #menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+}
+
+
+/* «Назад» (../lib/back.js): a small button in the top-left corner */
+#backBtn {
+  position: absolute;
+  top: 4px;
+  left: calc(4px + env(safe-area-inset-left));
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font: bold 18px "Courier New", monospace;
+}
+.withBack #hud { padding-left: 40px; }
+#overlay { z-index: 4; }
+
+@media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
+  .withBack #hud { padding-left: 0; }
+}
+
+/* Keyboard help only where there is a keyboard and a mouse. */
+@media not all and (hover: hover) and (pointer: fine) {
+  #overlay .hint { display: none; }
+}
