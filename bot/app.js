@@ -6,13 +6,16 @@ import { currentCommit } from "./version.js";
 import { createEconomy, loadEconomy } from "./economy.js";
 import { createTanksResults } from "./tanks-results.js";
 import { createWord } from "./word.js";
+import { createAdmin } from "./admin.js";
 
 // Всё, кроме самого бота Telegram и туннеля: база, HTTP API и комнаты «Танкодрома».
 // Вынесено отдельно, чтобы запуск и остановку можно было проверить тестом без сети и токена.
 // notify(userId, text, { offText }) — сообщение игроку от бота (итоги недели); без него сообщений нет.
 // createInvoice(item, user) — ссылка на счёт в Telegram Stars (bot.api.createInvoiceLink); без неё покупок за звёзды нет.
+// admins — Telegram id из ADMIN_ID: им открыта панель /admin; refundStars(userId, chargeId) — возврат звёзд из панели.
 export async function startApp({
   env = process.env, botToken, onAchievements, notify = null, createInvoice = null, port, tanksLimits,
+  admins = new Set(), refundStars = null,
 } = {}) {
   // Адрес игры не вшит в код: он задаётся в .env, чтобы переезд сайта не требовал правки бота.
   const gameUrl = env.WEBAPP_URL;
@@ -48,8 +51,12 @@ export async function startApp({
   let tanks = null;
   const tanksResults = createTanksResults(store, { members: (code) => tanks?.members(code) ?? null });
   const word = createWord(store, { economy, tracker });
+  const admin = createAdmin({
+    store, economy, admins, refundStars, commit, dbFile,
+    live: () => (tanks ? { rooms: tanks.rooms.size, sockets: tanks.wss.clients.size } : null),
+  });
   const server = createApiServer({
-    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, createInvoice, word,
+    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, createInvoice, word, admin,
   });
   tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
 

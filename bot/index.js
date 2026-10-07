@@ -22,6 +22,8 @@ if (!process.env.WEBAPP_URL) {
 }
 
 const bot = new Bot(token);
+// Telegram id администраторов через запятую; пусто — команда /stats и панель /admin выключены.
+const admins = new Set((process.env.ADMIN_ID || "").split(",").map((s) => Number(s.trim())).filter((n) => Number.isSafeInteger(n) && n > 0));
 
 // ---------- Сервер очков ----------
 const app = await startApp({
@@ -32,10 +34,10 @@ const app = await startApp({
       .catch(() => {}),
   notify: walletNotifier(bot),
   createInvoice: starsInvoice(bot),
+  admins,
+  refundStars: (userId, chargeId) => bot.api.refundStarPayment(userId, chargeId),
 });
 const { store, tracker } = app;
-// Telegram id администраторов через запятую; пусто — команда /stats выключена.
-const admins = new Set((process.env.ADMIN_ID || "").split(",").map((s) => Number(s.trim())).filter(Number.isSafeInteger));
 const baseGameUrl = app.gameUrl;
 console.log(`Сервер очков слушает порт ${app.port}, коммит ${app.commit}`);
 
@@ -192,6 +194,16 @@ bot.command("invite", (ctx) => {
 bot.command("stats", (ctx, next) => {
   if (!admins.has(ctx.from?.id)) return next();
   return ctx.reply(statsReport(store.db) + "\n\n" + economyReport(store.db, app.economy.cfg));
+});
+
+// Панель владельца (admin.js): открывается кнопкой Mini App с самого сервера бота.
+bot.command("admin", (ctx, next) => {
+  if (!admins.has(ctx.from?.id) || ctx.chat?.type !== "private") return next();
+  if (!apiUrl) return ctx.reply("У сервера сейчас нет публичного адреса, панель не откроется.");
+  const url = new URL("admin", apiUrl.endsWith("/") ? apiUrl : `${apiUrl}/`).toString();
+  return ctx.reply("Панель: статистика, игроки, жетоны и покупки.", {
+    reply_markup: new InlineKeyboard().webApp("📊 Открыть панель", url),
+  });
 });
 
 // Жетоны: итоги недели и команды администратора (/wallet, /flag, /unflag, /annul).
