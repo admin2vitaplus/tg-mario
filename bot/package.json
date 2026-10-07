@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env index.js",
     "test": "node --disable-warning=ExperimentalWarning --test",
-    "export:season": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/export-season.js"
+    "export:season": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/export-season.js",
+    "admin:password": "node scripts/admin-password.js"
   },
   "engines": {
     "node": ">=22.13"

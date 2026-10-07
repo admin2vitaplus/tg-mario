@@ -33,6 +33,7 @@ const app = await startApp({
       .catch(() => {}),
   notify: walletNotifier(bot),
   createInvoice: starsInvoice(bot),
+  refundStars: (userId, chargeId) => bot.api.refundStarPayment(userId, chargeId),
 });
 const { store, tracker } = app;
 // Telegram id владельца (администраторов) через запятую. Только им доступны служебные команды
@@ -197,6 +198,16 @@ bot.command("invite", owner((ctx) => {
 bot.command("stats", (ctx, next) => {
   if (!admins.has(ctx.from?.id)) return next();
   return ctx.reply(statsReport(store.db) + "\n\n" + economyReport(store.db, app.economy.cfg));
+});
+
+// Панель владельца (admin.js): ссылка на страницу самого сервера бота, вход по логину и паролю.
+bot.command("admin", (ctx, next) => {
+  if (!admins.has(ctx.from?.id) || ctx.chat?.type !== "private") return next();
+  if (!apiUrl) return ctx.reply("У сервера сейчас нет публичного адреса, панель не откроется.");
+  const url = new URL("admin", apiUrl.endsWith("/") ? apiUrl : `${apiUrl}/`).toString();
+  return ctx.reply(`Панель: статистика, игроки, жетоны и покупки. Вход по логину и паролю.\n${url}`, {
+    reply_markup: new InlineKeyboard().url("📊 Открыть панель", url),
+  });
 });
 
 // Жетоны: итоги недели и команды администратора (/wallet, /flag, /unflag, /annul).

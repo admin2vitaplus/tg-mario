@@ -28,8 +28,9 @@ export function seasonLabel(season) {
   return `${d(seasonStart(season))}–${d(seasonStart(season + 1) - 1)}`;
 }
 
-// daily — вход в сборник за день (с серией дней), task — ежедневное задание в игре.
-export const REASONS = ["achievement", "record", "daily", "task", "invite", "prize", "shop", "annul"];
+// daily — вход в сборник за день (с серией дней), task — ежедневное задание в игре,
+// admin — ручное начисление или списание владельцем из панели (admin.js).
+export const REASONS = ["achievement", "record", "daily", "task", "invite", "prize", "shop", "annul", "admin"];
 // Начисления с дневным потолком на игрока. Призы недели ограничены своим фондом.
 const CAPPED = ["achievement", "record", "daily", "task", "invite"];
 // Игры с жетонами и их ежедневные задания (сбрасываются в 00:00 UTC).
@@ -234,7 +235,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     let sql;
     if (board === "overall") {
       sql = `SELECT l.player_id AS id, SUM(l.amount) AS value, MAX(l.id) AS tie FROM ledger l
-        WHERE l.reason NOT IN ('prize', 'shop', 'annul') ${period === "week" ? `AND l.season = ${season}` : ""}
+        WHERE l.reason NOT IN ('prize', 'shop', 'annul', 'admin') ${period === "week" ? `AND l.season = ${season}` : ""}
         GROUP BY l.player_id HAVING value > 0`;
     } else if (board === "word") {
       sql = wordSums(period === "week" ? from : 0, Number.MAX_SAFE_INTEGER);
@@ -571,12 +572,12 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
 
 const REASON_NAMES = {
   achievement: "достижения", record: "рекорды", daily: "вход за день", task: "задания в играх", invite: "приглашения",
-  prize: "призы", shop: "магазин", annul: "аннулировано",
+  prize: "призы", shop: "магазин", annul: "аннулировано", admin: "вручную",
 };
 
 export function economyStats(db, season) {
   const byReason = db.prepare(`SELECT reason, SUM(amount) AS n FROM ledger WHERE season = ? GROUP BY reason`).all(season);
-  const issued = byReason.filter((r) => r.n > 0 && r.reason !== "shop" && r.reason !== "annul").reduce((a, r) => a + r.n, 0);
+  const issued = byReason.filter((r) => r.n > 0 && !["shop", "annul", "admin"].includes(r.reason)).reduce((a, r) => a + r.n, 0);
   const top = db.prepare(`SELECT l.player_id, p.name, SUM(l.amount) AS n FROM ledger l
     LEFT JOIN players p ON p.id = l.player_id
     WHERE l.season = ? AND l.amount > 0 AND l.reason != 'shop' GROUP BY l.player_id ORDER BY n DESC LIMIT 5`).all(season);
@@ -590,7 +591,7 @@ export function economyStats(db, season) {
 export function economyReport(db, cfg, at = Date.now()) {
   const s = economyStats(db, seasonOf(at));
   const of = (reason) => s.byReason.find((r) => r.reason === reason)?.n ?? 0;
-  const share = s.byReason.filter((r) => r.n > 0 && !["shop", "annul"].includes(r.reason))
+  const share = s.byReason.filter((r) => r.n > 0 && !["shop", "annul", "admin"].includes(r.reason))
     .map((r) => `${REASON_NAMES[r.reason]} ${Math.round((r.n / s.issued) * 100)}%`).join(", ");
   return [
     `💠 Жетоны, неделя ${seasonLabel(s.season)} (сезон ${s.season}, дни по UTC)`,

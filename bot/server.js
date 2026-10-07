@@ -5,6 +5,7 @@ import { createRateLimiter } from "./ratelimit.js";
 import { checkLevel, checkRun, currentGame, LAST_LEVEL, PER_WORLD, SEQUENCE_TTL_MS, WORLD_TIMES } from "./plausibility.js";
 import { CLIENT_EVENTS, GAMES } from "./stats.js";
 import { publicRules, seasonOf, seasonStart } from "./economy.js";
+import { adminPage, isAdminPath } from "./admin.js";
 
 // Один HTTP-сервер на все игры. Маршруты игры «Прыг-Скок» живут под /api/mario/.
 // Сетевые игры (например, танки) подключаются к этому же серверу через событие
@@ -65,7 +66,7 @@ export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
   store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
-  tanks = null, createInvoice = null, word = null,
+  tanks = null, createInvoice = null, word = null, admin = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -355,11 +356,19 @@ export function createApiServer({
     return [204, null];
   };
 
+  // Панель владельца (admin.js): страница и маршруты /api/admin/*.
+  if (admin) Object.assign(routes, admin.routes);
+
   const server = createServer(async (req, res) => {
     const origin = req.headers.origin;
+    const url = new URL(req.url, "http://x");
+    const path = url.pathname.replace(/\/+$/, "");
+    // Панель открывается с самого сервера, поэтому её запросы приходят со своего адреса (он меняется
+    // вместе с туннелем). Ей CORS не нужен: чужой сайт не получит заголовков и не пройдёт предзапрос.
+    const own = admin && isAdminPath(path);
     // CORS только для сайта игры; запросы со страниц чужих сайтов отклоняются целиком.
-    if (origin && !originAllowed(origin)) return send(res, 403, { error: "forbidden origin" });
-    if (origin) {
+    if (origin && !own && !originAllowed(origin)) return send(res, 403, { error: "forbidden origin" });
+    if (origin && !own) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
       res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
@@ -368,8 +377,11 @@ export function createApiServer({
     }
     if (req.method === "OPTIONS") return res.writeHead(204).end();
 
-    const url = new URL(req.url, "http://x");
-    const path = url.pathname.replace(/\/+$/, "");
+    const page = own && req.method === "GET" ? adminPage(path) : null;
+    if (page) {
+      res.writeHead(200, page.headers);
+      return res.end(page.body);
+    }
     const handler = routes[`${req.method} ${path}`];
     if (!handler) return send(res, 404, { error: "not found" });
 
@@ -385,7 +397,7 @@ export function createApiServer({
         res.setHeader("Retry-After", String(byUser.retryAfter(user.id)));
         return send(res, 429, { error: "too many requests" });
       }
-      const [status, out] = await handler(body, user, url);
+      const [status, out] = await handler(body, user, url, { req, ip });
       send(res, status, out);
     } catch (err) {
       if (err instanceof HttpError) {

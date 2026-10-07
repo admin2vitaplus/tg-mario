@@ -1,0 +1,63 @@
+/* Панель владельца: тёмная, с жёлтым акцентом картриджа; ширина от 360 px. */
+:root {
+  --bg: #15161a; --card: #1f2127; --line: #2e3139; --text: #eceef2; --muted: #9aa0ab;
+  --accent: #f5c518; --accent2: #5ab0ff; --pos: #5fd38a; --neg: #ff6b6b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 0 12px 32px; max-width: 720px; margin: 0 auto; }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 8px; }
+.top { gap: 8px; }
+.top b { color: var(--accent); font-size: 18px; letter-spacing: .5px; margin-right: auto; }
+.login { margin-top: 24px; }
+.login button { width: 100%; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 8px; }
+.tabs button { flex: none; padding: 6px 9px; font-size: 14px; }
+.tabs button.on { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }
+button { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+button:active { transform: translateY(1px); }
+button.ghost { background: transparent; }
+button.danger { border-color: var(--neg); color: var(--neg); }
+button.mini { padding: 2px 8px; font-size: 13px; }
+input { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; width: 100%; min-width: 0; margin-bottom: 8px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin: 10px 0; }
+.card h2 { font-size: 15px; margin: 0 0 8px; color: var(--accent); }
+.card h3 { font-size: 13px; margin: 8px 0 2px; color: var(--muted); font-weight: 500; }
+.note { color: var(--muted); margin: 8px 0; }
+.small { color: var(--muted); font-size: 13px; margin: 4px 0; }
+.kv { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.kv:last-child { border-bottom: 0; }
+.kv span { color: var(--muted); overflow-wrap: anywhere; }
+.kv b { text-align: right; white-space: nowrap; font-weight: 600; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.tile { background: var(--bg); border-radius: 10px; padding: 8px; }
+.tile b { display: block; font-size: 20px; }
+.tile span { color: var(--muted); font-size: 12px; }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 70px; margin: 4px 0; }
+.bars i { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; min-width: 2px; }
+.bars.b { height: 36px; }
+.bars.b i { background: var(--accent2); }
+.legend { display: flex; gap: 12px; font-size: 12px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.legend .a::before { background: var(--accent); }
+.legend .b::before { background: var(--accent2); }
+.axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+th, td { text-align: right; padding: 3px 2px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 500; }
+td:first-child, th:first-child { text-align: left; }
+.game { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.game:last-child { border-bottom: 0; }
+.game small { display: block; color: var(--muted); }
+.search { display: flex; gap: 8px; margin-top: 4px; }
+.search input { margin: 0; }
+.row { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; text-align: left; margin: 4px 0; background: var(--bg); }
+.row small { color: var(--muted); }
+.row .right { white-space: nowrap; color: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.inline { display: flex; gap: 8px; flex: 1 1 100%; }
+.inline input { margin: 0; }
+.msg { color: var(--neg); min-height: 1em; margin: 6px 0 0; }
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
