@@ -34,7 +34,7 @@ async function withPanel(fn, { authOpts = {}, enabled = true } = {}) {
     refundStars: async (userId, charge) => { refunds.push([userId, charge]); },
   });
   const server = createApiServer({
-    store, botToken: TOKEN, allowedOrigins: ["https://game.example"], tracker, economy, admin: auth.enabled ? admin : null,
+    store, botToken: TOKEN, allowedOrigins: ["https://game.example"], tracker, economy, admin,
   });
   await new Promise((ok) => server.listen(0, ok));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -100,10 +100,13 @@ test("login attempts are limited and sessions expire", () =>
     assert.equal((await call("GET", "/api/admin/me", { token })).status, 401);
   }));
 
-test("without ADMIN_LOGIN and ADMIN_PASSWORD_HASH the panel does not exist", () =>
+test("without ADMIN_LOGIN and ADMIN_PASSWORD_HASH the page explains, login is off", () =>
   withPanel(async ({ call }) => {
-    assert.equal((await call("GET", "/admin")).status, 404);
+    // Страница открывается и сама пишет, что вход не настроен (вместо голого «not found»).
+    assert.equal((await call("GET", "/admin")).status, 200);
+    assert.deepEqual((await call("GET", "/api/admin/status")).json, { enabled: false });
     assert.equal((await call("POST", "/api/admin/login", { body: { login: "owner", password: PASSWORD } })).status, 404);
+    assert.equal((await call("GET", "/api/admin/overview")).status, 401);
   }, { enabled: false }));
 
 test("password hash: salted, checked, garbage rejected", () => {

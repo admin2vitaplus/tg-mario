@@ -204,6 +204,12 @@ bot.command("stats", (ctx, next) => {
 bot.command("admin", (ctx, next) => {
   if (!admins.has(ctx.from?.id) || ctx.chat?.type !== "private") return next();
   if (!apiUrl) return ctx.reply("У сервера сейчас нет публичного адреса, панель не откроется.");
+  // Без логина и хэша пароля страница откроется, но войти будет нельзя: подсказываем, что задать.
+  if (!app.adminEnabled) {
+    return ctx.reply("Панель выключена: в .env бота не заданы ADMIN_LOGIN и ADMIN_PASSWORD_HASH.\n" +
+      "В папке бота на сервере: npm run admin:password — напечатает строку ADMIN_PASSWORD_HASH=…; " +
+      "впишите её и ADMIN_LOGIN=<логин> в .env и перезапустите бота (sudo systemctl restart tgmario).");
+  }
   const url = new URL("admin", apiUrl.endsWith("/") ? apiUrl : `${apiUrl}/`).toString();
   return ctx.reply(`Панель: статистика, игроки, жетоны и покупки. Вход по логину и паролю.\n${url}`, {
     reply_markup: new InlineKeyboard().url("📊 Открыть панель", url),

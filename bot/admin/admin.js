@@ -359,7 +359,10 @@
   } } }, T('sign_out'));
   document.querySelector('.top').insertBefore(out, document.getElementById('reload'));
   function start() {
-    if (!token) return loginForm('');
+    if (!token) {
+      return api('GET', 'status').then(function (r) { loginForm(r.enabled ? '' : T('disabled')); })
+        .catch(function () { loginForm(''); });
+    }
     api('GET', 'me').then(function () { out.hidden = false; show('overview', true); }).catch(fail);
   }
   document.getElementById('title').textContent = T('title');

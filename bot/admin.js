@@ -195,6 +195,8 @@ export function createAdmin({
   const log = (what) => logger(`Панель: ${what}`);
 
   const routes = {
+    // Настроен ли вход: страница сразу пишет, если логин и пароль на сервере не заданы.
+    "GET /api/admin/status": () => [200, { enabled: auth.enabled }],
     "POST /api/admin/login": (body, _user, _url, { ip }) => {
       const r = auth.login(ip, body.login, body.password);
       if (r.ok) { log(`вход с ${ip}`); return [200, { ok: true, token: r.token, expiresAt: r.expiresAt }]; }

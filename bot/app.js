@@ -59,7 +59,7 @@ export async function startApp({
     live: () => (tanks ? { rooms: tanks.rooms.size, sockets: tanks.wss.clients.size } : null),
   });
   const server = createApiServer({
-    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, createInvoice, word, admin: auth.enabled ? admin : null,
+    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, createInvoice, word, admin,
   });
   tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
 
@@ -85,5 +85,8 @@ export async function startApp({
     store.close();
   })();
 
-  return { server, store, tanks, tracker, economy, word, commit, gameUrl, allowedOrigins, port: server.address().port, close };
+  return {
+    server, store, tanks, tracker, economy, word, commit, gameUrl, allowedOrigins, port: server.address().port, close,
+    adminEnabled: auth.enabled,
+  };
 }
