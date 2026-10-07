@@ -1,4 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { gzipSync } from "node:zlib";
 import { loadavg } from "node:os";
 import { collectStats } from "./stats.js";
 import { dayOf } from "./days.js";
@@ -8,35 +10,57 @@ import { economyStats, seasonLabel, seasonOf, seasonStart } from "./economy.js";
 // (ADMIN_LOGIN, ADMIN_PASSWORD_HASH, см. admin-auth.js); без них панель выключена.
 // Без действующей сессии сервер отвечает 401 и ничего не показывает.
 
-const PAGE_FILES = {
-  "index.html": "text/html; charset=utf-8",
-  "admin.js": "text/javascript; charset=utf-8",
-  "admin.css": "text/css; charset=utf-8",
-};
 const PAGE_DIR = new URL("./admin/", import.meta.url);
-// Страница только со своего сервера: никаких внешних скриптов и стилей.
-const PAGE_HEADERS = {
-  "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-  "Cache-Control": "no-cache",
-  "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "no-referrer",
-};
+const sha = (text) => createHash("sha256").update(text).digest("base64");
+
+// Страница собирается один раз: стили и скрипт вписываются в HTML, чтобы через медленный туннель
+// она открывалась за один запрос, а не за три подряд. Внешнего по-прежнему ничего: CSP разрешает
+// только эти два встроенных блока (по их хэшам).
+let built = null;
+function buildPage() {
+  const css = readFileSync(new URL("admin.css", PAGE_DIR), "utf8");
+  const js = readFileSync(new URL("admin.js", PAGE_DIR), "utf8");
+  const html = readFileSync(new URL("index.html", PAGE_DIR), "utf8")
+    .replace('<link rel="stylesheet" href="admin/admin.css">', () => `<style>${css}</style>`)
+    .replace('<script src="admin/admin.js"></script>', () => `<script>${js}</script>`);
+  const body = Buffer.from(html);
+  return {
+    body,
+    gzip: gzipSync(body, { level: 9 }),
+    etag: `"${sha(body).slice(0, 27)}"`,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy": `default-src 'self'; style-src 'sha256-${sha(css)}'; script-src 'sha256-${sha(js)}'; ` +
+        "img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      // Браузер каждый раз сверяет ETag: после обновления бота придёт новая страница, иначе — короткий 304.
+      "Cache-Control": "no-cache",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+      Vary: "Accept-Encoding",
+    },
+  };
+}
 
 export const ADMIN_DAYS = 30;
+// Сводка считается заново не чаще раза в 30 секунд. Если она старше, но не старше 10 минут, панель
+// сразу получает прошлую, а новая считается сразу после ответа (следующее открытие увидит её).
 const OVERVIEW_TTL_MS = 30_000;
+const OVERVIEW_STALE_MS = 10 * 60_000;
 // Ручное начисление или списание за один раз — не больше этого.
 export const MAX_ADJUST = 100_000;
 
 export const isAdminPath = (path) => path === "/admin" || path.startsWith("/admin/") || path.startsWith("/api/admin/");
 
-// Файл страницы панели или null. Файлы читаются один раз.
-const pageCache = new Map();
-export function adminPage(path) {
-  // /admin — сама страница; её файлы — /admin/<имя> (и при открытии с «/» на конце — /admin/admin/<имя>).
-  const name = path === "/admin" ? "index.html" : /^\/admin(?:\/admin)?\/(admin\.(?:js|css))$/.exec(path)?.[1];
-  if (!name) return null;
-  if (!pageCache.has(name)) pageCache.set(name, readFileSync(new URL(name, PAGE_DIR)));
-  return { body: pageCache.get(name), headers: { "Content-Type": PAGE_FILES[name], ...PAGE_HEADERS } };
+// Страница панели для запроса или null: { status, headers, body } с учётом gzip и ETag.
+export function adminPage(path, req) {
+  if (path !== "/admin") return null;
+  built ??= buildPage();
+  const headers = { ...built.headers, ETag: built.etag };
+  if (req.headers["if-none-match"] === built.etag) return { status: 304, headers, body: null };
+  if (/\bgzip\b/.test(req.headers["accept-encoding"] || "")) {
+    return { status: 200, headers: { ...headers, "Content-Encoding": "gzip" }, body: built.gzip };
+  }
+  return { status: 200, headers, body: built.body };
 }
 
 const id = (v) => {
@@ -103,6 +127,7 @@ export function createAdmin({
   const { db } = store;
   let cpuMark = { at: Date.now(), usage: process.cpuUsage() };
   let overview = null;
+  let refreshing = false;
 
   // CPU процесса между двумя просмотрами панели (на сервере предел 40 %).
   const cpuPercent = () => {
@@ -189,6 +214,8 @@ export function createAdmin({
 
   const guard = (fn) => async (body, _user, url, { req }) => {
     if (!auth.check(req.headers.authorization)) return [401, { error: "unauthorized" }];
+    // Изменения из панели (жетоны, пометки, возвраты) сразу видны в сводке.
+    if (req.method === "POST") overview = null;
     return fn(body, url);
   };
   const needEconomy = (fn) => (economy ? fn : () => [503, { error: "no economy" }]);
@@ -209,7 +236,12 @@ export function createAdmin({
     "GET /api/admin/me": guard(() => [200, { ok: true, refund: !!refundStars, economy: !!economy }]),
     "GET /api/admin/overview": guard(() => {
       const at = now();
-      if (!overview || at - overview.at > OVERVIEW_TTL_MS || at < overview.at) overview = collectOverview();
+      const age = overview ? at - overview.at : Infinity;
+      if (age > OVERVIEW_STALE_MS || age < 0) overview = collectOverview();
+      else if (age > OVERVIEW_TTL_MS && !refreshing) {
+        refreshing = true;
+        setImmediate(() => { try { overview = collectOverview(); } finally { refreshing = false; } });
+      }
       return [200, { ...overview, server: server() }];
     }),
     "GET /api/admin/players": guard((_b, url) => [200, search(url.searchParams.get("q"))]),
