@@ -790,6 +790,14 @@ function apiBase() {
   return '';
 }
 const API = apiBase();
+// The menu no longer waits for the server check before opening a game (it can take
+// seconds through the tunnel), so ?api= may be an old address: once lib/server.js has
+// found the one that answers, that one is used.
+const apiNow = () => (window.Server && window.Server.online && window.Server.base) || API;
+const whenChecked = (fn) => {
+  const s = window.Server;
+  if (s && s.online === null && s.ready) s.ready.then(fn, fn); else fn();
+};
 const BOT_NAME = (() => {
   let name = new URLSearchParams(location.search).get('bot');
   try {
@@ -803,7 +811,7 @@ const BOT_NAME = (() => {
 // A link that opens the collection straight away, with the server's tunnel name after «__» (see ../menu.js).
 function appLink(label) {
   let host = '';
-  try { host = new URL(API).hostname; } catch (e) { /* no server */ }
+  try { host = new URL(apiNow()).hostname; } catch (e) { /* no server */ }
   const m = /^([a-z0-9-]{1,63})\.trycloudflare\.com$/.exec(host);
   return 'https://t.me/' + BOT_NAME + '?startapp=' + label + (m ? '__' + m[1] : '');
 }
@@ -822,6 +830,7 @@ function netSend(msg) {
 }
 
 function netClose() {
+  connectSeq++;
   const ws = net.ws;
   net.ws = null;
   net.code = '';
@@ -833,10 +842,17 @@ function netClose() {
   if (ws) { ws.onclose = null; try { ws.close(1000); } catch (e) { /* ignore */ } }
 }
 
+// A leave (netClose) while the server check is still running cancels the connection.
+let connectSeq = 0;
 function connect(onOpen, onFail) {
+  const seq = ++connectSeq;
+  whenChecked(() => { if (seq === connectSeq) openSocket(onOpen, onFail); });
+}
+
+function openSocket(onOpen, onFail) {
   let ws;
   const auth = tg && tg.initData ? '?auth=' + encodeURIComponent(tg.initData) : '';
-  try { ws = new WebSocket(API.replace(/^http/, 'ws') + '/ws/bombs' + auth); } catch (e) { onFail(false); return; }
+  try { ws = new WebSocket(apiNow().replace(/^http/, 'ws') + '/ws/bombs' + auth); } catch (e) { onFail(false); return; }
   net.ws = ws;
   let opened = false;
   const timer = setTimeout(() => { if (!opened && net.ws === ws) ws.close(); }, 10000);
@@ -1055,7 +1071,7 @@ function onlineMenu(text) {
 function checkServer() {
   const ctl = window.AbortController ? new AbortController() : null;
   const timer = setTimeout(() => ctl && ctl.abort(), 6000);
-  fetch(API + '/api/health', { mode: 'no-cors', signal: ctl ? ctl.signal : undefined })
+  fetch(apiNow() + '/api/health', { mode: 'no-cors', signal: ctl ? ctl.signal : undefined })
     .then(() => { serverAlive = true; })
     .catch(() => {
       serverAlive = false;
