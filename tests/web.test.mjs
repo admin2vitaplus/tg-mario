@@ -190,6 +190,21 @@ test('no separate records button: tables live in the tickets panels', () => {
   assert.match(read(path.join(WEB, 'api.js')), /walletGame = 'mario'/);
 });
 
+// Games with their own page open fast: the menu fetches their files ahead and does not
+// wait long for the server check (the game page checks the server itself).
+test('games with their own page are fetched ahead and opened without a long wait', () => {
+  for (const g of loadConfig().games.filter((x) => x.url && x.enabled)) {
+    assert.ok(Array.isArray(g.preload) && g.preload.length, g.id + ' has no preload list');
+    const page = read(path.join(WEB, g.url, 'index.html'));
+    for (const f of g.preload) {
+      assert.ok(fs.existsSync(path.join(WEB, f)), `${g.id}: ${f} is missing`);
+      assert.ok(page.includes(path.posix.relative(g.url, f)), `${g.id}: ${f} is not used by the page`);
+    }
+  }
+  const wait = Number(/const URL_GAME_WAIT_MS = (\d+);/.exec(read(path.join(WEB, 'menu.js')))[1]);
+  assert.ok(wait <= 1000, 'the menu waits ' + wait + ' ms');
+});
+
 // ---------- Size budgets (gzip) ----------
 
 const gz = (f) => zlib.gzipSync(fs.readFileSync(path.join(WEB, f)), { level: 9 }).length;

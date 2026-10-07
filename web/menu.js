@@ -34,6 +34,8 @@ const EN_TITLES = { 'pryg-skok': 'HOP-SKIP', tanks: 'TANK FIELD', bombs: 'BOMB F
 const title = (g) => (EN ? g.titleEn || EN_TITLES[g.id] || g.title : g.title);
 
 let startGame = null; // a game to open right away, from the launch link
+// How long opening a game with its own page waits for the server check (lib/server.js).
+const URL_GAME_WAIT_MS = 400;
 
 // A t.me/<bot>?startapp=<label> link opens this menu with start_param, but
 // without ?api=: the label may carry the server's tunnel name after «__»
@@ -61,7 +63,13 @@ let startGame = null; // a game to open right away, from the launch link
       if (server && server.online) params.set('api', server.base);
       location.replace(roomGame + '/?' + params + location.hash);
     };
-    if (server) server.ready.then(go); else go();
+    // The room page checks the server again itself, so the wait is short (URL_GAME_WAIT_MS).
+    if (server && server.online === null) {
+      let gone = false;
+      const once = () => { if (!gone) { gone = true; go(); } };
+      server.ready.then(once, once);
+      setTimeout(once, URL_GAME_WAIT_MS);
+    } else go();
     return;
   }
   // A link to a game (startapp=word, or ref_<id>-word from a shared result) opens that game.
@@ -205,10 +213,15 @@ function choose() {
       const q = params.toString();
       location.href = g.url + (q ? '?' + q : '');
     };
+    // The check goes through the tunnel and can take seconds; the game page checks
+    // the server again itself, so the menu waits only a moment for it.
     if (server && server.online === null) {
       loading = true;
       hint.textContent = L('Загрузка…', 'Loading…');
-      server.ready.then(go);
+      let gone = false;
+      const once = () => { if (!gone) { gone = true; go(); } };
+      server.ready.then(once, once);
+      setTimeout(once, URL_GAME_WAIT_MS);
     } else go();
     return;
   }
@@ -249,9 +262,13 @@ function onKey(e) {
 function prefetch() {
   const net = typeof navigator !== 'undefined' && navigator.connection;
   if (net && (net.saveData || /2g/.test(net.effectiveType || ''))) return;
+  // The platformer's files, and the files of every game with its own page (`preload`),
+  // so choosing a game opens it from the cache.
+  const files = [];
   const g = games.find((x) => x.scripts);
-  if (!g) return;
-  for (const href of [...g.scripts, ...(g.styles || [])]) {
+  if (g) files.push(...g.scripts, ...(g.styles || []));
+  for (const x of games) if (x.url && x.preload) files.push(...x.preload);
+  for (const href of [...new Set(files)]) {
     const link = document.createElement('link');
     link.rel = 'prefetch';
     link.href = href;
