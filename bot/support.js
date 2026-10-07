@@ -20,6 +20,7 @@ export const PLAYER_COMMANDS = [
 
 export const OWNER_COMMANDS = [
   ...PLAYER_COMMANDS,
+  { command: "admin", description: "Панель" },
   { command: "top", description: "Таблица рекордов" },
   { command: "invite", description: "Ссылка-приглашение" },
   { command: "stats", description: "Статистика игр" },
