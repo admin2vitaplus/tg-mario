@@ -397,7 +397,7 @@ export function createApiServer({
         res.setHeader("Retry-After", String(byUser.retryAfter(user.id)));
         return send(res, 429, { error: "too many requests" });
       }
-      const [status, out] = await handler(body, user, url);
+      const [status, out] = await handler(body, user, url, { req, ip });
       send(res, status, out);
     } catch (err) {
       if (err instanceof HttpError) {

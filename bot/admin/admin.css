@@ -8,7 +8,10 @@
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 0 12px 32px; max-width: 720px; margin: 0 auto; }
 .top { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 8px; }
-.top b { color: var(--accent); font-size: 18px; letter-spacing: .5px; }
+.top { gap: 8px; }
+.top b { color: var(--accent); font-size: 18px; letter-spacing: .5px; margin-right: auto; }
+.login { margin-top: 24px; }
+.login button { width: 100%; }
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 8px; }
 .tabs button { flex: none; padding: 6px 9px; font-size: 14px; }
 .tabs button.on { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }

@@ -6,9 +6,12 @@ import { createApiServer } from "../server.js";
 import { createEconomy, loadEconomy } from "../economy.js";
 import { createTracker } from "../stats.js";
 import { createAdmin } from "../admin.js";
+import { createAdminAuth, hashPassword, checkPassword } from "../admin-auth.js";
 
 const TOKEN = "123456:TEST";
-const OWNER = { id: 777, first_name: "Владелец", language_code: "ru" };
+const PASSWORD = "очень-секретный пароль";
+const HASH = hashPassword(PASSWORD);
+const OWNER = { owner: true };
 const alice = { id: 1, first_name: "Алиса", username: "alice" };
 
 function initData(user, authDate = Math.floor(Date.now() / 1000)) {
@@ -19,55 +22,105 @@ function initData(user, authDate = Math.floor(Date.now() / 1000)) {
   return params.toString();
 }
 
-async function withPanel(fn) {
+async function withPanel(fn, { authOpts = {}, enabled = true } = {}) {
   const store = openDb(":memory:");
+  const clock = { t: Date.now() };
+  const auth = createAdminAuth({ login: "owner", passwordHash: enabled ? HASH : "", now: () => clock.t, ...authOpts });
   const economy = createEconomy(store, loadEconomy());
   const tracker = createTracker(store);
   const refunds = [];
   const admin = createAdmin({
-    store, economy, admins: new Set([OWNER.id]), commit: "abc123", logger: () => {},
+    store, economy, auth, commit: "abc123", logger: () => {},
     refundStars: async (userId, charge) => { refunds.push([userId, charge]); },
   });
   const server = createApiServer({
-    store, botToken: TOKEN, allowedOrigins: ["https://game.example"], tracker, economy, admin,
+    store, botToken: TOKEN, allowedOrigins: ["https://game.example"], tracker, economy, admin: auth.enabled ? admin : null,
   });
   await new Promise((ok) => server.listen(0, ok));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const call = async (method, path, { user, body, origin } = {}) => {
+  let session = null;
+  const call = async (method, path, { user, body, origin, token } = {}) => {
     const headers = { "Content-Type": "application/json" };
     if (origin) headers.Origin = origin;
-    if (user) headers.Authorization = `tma ${initData(user)}`;
+    if (user === OWNER) headers.Authorization = `Admin ${session ??= await loginToken()}`;
+    else if (user) headers.Authorization = `tma ${initData(user)}`;
+    if (token) headers.Authorization = token;
     const res = await fetch(base + path, { method, headers, body: body && JSON.stringify(body) });
     const raw = await res.text();
     let json = null;
     try { json = JSON.parse(raw); } catch { /* страница */ }
     return { status: res.status, json, raw, headers: res.headers };
   };
+  const loginToken = async () => {
+    const r = await call("POST", "/api/admin/login", { body: { login: "owner", password: PASSWORD } });
+    assert.equal(r.status, 200);
+    return r.json.token;
+  };
   try {
-    await fn({ call, store, economy, tracker, refunds });
+    await fn({ call, store, economy, tracker, refunds, clock });
   } finally {
     server.close();
     store.close();
   }
 }
 
-test("the panel API is closed to everyone but ADMIN_ID", () =>
+test("the panel API needs a session from login and password", () =>
   withPanel(async ({ call }) => {
     assert.equal((await call("GET", "/api/admin/overview")).status, 401);
-    assert.equal((await call("GET", "/api/admin/overview", { user: alice })).status, 403);
-    assert.equal((await call("POST", "/api/admin/adjust", { user: alice, body: { id: 1, amount: 500, key: "abcdefgh12" } })).status, 403);
-    assert.equal((await call("GET", "/api/admin/players", { user: alice })).status, 403);
-    const me = await call("GET", "/api/admin/me", { user: OWNER });
-    assert.equal(me.status, 200);
-    assert.equal(me.json.id, OWNER.id);
+    // Подпись Telegram, даже настоящая, панель не открывает.
+    assert.equal((await call("GET", "/api/admin/overview", { user: alice })).status, 401);
+    assert.equal((await call("POST", "/api/admin/adjust", { user: alice, body: { id: 1, amount: 500, key: "abcdefgh12" } })).status, 401);
+    assert.equal((await call("GET", "/api/admin/me", { token: "Admin " + "x".repeat(43) })).status, 401);
+    let r = await call("POST", "/api/admin/login", { body: { login: "owner", password: "wrong" } });
+    assert.equal(r.status, 401);
+    assert.equal(r.json.token, undefined);
+    r = await call("POST", "/api/admin/login", { body: { login: "other", password: PASSWORD } });
+    assert.equal(r.status, 401);
+    r = await call("POST", "/api/admin/login", { body: { login: " owner ", password: PASSWORD } });
+    assert.equal(r.status, 200);
+    const token = `Admin ${r.json.token}`;
+    assert.equal((await call("GET", "/api/admin/me", { token })).status, 200);
+    await call("POST", "/api/admin/logout", { token });
+    assert.equal((await call("GET", "/api/admin/me", { token })).status, 401);
   }));
+
+test("login attempts are limited and sessions expire", () =>
+  withPanel(async ({ call, clock }) => {
+    for (let i = 0; i < 5; i++) {
+      assert.equal((await call("POST", "/api/admin/login", { body: { login: "owner", password: `guess${i}` } })).status, 401);
+    }
+    let r = await call("POST", "/api/admin/login", { body: { login: "owner", password: PASSWORD } });
+    assert.equal(r.status, 429, "locked even with the right password");
+    assert.ok(r.json.retryAfter > 0);
+    clock.t += 15 * 60 * 1000 + 1;
+    r = await call("POST", "/api/admin/login", { body: { login: "owner", password: PASSWORD } });
+    assert.equal(r.status, 200);
+    const token = `Admin ${r.json.token}`;
+    clock.t += 12 * 3600 * 1000 + 1;
+    assert.equal((await call("GET", "/api/admin/me", { token })).status, 401);
+  }));
+
+test("without ADMIN_LOGIN and ADMIN_PASSWORD_HASH the panel does not exist", () =>
+  withPanel(async ({ call }) => {
+    assert.equal((await call("GET", "/admin")).status, 404);
+    assert.equal((await call("POST", "/api/admin/login", { body: { login: "owner", password: PASSWORD } })).status, 404);
+  }, { enabled: false }));
+
+test("password hash: salted, checked, garbage rejected", () => {
+  assert.notEqual(hashPassword("abc"), hashPassword("abc"));
+  assert.ok(checkPassword("abc", hashPassword("abc")));
+  assert.ok(!checkPassword("abd", hashPassword("abc")));
+  assert.ok(!checkPassword("abc", "abc"));
+  assert.ok(!checkPassword("abc", ""));
+  assert.equal(createAdminAuth({ login: "a", passwordHash: "plain" }).enabled, false);
+});
 
 test("serves the page from the server itself with a strict CSP", () =>
   withPanel(async ({ call }) => {
     const page = await call("GET", "/admin");
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-type"), /text\/html/);
-    assert.match(page.headers.get("content-security-policy"), /default-src 'self'/);
+    assert.match(page.headers.get("content-security-policy"), /default-src 'self'.*frame-ancestors 'none'/);
     assert.match(page.raw, /admin\/admin\.js/);
     assert.doesNotMatch(page.raw, /https?:\/\//, "no outside hosts on the page");
     for (const p of ["/admin/admin.js", "/admin/admin.css", "/admin/admin/admin.js"]) {

@@ -1,13 +1,14 @@
-// Панель владельца (bot/admin.js на сервере). Открывается из бота командой /admin как Telegram Mini App:
-// подпись Telegram (initData) берётся из адреса страницы и уходит в каждый запрос.
+// Панель владельца (bot/admin.js на сервере). Вход по логину и паролю; ключ сессии хранится
+// до закрытия вкладки (sessionStorage) и уходит в каждый запрос.
 // Внешних скриптов нет; имена игроков вставляются только как текст.
 (function () {
   'use strict';
 
   var DICT = {
     ru: {
-      title: '◆ Панель', open_in_tg: 'Откройте панель в Telegram: команда /admin в боте.',
-      forbidden: 'Нет доступа.', error: 'Ошибка: ', loading: 'Загрузка…', expired: 'Подпись устарела: закройте панель и откройте снова через /admin.',
+      title: '◆ Панель', login: 'Логин', password: 'Пароль', sign_in: 'Войти', sign_out: 'Выйти',
+      wrong: 'Неверный логин или пароль.', locked: 'Слишком много попыток. Попробуйте через {n} мин.',
+      disabled: 'Вход в панель не настроен на сервере.', error: 'Ошибка: ', loading: 'Загрузка…',
       tab_overview: 'Сводка', tab_players: 'Игроки', tab_economy: 'Жетоны', tab_stars: 'Звёзды', tab_server: 'Сервер',
       today: 'сегодня', yesterday: 'вчера', week: '7 дней', month: '30 дней', total: 'всего',
       players: 'Игроки', new_players: 'новые', games_done: 'игр', matches: 'матчи',
@@ -33,8 +34,9 @@
       r_prize: 'приз недели', r_shop: 'покупка', r_annul: 'аннулировано', r_admin: 'вручную',
     },
     en: {
-      title: '◆ Dashboard', open_in_tg: 'Open the dashboard in Telegram: send /admin to the bot.',
-      forbidden: 'No access.', error: 'Error: ', loading: 'Loading…', expired: 'The signature is out of date: close the dashboard and open it again with /admin.',
+      title: '◆ Dashboard', login: 'Login', password: 'Password', sign_in: 'Sign in', sign_out: 'Sign out',
+      wrong: 'Wrong login or password.', locked: 'Too many attempts. Try again in {n} min.',
+      disabled: 'Sign-in is not set up on the server.', error: 'Error: ', loading: 'Loading…',
       tab_overview: 'Overview', tab_players: 'Players', tab_economy: 'Tickets', tab_stars: 'Stars', tab_server: 'Server',
       today: 'today', yesterday: 'yesterday', week: '7 days', month: '30 days', total: 'total',
       players: 'Players', new_players: 'new', games_done: 'games', matches: 'matches',
@@ -61,16 +63,11 @@
     },
   };
 
-  // ---------- Подпись Telegram ----------
-  var initData = '';
-  try {
-    initData = new URLSearchParams(location.hash.slice(1)).get('tgWebAppData') || '';
-    if (initData) sessionStorage.setItem('admin-init', initData);
-    else initData = sessionStorage.getItem('admin-init') || '';
-  } catch (e) { /* без хранилища — только из адреса */ }
-  var tgUser = null;
-  try { tgUser = JSON.parse(new URLSearchParams(initData).get('user') || 'null'); } catch (e) { tgUser = null; }
-  var lang = tgUser && !/^(ru|uk|be|kk)/i.test(tgUser.language_code || 'ru') ? 'en' : 'ru';
+  // ---------- Сессия ----------
+  var token = '';
+  try { token = sessionStorage.getItem('admin-token') || ''; } catch (e) { /* без хранилища — до перезагрузки */ }
+  function setToken(t) { token = t; try { if (t) sessionStorage.setItem('admin-token', t); else sessionStorage.removeItem('admin-token'); } catch (e) { /* ничего */ } }
+  var lang = /^(ru|uk|be|kk)/i.test(navigator.language || 'ru') ? 'ru' : 'en';
   document.documentElement.lang = lang;
   function T(key, vars) {
     var s = DICT[lang][key] || DICT.ru[key] || key;
@@ -111,21 +108,53 @@
   function key() { var a = new Uint8Array(8); crypto.getRandomValues(a); return Array.from(a, function (b) { return b.toString(16).padStart(2, '0'); }).join(''); }
 
   // ---------- Сервер ----------
+  function NeedLogin() {}
   function api(method, path, body) {
     return fetch('api/admin/' + path, {
       method: method,
-      headers: Object.assign({ Authorization: 'tma ' + initData }, body ? { 'Content-Type': 'application/json' } : {}),
+      headers: Object.assign(token ? { Authorization: 'Admin ' + token } : {}, body ? { 'Content-Type': 'application/json' } : {}),
       body: body ? JSON.stringify(body) : undefined,
     }).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (json) {
-        if (res.status === 401) throw new Error(T('expired'));
-        if (res.status === 403) throw new Error(T('forbidden'));
-        if (!res.ok && !(res.status === 409 && json && json.error)) throw new Error(T('error') + (json.detail || json.error || res.status));
+        if (res.status === 401 && path !== 'login') { setToken(''); throw new NeedLogin(); }
+        if (!res.ok && !(res.status === 409 && json && json.error)) {
+          var err = new Error(T('error') + (json.detail || json.error || res.status));
+          err.status = res.status; err.json = json;
+          throw err;
+        }
         return json;
       });
     });
   }
-  function fail(err) { main.replaceChildren(note(err.message || String(err))); }
+  function fail(err) {
+    if (err instanceof NeedLogin) return loginForm('');
+    main.replaceChildren(note(err.message || String(err)));
+  }
+
+  function loginForm(message) {
+    document.getElementById('tabs').replaceChildren();
+    out.hidden = true;
+    var user = h('input', { type: 'text', autocomplete: 'username', placeholder: T('login'), autocapitalize: 'none' });
+    var pass = h('input', { type: 'password', autocomplete: 'current-password', placeholder: T('password') });
+    var msg = h('p', { class: 'msg', text: message || '' });
+    var btn = h('button', { type: 'submit', text: T('sign_in') });
+    var form = h('form', { class: 'card login', on: { submit: function (e) {
+      e.preventDefault();
+      btn.disabled = true;
+      api('POST', 'login', { login: user.value, password: pass.value }).then(function (r) {
+        setToken(r.token);
+        start();
+      }).catch(function (err) {
+        btn.disabled = false;
+        pass.value = '';
+        var st = err.status;
+        msg.textContent = st === 404 ? T('disabled') : st === 429 ? T('locked', { n: Math.ceil(((err.json && err.json.retryAfter) || 900) / 60) })
+          : st === 401 ? T('wrong') : err.message;
+      });
+    } } }, user, pass, btn, msg);
+    main.replaceChildren(form);
+    user.focus();
+  }
 
   // ---------- Вкладки ----------
   var TABS = ['overview', 'players', 'economy', 'stars', 'server'];
@@ -325,12 +354,20 @@
   }
 
   // ---------- Старт ----------
+  var out = h('button', { type: 'button', class: 'ghost', hidden: '', on: { click: function () {
+    api('POST', 'logout', {}).catch(function () {}).then(function () { setToken(''); overview = null; loginForm(''); });
+  } } }, T('sign_out'));
+  document.querySelector('.top').insertBefore(out, document.getElementById('reload'));
+  function start() {
+    if (!token) return loginForm('');
+    api('GET', 'me').then(function () { out.hidden = false; show('overview', true); }).catch(fail);
+  }
   document.getElementById('title').textContent = T('title');
   document.title = T('title').replace('◆ ', '');
   document.getElementById('reload').addEventListener('click', function () {
+    if (!token) return;
     if (current === 'players') players('');
     else show(current, true);
   });
-  if (!initData) { main.replaceChildren(note(T('open_in_tg'))); return; }
-  api('GET', 'me').then(function () { show('overview'); }).catch(fail);
+  start();
 })();

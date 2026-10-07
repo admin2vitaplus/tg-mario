@@ -4,9 +4,9 @@ import { collectStats } from "./stats.js";
 import { dayOf } from "./days.js";
 import { economyStats, seasonLabel, seasonOf, seasonStart } from "./economy.js";
 
-// Панель владельца: страница /admin (Telegram Mini App из команды /admin) и маршруты /api/admin/*.
-// Доступ только у Telegram id из ADMIN_ID: подпись initData проверяет server.js, здесь — сам id.
-// Чужому аккаунту сервер отвечает 403 и ничего не показывает.
+// Панель владельца: страница /admin и маршруты /api/admin/*. Вход по логину и паролю
+// (ADMIN_LOGIN, ADMIN_PASSWORD_HASH, см. admin-auth.js); без них панель выключена.
+// Без действующей сессии сервер отвечает 401 и ничего не показывает.
 
 const PAGE_FILES = {
   "index.html": "text/html; charset=utf-8",
@@ -16,7 +16,7 @@ const PAGE_FILES = {
 const PAGE_DIR = new URL("./admin/", import.meta.url);
 // Страница только со своего сервера: никаких внешних скриптов и стилей.
 const PAGE_HEADERS = {
-  "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'",
+  "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   "Cache-Control": "no-cache",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
@@ -97,11 +97,10 @@ function starsBlock(db) {
 }
 
 export function createAdmin({
-  store, economy = null, admins = new Set(), refundStars = null, commit = "unknown", startedAt = Date.now(),
+  store, economy = null, auth, refundStars = null, commit = "unknown", startedAt = Date.now(),
   dbFile = null, live = () => null, now = Date.now, logger = console.log,
 }) {
   const { db } = store;
-  const isAdmin = (user) => !!user && admins.has(user.id);
   let cpuMark = { at: Date.now(), usage: process.cpuUsage() };
   let overview = null;
 
@@ -187,24 +186,31 @@ export function createAdmin({
       WHERE p.id IN (${ids.map(Number).join(",")}) ORDER BY p.id = ? DESC, p.best_score DESC LIMIT 30`).all(exact ?? -1);
   };
 
-  const guard = (fn) => async (body, user, url) => {
-    if (!user) return [401, { error: "unauthorized" }];
-    if (!isAdmin(user)) return [403, { error: "forbidden" }];
-    return fn(body, user, url);
+  const guard = (fn) => async (body, _user, url, { req }) => {
+    if (!auth.check(req.headers.authorization)) return [401, { error: "unauthorized" }];
+    return fn(body, url);
   };
   const needEconomy = (fn) => (economy ? fn : () => [503, { error: "no economy" }]);
-  // Что сделал владелец — в журнал службы (journalctl), без подписей и токенов.
-  const log = (user, what) => logger(`Панель: ${user.id} ${what}`);
+  // Что сделал владелец — в журнал службы (journalctl), без паролей и ключей.
+  const log = (what) => logger(`Панель: ${what}`);
 
   const routes = {
-    "GET /api/admin/me": guard((_b, user) => [200, { ok: true, id: user.id, refund: !!refundStars, economy: !!economy }]),
+    "POST /api/admin/login": (body, _user, _url, { ip }) => {
+      const r = auth.login(ip, body.login, body.password);
+      if (r.ok) { log(`вход с ${ip}`); return [200, { ok: true, token: r.token, expiresAt: r.expiresAt }]; }
+      if (r.error === "disabled") return [404, { error: "not found" }];
+      if (r.error === "wrong") logger(`Панель: неверный вход с ${ip}`);
+      return [r.error === "locked" ? 429 : 401, r];
+    },
+    "POST /api/admin/logout": (_b, _u, _url, { req }) => { auth.logout(req.headers.authorization); return [200, { ok: true }]; },
+    "GET /api/admin/me": guard(() => [200, { ok: true, refund: !!refundStars, economy: !!economy }]),
     "GET /api/admin/overview": guard(() => {
       const at = now();
       if (!overview || at - overview.at > OVERVIEW_TTL_MS || at < overview.at) overview = collectOverview();
       return [200, { ...overview, server: server() }];
     }),
-    "GET /api/admin/players": guard((_b, _u, url) => [200, search(url.searchParams.get("q"))]),
-    "GET /api/admin/player": guard((_b, _u, url) => {
+    "GET /api/admin/players": guard((_b, url) => [200, search(url.searchParams.get("q"))]),
+    "GET /api/admin/player": guard((_b, url) => {
       const pid = id(url.searchParams.get("id"));
       if (!pid) return [400, { error: "bad data" }];
       const p = player(pid);
@@ -213,7 +219,7 @@ export function createAdmin({
 
     // Начислить (amount > 0) или списать (amount < 0) жетоны: отдельная запись журнала с причиной admin.
     // key — случайная метка с кнопки: повторная отправка той же формы ничего не добавит.
-    "POST /api/admin/adjust": guard(needEconomy((body, user) => {
+    "POST /api/admin/adjust": guard(needEconomy((body) => {
       const pid = id(body.id);
       const amount = Number(body.amount);
       const key = typeof body.key === "string" && /^[a-z0-9]{8,32}$/.test(body.key) ? body.key : null;
@@ -226,26 +232,26 @@ export function createAdmin({
         const n = economy.post(pid, amount, "admin", `${key}:${text(body.note, 60)}`);
         return { ok: true, posted: n, balance: economy.wallet(pid).balance };
       });
-      if (r.ok) log(user, `жетоны ${amount > 0 ? "+" : ""}${amount} игроку ${pid}`);
+      if (r.ok) log(`жетоны ${amount > 0 ? "+" : ""}${amount} игроку ${pid}`);
       return [r.ok ? 200 : 409, r];
     })),
-    "POST /api/admin/flag": guard(needEconomy((body, user) => {
+    "POST /api/admin/flag": guard(needEconomy((body) => {
       const pid = id(body.id);
       if (!pid) return [400, { error: "bad data" }];
       if (body.on === false) economy.unflag(pid);
       else economy.flag(pid, text(body.why, 100) || "admin");
-      log(user, `${body.on === false ? "снял пометку" : "пометил"} ${pid}`);
+      log(`${body.on === false ? "снял пометку" : "пометил"} ${pid}`);
       return [200, { ok: true }];
     })),
-    "POST /api/admin/annul": guard(needEconomy((body, user) => {
+    "POST /api/admin/annul": guard(needEconomy((body) => {
       const pid = id(body.id);
       const season = body.season == null ? seasonOf(now()) : Number(body.season);
       if (!pid || !Number.isSafeInteger(season) || season < 0) return [400, { error: "bad data" }];
       const n = economy.annul(pid, season);
-      log(user, `аннулировал ${-n} у ${pid} за сезон ${season}`);
+      log(`аннулировал ${-n} у ${pid} за сезон ${season}`);
       return [200, { ok: true, annulled: -n, balance: economy.wallet(pid).balance }];
     })),
-    "POST /api/admin/refund": guard(needEconomy(async (body, user) => {
+    "POST /api/admin/refund": guard(needEconomy(async (body) => {
       if (!refundStars) return [503, { error: "no refunds" }];
       const pid = id(body.id);
       const charge = text(body.charge, 200);
@@ -258,11 +264,11 @@ export function createAdmin({
         return [502, { error: "telegram", detail: String(err.description || err.message).slice(0, 200) }];
       }
       economy.refunded(charge);
-      log(user, `вернул ${p.stars} звёзд игроку ${pid}`);
+      log(`вернул ${p.stars} звёзд игроку ${pid}`);
       return [200, { ok: true, stars: p.stars }];
     })),
   };
 
-  return { routes, isAdmin };
+  return { routes };
 }
 
