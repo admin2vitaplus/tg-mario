@@ -7,6 +7,7 @@ import { statsReport } from "./stats.js";
 import { economyReport } from "./economy.js";
 import { installWalletCommands, starsInvoice, walletNotifier } from "./wallet-bot.js";
 import { groupPlay, inlineResults, watchEnabledGames } from "./invites.js";
+import { OWNER_COMMANDS, PLAYER_COMMANDS, supportHandler } from "./support.js";
 
 installSafeConsole();
 
@@ -35,7 +36,8 @@ const app = await startApp({
   refundStars: (userId, chargeId) => bot.api.refundStarPayment(userId, chargeId),
 });
 const { store, tracker } = app;
-// Telegram id администраторов через запятую; пусто — команда /stats выключена.
+// Telegram id владельца (администраторов) через запятую. Только им доступны служебные команды
+// и им приходят сообщения игроков; пусто — служебные команды выключены, сообщения никуда не идут.
 const admins = new Set((process.env.ADMIN_ID || "").split(",").map((s) => Number(s.trim())).filter(Number.isSafeInteger));
 const baseGameUrl = app.gameUrl;
 console.log(`Сервер очков слушает порт ${app.port}, коммит ${app.commit}`);
@@ -137,7 +139,7 @@ bot.command("start", (ctx) => {
   return ctx.reply(
     "Привет! Это «Прыг-Скок» — платформер прямо в Telegram.\n" +
       "Собирай монеты, прыгай на жуков и доберись до флага.\n\n" +
-      "/top — таблица рекордов, /me — мои достижения",
+      "/me — моя статистика. Вопрос разработчику можно просто написать сюда.",
     { reply_markup: playKeyboard() },
   );
 });
@@ -158,12 +160,15 @@ bot.on("inline_query", (ctx) => ctx.answerInlineQuery(inlineResults({
 // Отправленная карточка — приглашение (приходит, только если в BotFather включён /setinlinefeedback).
 bot.on("chosen_inline_result", (ctx) => tracker.event(ctx.from.id, "invite_created"));
 
-bot.command("top", (ctx) => {
+// Только для владельца: остальным игрокам доступны игра и своя статистика (ниже — owner()).
+const owner = (handler) => (ctx, next) => (admins.has(ctx.from?.id) ? handler(ctx) : next());
+
+bot.command("top", owner((ctx) => {
   const top = store.top(10);
   if (!top.length) return ctx.reply("Рекордов пока нет. Будь первым!", { reply_markup: playKeyboard() });
   const lines = top.map((p, i) => `${medal(i + 1)} ${p.name} — ${p.best_score}`);
   return ctx.reply("🏆 Таблица рекордов\n\n" + lines.join("\n"), { reply_markup: playKeyboard() });
-});
+}));
 
 bot.command("me", (ctx) => {
   const player = store.getPlayer(ctx.from.id);
@@ -178,7 +183,7 @@ bot.command("me", (ctx) => {
 });
 
 // Личная ссылка-приглашение: кто придёт по ней, засчитывается в K-фактор.
-bot.command("invite", (ctx) => {
+bot.command("invite", owner((ctx) => {
   const link = `https://t.me/${bot.botInfo.username}?start=ref_${ctx.from.id}`;
   tracker.event(ctx.from.id, "invite_created");
   const share = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("Сыграем? Тут ретро-игры прямо в Telegram.")}`;
@@ -187,7 +192,7 @@ bot.command("invite", (ctx) => {
     `тебе ${invite.inviter} жетонов, ему ${invite.newcomer}.`, {
     reply_markup: new InlineKeyboard().url("📨 Отправить другу", share),
   });
-});
+}));
 
 // Статистика только для администраторов (ADMIN_ID); остальным команда как будто не существует.
 bot.command("stats", (ctx, next) => {
@@ -211,14 +216,15 @@ installWalletCommands(bot, { economy: app.economy, admins });
 bot.command("help", (ctx) =>
   ctx.reply(
     "Управление: кнопки на экране или клавиатура (← →, прыжок Z/пробел, бег X/Shift).\n" +
-      "/play — открыть игру\n/top — таблица рекордов\n/me — мои достижения\n/invite — позвать друга\n\n" +
+      "/play — открыть игру\n/me — моя статистика\n/paysupport — помощь с оплатой\n" +
+      "Вопрос разработчику можно просто написать сюда.\n\n" +
       `Игра в чате с друзьями: добавьте бота в группу и напишите /play, или в любом чате наберите @${bot.botInfo.username} и выберите игру.`,
   ),
 );
 
+// Личные сообщения игроков пересылаются владельцу, его ответы — игрокам (support.js).
 // В группах бот молчит на обычные сообщения: игры там зовут через /play и инлайн-режим.
-bot.on("message", (ctx) => (ctx.chat.type === "private"
-  ? ctx.reply("Нажми кнопку, чтобы играть:", { reply_markup: playKeyboard() }) : undefined));
+bot.on("message", supportHandler({ admins, playKeyboard }));
 
 bot.catch((err) => console.error("Ошибка бота:", err.error));
 
@@ -226,13 +232,12 @@ bot.catch((err) => console.error("Ошибка бота:", err.error));
 await bot.api.setChatMenuButton({
   menu_button: { type: "web_app", text: "Играть", web_app: { url: gameUrl } },
 });
-await bot.api.setMyCommands([
-  { command: "play", description: "Открыть игру" },
-  { command: "top", description: "Таблица рекордов" },
-  { command: "me", description: "Мои достижения" },
-  { command: "invite", description: "Позвать друга" },
-  { command: "help", description: "Как играть" },
-  { command: "paysupport", description: "Помощь с оплатой" },
-]);
+// Меню команд: игрокам — игра и своя статистика, владельцу в его чате — все команды.
+await bot.api.setMyCommands(PLAYER_COMMANDS);
+for (const id of admins) {
+  // Если владелец ещё не писал боту, Telegram откажет; меню появится после перезапуска.
+  await bot.api.setMyCommands(OWNER_COMMANDS, { scope: { type: "chat", chat_id: id } })
+    .catch((err) => console.warn(`Меню владельца не установлено: ${err.description || err.message}`));
+}
 
 bot.start({ onStart: (me) => console.log(`Бот @${me.username} запущен, игра: ${gameUrl}`) });
