@@ -1495,7 +1495,14 @@ let starting = false;
 function beginLocal(players) {
   if (starting) return;
   starting = true;
-  withTicket(3000).then(() => { starting = false; begin(players); });
+  // The ticket is usually here already; on a slow line the tapped button shows the game is starting.
+  const slow = setTimeout(() => document.body.classList.add('ui-starting'), 150);
+  withTicket(3000).then(() => {
+    clearTimeout(slow);
+    document.body.classList.remove('ui-starting');
+    starting = false;
+    begin(players);
+  });
 }
 
 function afterStep(s) {

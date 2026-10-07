@@ -67,6 +67,8 @@ html, body {
 .btn.bb { background: rgba(40, 90, 216, 0.6); font-size: 24px; }
 .btn.bb.on { background: rgba(90, 140, 255, 0.9); }
 @keyframes rise { from { top: 100%; } to { top: 50%; } }
+/* Under an open overlay (pause, menu) the «STAGE N» line would show through its title. */
+#app:has(#overlay:not(.hidden)) #banner { visibility: hidden; }
 .hidden { display: none !important; }
 
 #controls {

@@ -76,6 +76,11 @@
   width: min(280px, 100%);
 }
 
+/* A game waits for the server's ticket (slow line): the main button says it is starting. */
+.ui-starting .ui-btn { pointer-events: none; }
+.ui-starting .ui-btn:not(.primary) { opacity: 0.45; }
+.ui-starting .ui-btn.primary::after { content: '…'; }
+
 /* A phone on its side: lower buttons so the column fits the short screen. */
 @media (orientation: landscape) and (max-height: 500px) {
   .ui-btn { min-height: 36px; padding: 6px 14px; font-size: 14px; }

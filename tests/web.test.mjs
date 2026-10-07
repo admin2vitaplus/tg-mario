@@ -294,6 +294,25 @@ test('the address that answers wins and is remembered; a dead one is not used', 
   assert.equal(r.store.get('prygskok_api'), old, 'a dead address does not replace the stored one');
 });
 
+// The check of the address costs a round trip over the tunnel: the first requests go straight
+// to the address from the launch link, and fall back to the checked one if that is dead.
+test('requests do not wait for the address check; a dead link address falls back to the live one', async () => {
+  const good = 'https://good-one.trycloudflare.com';
+  const old = 'https://old-one.trycloudflare.com';
+  let r = runServerJs({ search: '?api=' + encodeURIComponent(good), alive: [good] });
+  const me = r.server.request('POST', '/api/wallet/checkin');
+  assert.deepEqual(r.calls, [good + '/api/health', good + '/api/wallet/checkin'], 'sent at once, next to the check');
+  assert.deepEqual(await me, { ok: true });
+  r = runServerJs({ search: '?api=' + encodeURIComponent(old), stored: good, alive: [good] });
+  assert.deepEqual(await r.server.request('POST', '/api/wallet/checkin'), { ok: true });
+  assert.deepEqual(r.calls.filter((u) => u.endsWith('/checkin')), [old + '/api/wallet/checkin', good + '/api/wallet/checkin']);
+  // Without a link address nothing is sent before the check.
+  r = runServerJs({ stored: good, alive: [good] });
+  const later = r.server.request('GET', '/api/wallet/me');
+  assert.deepEqual(r.calls, [good + '/api/health']);
+  await later;
+});
+
 // «Прыг-Скок» in English: every level name and look has its English in game.js (EN_NAMES).
 test('Hop-Skip names all have English', () => {
   const game = read(path.join(WEB, 'game.js'));
