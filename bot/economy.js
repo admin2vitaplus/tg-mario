@@ -428,6 +428,8 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         season: seasonOf(at),
         seasonEndsAt: seasonStart(seasonOf(at) + 1),
         notify: !!w.notify,
+        // Помеченному игроку начисления не идут: страница говорит ему об этом.
+        flagged: !!w.flagged,
         tasks: economy.tasks(playerId, at),
         dayEndsAt: (day + 1) * DAY_MS,
       };

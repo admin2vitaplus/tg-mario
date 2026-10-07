@@ -65,6 +65,7 @@ const STR = {
     today: 'Сегодня получено {n} из {cap}. Серия дней: {streak}.',
     how_cap: 'В день можно получить не больше {cap}, не считая призов недели.',
     how_note: 'Жетоны начисляет сервер за результаты, которые он проверил.',
+    flagged: 'Начисления жетонов приостановлены: сервер несколько раз не смог проверить результаты игр. Напишите боту, администратор проверит и включит их снова.',
     invite: 'Позвать друга',
     invite_text: 'Сыграем? Ретро-игры прямо в Telegram.',
     no_history: 'Операций пока нет. Сыграй — и здесь появятся первые жетоны.',
@@ -121,6 +122,7 @@ const STR = {
     today: 'Today: {n} of {cap}. Days in a row: {streak}.',
     how_cap: 'At most {cap} a day, weekly prizes aside.',
     how_note: 'Tickets are given by the server for results it has checked.',
+    flagged: 'Tickets are on hold: the server could not check several game results. Write to the bot and the admin will check and switch them back on.',
     invite: 'Invite a friend',
     invite_text: 'Want to play? Retro games right in Telegram.',
     no_history: 'Nothing here yet. Play a game to get your first tickets.',
@@ -376,7 +378,8 @@ function renderTasks(body) {
   const note = (t) => `<p class="wNote">${esc(t)}</p>`;
   const now = Date.now();
   let html = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` +
-    note(T('today', { n: me.today, cap: me.dailyCap, streak: me.streak }));
+    note(T('today', { n: me.today, cap: me.dailyCap, streak: me.streak })) +
+    (me.flagged ? `<p class="wNote wWarn">${esc(T('flagged'))}</p>` : '');
   const list = (me.tasks && me.tasks[scope || 'main']) || [];
   const day = list.filter((t) => t.period === 'day');
   const week = list.filter((t) => t.period === 'week');

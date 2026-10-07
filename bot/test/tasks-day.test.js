@@ -157,3 +157,21 @@ test("the daily cap: a task done after it is still crossed off, and the visit st
     assert.deepEqual(r.json.grants, [{ reason: "daily", amount: CFG.daily.base + CFG.daily.perStreakDay }]);
   });
 });
+
+test("a flagged player is told so, and achievements held back are paid once the flag is lifted", async () => {
+  const clock = { t: Date.UTC(2026, 9, 7, 12) };
+  await withServer(clock, async ({ call, economy, store }) => {
+    store.touchPlayer(ME);
+    economy.flag(ME.id, "test");
+    const r = await call("POST", "/api/mario/level", { world: 1, level: 0, score: 4000, timeLeft: 300, deaths: 1 });
+    assert.ok(r.json.newAchievements.length > 0);
+    let me = (await call("GET", "/api/wallet/me")).json;
+    assert.equal(me.flagged, true);
+    assert.equal(me.balance, 0);
+    economy.unflag(ME.id);
+    // Вход за день уже был сегодня: панель сама доплачивает при открытии.
+    me = (await call("GET", "/api/wallet/me")).json;
+    assert.equal(me.flagged, false);
+    assert.equal(me.balance, r.json.newAchievements.length * CFG.achievement);
+  });
+});
