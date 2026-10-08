@@ -22,7 +22,8 @@ const int = (v, max) => {
 function send(res, status, body, gzip = false) {
   if (body == null) return res.writeHead(status).end();
   const json = JSON.stringify(body);
-  // Ответы панели (сводка, списки) через туннель уходят сжатыми; игре это не нужно — у неё ответы маленькие.
+  // Ответы больше 1 КБ через туннель уходят сжатыми: панель (сводка, списки) и игры — панель жетонов
+  // с заданиями (~15 КБ) и топ-100 (~7 КБ) сжимаются в 5–7 раз.
   if (gzip && json.length > 1024) {
     res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Content-Encoding": "gzip", Vary: "Accept-Encoding" });
     return res.end(gzipSync(json));
@@ -439,7 +440,7 @@ export function createApiServer({
         return send(res, 429, { error: "too many requests" });
       }
       const [status, out] = await handler(body, user, url, { req, ip });
-      send(res, status, out, own && /\bgzip\b/.test(req.headers["accept-encoding"] || ""));
+      send(res, status, out, /\bgzip\b/.test(req.headers["accept-encoding"] || ""));
     } catch (err) {
       if (err instanceof HttpError) {
         if (err.status === 413) res.setHeader("Connection", "close");

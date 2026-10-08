@@ -63,6 +63,8 @@ html, body {
 
 #banner.over { color: #e83820; animation: rise 2s ease-out both; }
 @keyframes rise { from { top: 100%; } to { top: 50%; } }
+/* Under an open overlay (pause, menu) the «STAGE N» line would show through its title. */
+#app:has(#overlay:not(.hidden)) #banner { visibility: hidden; }
 .hidden { display: none !important; }
 
 #controls {

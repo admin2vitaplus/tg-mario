@@ -38,7 +38,8 @@
   color: #fff;
   font-family: "Courier New", monospace;
 }
-.wallet h1 { margin: 4px 0 8px; font-size: 22px; color: #7fe8ec; letter-spacing: 2px; text-align: center; }
+/* 20px: «◆ TICKETS · Tank Field» fits one line at 360 px. */
+.wallet h1 { margin: 4px 0 8px; font-size: 20px; color: #7fe8ec; letter-spacing: 1px; text-align: center; }
 /* Tabs: one segmented bar, the open tab lit. */
 .wTabs { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.07); }
 .wTabs button, .wClose {
@@ -109,15 +110,15 @@
 
 #walletToasts {
   position: fixed;
-  /* Above the panel's «Закрыть», so a toast never covers a button. */
-  bottom: calc(72px + env(safe-area-inset-bottom));
+  /* At the top, over the title: at the bottom it covered the lobby's «Играть» and game buttons. */
+  top: calc(8px + env(safe-area-inset-top) + var(--tg-content-safe-area-inset-top, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 80;
   pointer-events: none;
 }
 .walletToast {
-  margin-top: 6px;
+  margin-bottom: 6px;
   padding: 6px 12px;
   border: 2px solid #7fe8ec;
   border-radius: 8px;
