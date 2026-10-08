@@ -326,3 +326,13 @@ test('Hop-Skip names all have English', () => {
   assert.ok(names.length > 30);
   assert.deepEqual(names.filter((n) => !known.has(n)), []);
 });
+
+// The ◆ panel hides a game switched off in config.js; it finds the game by the id there.
+test('every game with жетоны is known to config.js by the id the wallet uses', () => {
+  const wallet = fs.readFileSync(path.join(import.meta.dirname, '..', 'web', 'lib', 'wallet.js'), 'utf8');
+  const map = Object.fromEntries([...wallet.match(/const CONFIG_ID = \{([^}]*)\}/)[1].matchAll(/(\w+): '([\w-]+)'/g)].map((m) => [m[1], m[2]]));
+  const config = fs.readFileSync(path.join(import.meta.dirname, '..', 'web', 'config.js'), 'utf8');
+  const ids = [...config.matchAll(/id: '([\w-]+)'/g)].map((m) => m[1]);
+  const economy = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'bot', 'economy.json'), 'utf8'));
+  for (const g of new Set(economy.shop.map((it) => it.game))) assert.ok(ids.includes(map[g] || g), `${g} is not in config.js`);
+});

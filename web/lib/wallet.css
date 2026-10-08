@@ -67,6 +67,7 @@
 .wTabs button:active, .wClose:active { background: rgba(255, 255, 255, 0.16); }
 .wBody { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; touch-action: pan-y; }
 .wNote { margin: 8px 0; font-size: 13px; color: #ccc; text-align: center; }
+.wNote.wWarn { color: #ffb4a8; }
 .wCode { font-size: 11px; opacity: 0.5; }
 .wBig { margin: 6px 0; font-size: 20px; font-weight: bold; text-align: center; color: #7fe8ec; }
 .wList { margin: 8px 0; padding-left: 18px; font-size: 14px; line-height: 1.35; }
