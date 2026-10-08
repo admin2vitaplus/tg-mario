@@ -109,7 +109,13 @@ function open(opts) {
       b.addEventListener('click', () => {
         if (!open && it.shop && window.Wallet) {
           // Bought: the panel opens again with the item available.
-          window.Wallet.buy(it.shop).then((ok) => { if (ok && panel === mine) window.Looks.open(opts); });
+          // At once a sign that the tap was heard: the item dims until the purchase is settled.
+          if (b.classList.contains('busy')) return;
+          b.classList.add('busy');
+          window.Wallet.buy(it.shop).then((ok) => {
+            b.classList.remove('busy');
+            if (ok && panel === mine) window.Looks.open(opts);
+          });
           return;
         }
         if (!open || sel[g.id] === it.id) return;
@@ -125,8 +131,12 @@ function open(opts) {
     body.append(sec);
   });
 
+  // The server can take a purchase back (wallet.js tells the player why): redraw the items.
+  const onOwned = () => { if (panel === mine) window.Looks.open(opts); };
+  window.addEventListener('wallet:owned', onOwned);
   const close = () => {
     if (panel !== mine) return;
+    window.removeEventListener('wallet:owned', onOwned);
     document.removeEventListener('keydown', onKey, true);
     detach = null;
     panel.remove();
@@ -141,7 +151,11 @@ function open(opts) {
   };
   panel.querySelector('.looksDone').addEventListener('click', close);
   document.addEventListener('keydown', onKey, true);
-  detach = () => { document.removeEventListener('keydown', onKey, true); detach = null; };
+  detach = () => {
+    window.removeEventListener('wallet:owned', onOwned);
+    document.removeEventListener('keydown', onKey, true);
+    detach = null;
+  };
   document.body.append(panel);
 }
 
