@@ -38,6 +38,9 @@
 }
 .looksItem.on { border-color: #f8d020; background: rgba(248, 208, 32, 0.15); }
 .looksItem.locked canvas, .looksItem.locked span { opacity: 0.5; }
+/* Tapped, the purchase on its way. */
+.looksItem.busy { border-color: #7fe8ec; animation: looksBusy 0.8s ease-in-out infinite alternate; }
+@keyframes looksBusy { to { opacity: 0.55; } }
 /* The price of a locked item, under its name: ◆ жетоны and ⭐ Stars. */
 .looksItem i { font-style: normal; font-size: 11px; color: #7fe8ec; white-space: nowrap; line-height: 1.2; }
 .looksItem i b { color: #f8d020; font-weight: bold; }

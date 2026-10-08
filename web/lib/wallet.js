@@ -222,10 +222,17 @@ if (enabled) {
   } catch (e) { /* nothing saved */ }
 }
 
+// Bought on this phone, the server's answer still on its way: such items stay owned, and the
+// balance stays lowered, when an older answer of /me comes in meanwhile.
+const pending = new Map(); // shop id -> price in жетоны (0 for Stars)
 function setMe(m) {
   me = m;
   meAt = Date.now();
-  keepOwned(m.owned || []);
+  const list = (m.owned || []).slice();
+  for (const [id, price] of pending) {
+    if (!list.includes(id)) { list.push(id); me = Object.assign({}, me, { balance: me.balance - price }); }
+  }
+  keepOwned(list);
   badge();
   save();
 }
@@ -564,7 +571,17 @@ function open(tab, opts) {
     if (p) { period = p.dataset.period; renderTable(panel.querySelector('.wBody')); return; }
     const b = e.target.closest('[data-act]');
     if (!b) return;
-    if (b.dataset.act === 'buy') buy(b.dataset.id, b.dataset.via).then((ok) => { if (ok && panel) show('shop'); });
+    if (b.dataset.act === 'buy') {
+      // At once a sign that the tap was heard; the button comes back if the purchase did not happen.
+      if (b.disabled) return;
+      const text = b.textContent;
+      b.disabled = true;
+      b.textContent = '…';
+      buy(b.dataset.id, b.dataset.via).then((ok) => {
+        if (ok && panel) show('shop');
+        else { b.disabled = false; b.textContent = text; }
+      });
+    }
     if (b.dataset.act === 'invite') invite();
     if (b.dataset.act === 'reopen') reopen();
   });
@@ -649,14 +666,46 @@ function enough(price) {
 }
 // confirmed: the player already picked «◆ N жетонов» in the choice popup, so a second popup
 // right after the first is not shown (on some phones it did not open, and nothing happened).
+// The item is handed over at once: the balance is checked, and the server answers through the
+// tunnel in a second or more. If the server says no, the item is taken back and the player told.
 function buyTokens(it, confirmed) {
   return enough(it.price).then((ok) => {
     if (!ok) return false;
     return (confirmed ? Promise.resolve(true) : ask(T('confirm', { name: it[lang], n: it.price }))).then((yes) => {
       if (!yes) return false;
-      return request('POST', '/buy', { item: it.id }).then((r) => bought(it.id, r));
+      const before = { owned: owned.slice(), balance: me.balance };
+      pending.set(it.id, it.price);
+      bought(it.id, { balance: me.balance - it.price });
+      request('POST', '/buy', { item: it.id }).then((r) => {
+        pending.delete(it.id);
+        if (r.owned || typeof r.balance === 'number') keepServer(it.id, r);
+      }, (e) => {
+        pending.delete(it.id);
+        if (e && e.status === 409 && e.body && e.body.error !== 'not enough') { refresh(true).catch(() => {}); return; }
+        keepOwned(before.owned);
+        me.balance = e && e.body && typeof e.body.balance === 'number' ? e.body.balance : before.balance;
+        badge();
+        save();
+        if (e && e.body && e.body.error === 'not enough') tell(T('not_enough', { n: it.price, have: me.balance }));
+        else failed(e);
+        notify();
+      });
+      return true;
     });
   });
+}
+// The server's word after an optimistic purchase: no second haptic buzz.
+function keepServer(id, r) {
+  keepOwned(r.owned || owned);
+  if (me && typeof r.balance === 'number') me.balance = r.balance;
+  badge();
+  save();
+  notify();
+}
+// Pages that show what is owned (the Looks panel) listen to this to redraw.
+function notify() {
+  if (panel && current === 'shop' && me && info) render(panel.querySelector('.wBody'));
+  try { window.dispatchEvent(new CustomEvent('wallet:owned')); } catch (e) { /* old browser */ }
 }
 
 // The server makes the invoice; Telegram shows it. «paid» — the bot hands the item over once
@@ -672,18 +721,21 @@ function invoiceClosed(status) {
   else if (status === 'pending') tell(T('paid_wait'));
   return status === 'paid';
 }
+// «paid» from Telegram means the Stars are spent: the item is shown at once, and the page then
+// waits for the bot to record the payment (it hears of it from Telegram a moment later).
 function buyStars(it) {
   return request('POST', '/invoice', { item: it.id }).then((r) => openInvoice(r.link)).then((status) => {
     if (!invoiceClosed(status)) return false;
-    return new Promise((resolve) => {
-      let tries = 0;
-      const check = () => refresh(true).then(() => {
-        if (owned.includes(it.id)) resolve(bought(it.id));
-        else if (++tries < 8) setTimeout(check, 1500);
-        else { tell(T('paid_wait')); resolve(false); }
-      }, () => (++tries < 8 ? setTimeout(check, 1500) : resolve(false)));
-      check();
-    });
+    pending.set(it.id, 0);
+    bought(it.id);
+    let tries = 0;
+    const check = () => refresh(true).then((m) => {
+      if (m && (m.owned || []).includes(it.id)) pending.delete(it.id);
+      else if (++tries < 8) setTimeout(check, 1500);
+      else { pending.delete(it.id); tell(T('paid_wait')); }
+    }, () => (++tries < 8 ? setTimeout(check, 1500) : pending.delete(it.id)));
+    setTimeout(check, 1000);
+    return true;
   });
 }
 
