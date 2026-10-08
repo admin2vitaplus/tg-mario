@@ -108,3 +108,14 @@ function defaultOnChange(now, was) {
   console.error(`Адрес туннеля сменился (${was} → ${now}). Перезапускаю бота, чтобы обновить кнопку игры.`);
   process.exit(1);
 }
+
+// ---------- Постоянный адрес (PUBLIC_API_URL) ----------
+// Свой домен или прямой вход через Caddy (например https://1-2-3-4.sslip.io:8443). Туннель тогда
+// не запускается и не опрашивается. Возвращает только origin (https://хост[:порт]) — так адрес
+// попадает в ?api= игры и в ссылку панели; не https — ошибка: Telegram такой адрес не откроет.
+export function fixedPublicUrl(value) {
+  let u;
+  try { u = new URL(String(value).trim()); } catch { throw new Error(`PUBLIC_API_URL не похож на адрес: ${value}`); }
+  if (u.protocol !== "https:") throw new Error(`PUBLIC_API_URL должен начинаться с https:// (сейчас ${u.protocol})`);
+  return u.origin;
+}
