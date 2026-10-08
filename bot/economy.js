@@ -38,6 +38,8 @@ export const REASONS = ["achievement", "record", "daily", "task", "invite", "pri
 const CAPPED = ["record", "daily", "task", "invite"];
 // Помеченному игроку не начисляется ничего из этого.
 const EARNED = ["achievement", ...CAPPED];
+// Отмечаются выполненными и после потолка (приглашение — нет: его жетоны дойдут в другой день).
+const MARKED = ["record", "daily", "task"];
 // Игры с жетонами и их ежедневные задания (сбрасываются в 00:00 UTC).
 export const GAMES = ["mario", "tanks", "bombs", "word"];
 export const DAILY_TASKS = ["play", "level", "record"];
@@ -169,7 +171,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     clearStrikes: db.prepare("UPDATE wallets SET strikes = 0, strike_day = NULL WHERE player_id = ?"),
     invitesThisSeason: db.prepare(`SELECT COUNT(*) AS n FROM ledger
       WHERE player_id = ? AND reason = 'invite' AND season = ? AND event LIKE 'friend:%'`),
-    history: db.prepare(`SELECT id, amount, reason, event, at FROM ledger WHERE player_id = ?
+    history: db.prepare(`SELECT id, amount, reason, event, at FROM ledger WHERE player_id = ? AND amount != 0
       ORDER BY id DESC LIMIT ?`),
     owned: db.prepare(`SELECT event AS item FROM ledger WHERE player_id = ? AND reason = 'shop' AND event NOT LIKE 'life:%'
       UNION SELECT item FROM purchases WHERE player_id = ? AND refunded_at IS NULL AND item NOT LIKE 'life:%'`),
@@ -219,7 +221,12 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       let n = amount;
       if (EARNED.includes(reason) && wallet(playerId).flagged) return 0;
       if (CAPPED.includes(reason)) n = Math.min(n, cfg.dailyCap - q.today.get(playerId, dayUtc(at)).n);
-      if (n === 0 || (CAPPED.includes(reason) && n < 0)) return 0; // потолок на сегодня исчерпан
+      if (n === 0 || (CAPPED.includes(reason) && n < 0)) {
+        // Потолок на сегодня исчерпан. Задание, рекорд и вход за день всё равно выполнены:
+        // запись с нулём отмечает это (задание зачёркнуто, серия дней идёт), жетонов она не даёт.
+        if (amount > 0 && MARKED.includes(reason)) q.insert.run(playerId, 0, reason, String(event), season ?? seasonOf(at), dayUtc(at), at);
+        return 0;
+      }
       q.insert.run(playerId, n, reason, String(event), season ?? seasonOf(at), dayUtc(at), at);
       q.bump.run(playerId, n);
       dropTop("overall");
@@ -241,7 +248,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     let sql;
     if (board === "overall") {
       sql = `SELECT l.player_id AS id, SUM(l.amount) AS value, MAX(l.id) AS tie FROM ledger l
-        WHERE l.reason NOT IN ('prize', 'shop', 'annul', 'admin') ${period === "week" ? `AND l.season = ${season}` : ""}
+        WHERE l.reason NOT IN ('prize', 'shop', 'annul', 'admin') AND l.amount != 0 ${period === "week" ? `AND l.season = ${season}` : ""}
         GROUP BY l.player_id HAVING value > 0`;
     } else if (board === "word") {
       sql = wordSums(period === "week" ? from : 0, Number.MAX_SAFE_INTEGER);
@@ -278,7 +285,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         const w = wallet(playerId);
         if (w.streak_day === day || w.flagged) return;
         const n = post(playerId, loginAmount(w, day), "daily", `day:${day}`, { at });
-        if (n > 0) q.setStreak.run(w.streak_day === day - 1 ? w.streak + 1 : 1, day, playerId);
+        if (q.has.get(playerId, "daily", `day:${day}`)) q.setStreak.run(w.streak_day === day - 1 ? w.streak + 1 : 1, day, playerId);
         grant(out, "daily", n);
       });
       return out;
@@ -421,6 +428,8 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         season: seasonOf(at),
         seasonEndsAt: seasonStart(seasonOf(at) + 1),
         notify: !!w.notify,
+        // Помеченному игроку начисления не идут: страница говорит ему об этом.
+        flagged: !!w.flagged,
         tasks: economy.tasks(playerId, at),
         dayEndsAt: (day + 1) * DAY_MS,
       };
@@ -525,7 +534,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
           ORDER BY t.value DESC, t.tie ASC LIMIT ?`).all(cfg.season.boards.word.length),
         overall: db.prepare(`SELECT l.player_id, SUM(l.amount) AS value, MAX(l.id) AS first
           FROM ledger l LEFT JOIN wallets w ON w.player_id = l.player_id
-          WHERE l.season = ? AND l.reason NOT IN ('prize', 'shop') AND w.flagged IS NULL
+          WHERE l.season = ? AND l.reason NOT IN ('prize', 'shop') AND l.amount != 0 AND w.flagged IS NULL
           GROUP BY l.player_id HAVING value > 0 ORDER BY value DESC, first ASC LIMIT ?`)
           .all(season, cfg.season.boards.overall.length),
       };

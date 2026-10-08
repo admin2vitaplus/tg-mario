@@ -231,6 +231,9 @@ export function createApiServer({
       if (!user) return [401, { error: "unauthorized" }];
       store.touchPlayer(user);
       economy.setLang(user.id, user.language_code);
+      // Вход за день страница отправляет раз в день, а недоплаченное достижение (например, после
+      // снятия пометки) должно дойти сразу, как только игрок откроет панель.
+      payEarned(user.id, []);
       return [200, walletMe(user.id)];
     };
     // Вход в сборник за день: общее задание главной (раз в день по UTC, с серией дней).

@@ -41,7 +41,9 @@ const STR = {
     t_invite: 'Позвать друга: {count} из {max} за неделю',
     t_invite_note: 'Друг сыграет {games} {games_w} — тебе {inviter} {inviter_w}, ему {newcomer}.',
     t_play: 'Сыграть игру', t_level: 'Пройти уровень', t_record: 'Побить свой рекорд',
-    t_level_word: 'Отгадать слово', t_record_word: 'Побить свой рекорд серии (от 2 дней)',
+    t_level_word: 'Отгадать слово', t_record_word: 'Побить свой рекорд серии (от 2 дней)', t_level_bombs: 'Пройти этап',
+    t_play_note: 'Засчитывается в конце игры или при выходе в меню, если играли от 20 секунд.',
+    t_record_note: 'Набрать больше очков, чем твой лучший результат в этой игре. Первая игра тоже считается.',
     t_other: 'Свои задания у каждой игры: откройте игру и нажмите «◆» в её меню.',
     period_week: 'За неделю', period_all: 'За всё время',
     top_overall: 'Жетоны, полученные за {p}', top_game: 'Лучший счёт за {p}',
@@ -63,6 +65,7 @@ const STR = {
     today: 'Сегодня получено {n} из {cap}. Серия дней: {streak}.',
     how_cap: 'В день можно получить не больше {cap}, не считая призов недели.',
     how_note: 'Жетоны начисляет сервер за результаты, которые он проверил.',
+    flagged: 'Начисления жетонов приостановлены: сервер несколько раз не смог проверить результаты игр. Напишите боту, администратор проверит и включит их снова.',
     invite: 'Позвать друга',
     invite_text: 'Сыграем? Ретро-игры прямо в Telegram.',
     no_history: 'Операций пока нет. Сыграй — и здесь появятся первые жетоны.',
@@ -97,7 +100,9 @@ const STR = {
     t_invite: 'Invite a friend: {count} of {max} this week',
     t_invite_note: 'Your friend plays {games} {games_w} — {inviter} {inviter_w} for you, {newcomer} for them.',
     t_play: 'Play a game', t_level: 'Clear a level', t_record: 'Beat your best',
-    t_level_word: 'Guess the word', t_record_word: 'Beat your best streak (2 days or more)',
+    t_level_word: 'Guess the word', t_record_word: 'Beat your best streak (2 days or more)', t_level_bombs: 'Clear a stage',
+    t_play_note: 'Counts when the game ends, or when you leave for the menu after 20 seconds of play.',
+    t_record_note: 'Score more than your best in this game. Your first game counts too.',
     t_other: 'Each game has its own tasks: open the game and tap «◆» in its menu.',
     period_week: 'This week', period_all: 'All time',
     top_overall: 'Tickets got in {p}', top_game: 'Best score in {p}',
@@ -119,6 +124,7 @@ const STR = {
     today: 'Today: {n} of {cap}. Days in a row: {streak}.',
     how_cap: 'At most {cap} a day, weekly prizes aside.',
     how_note: 'Tickets are given by the server for results it has checked.',
+    flagged: 'Tickets are on hold: the server could not check several game results. Write to the bot and the admin will check and switch them back on.',
     invite: 'Invite a friend',
     invite_text: 'Want to play? Retro games right in Telegram.',
     no_history: 'Nothing here yet. Play a game to get your first tickets.',
@@ -353,6 +359,12 @@ function gamesWord(n) {
 const achTitle = (a) => (lang === 'en' && a.titleEn) || a.title;
 const achText = (a) => (lang === 'en' && a.textEn) || a.text;
 
+// A game switched off in config.js (enabled: false) is hidden here too: its shop items and its
+// own panel. What the player already got from it stays in the history.
+// The жетоны id 'mario' is 'pryg-skok' in config.js.
+const CONFIG_ID = { mario: 'pryg-skok' };
+const gameOn = (g) => !g || !window.CARTRIDGE || !window.CARTRIDGE.isEnabled || window.CARTRIDGE.isEnabled(CONFIG_ID[g] || g);
+
 let panel = null;
 let current = 'tasks';
 let scope = null;      // null — the collection; 'mario' | 'tanks' | 'bombs' | 'word' — that game
@@ -370,7 +382,8 @@ function renderTasks(body) {
   const note = (t) => `<p class="wNote">${esc(t)}</p>`;
   const now = Date.now();
   let html = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` +
-    note(T('today', { n: me.today, cap: me.dailyCap, streak: me.streak }));
+    note(T('today', { n: me.today, cap: me.dailyCap, streak: me.streak })) +
+    (me.flagged ? `<p class="wNote wWarn">${esc(T('flagged'))}</p>` : '');
   const list = (me.tasks && me.tasks[scope || 'main']) || [];
   const day = list.filter((t) => t.period === 'day');
   const week = list.filter((t) => t.period === 'week');
@@ -380,7 +393,8 @@ function renderTasks(body) {
     html += `<h2 class="wSec">${esc(T('sec_day', { left: left(me.dayEndsAt - now) }))}</h2><ul class="wTasks">` +
       day.map((t) => (t.id === 'login'
         ? taskRow(t, T('t_login'), T('t_login_note', { streak: me.streak, step: r.daily.perStreakDay, max: r.daily.max }))
-        : taskRow(t, T(STR.ru['t_' + t.id + '_' + scope] ? 't_' + t.id + '_' + scope : 't_' + t.id)))).join('') + '</ul>';
+        : taskRow(t, T(STR.ru['t_' + t.id + '_' + scope] ? 't_' + t.id + '_' + scope : 't_' + t.id),
+          scope !== 'word' && STR.ru['t_' + t.id + '_note'] ? T('t_' + t.id + '_note') : ''))).join('') + '</ul>';
   }
   if (week.length) {
     html += `<h2 class="wSec">${esc(T('sec_week', { left: left(me.seasonEndsAt - now) }))}</h2><ul class="wTasks">` +
@@ -460,7 +474,7 @@ function render(body) {
         `${h.amount > 0 ? '+' : ''}${h.amount}</b></li>`;
     }).join('') + '</ul>';
   } else {
-    const items = info.shop.filter((it) => (scope ? it.game === scope : gameOn(it.game)));
+    const items = info.shop.filter((it) => (!scope || it.game === scope) && gameOn(it.game));
     body.innerHTML = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` +
       note(scope ? T('shop_game') : T('shop_note')) +
       '<ul class="wShop">' + items.map((it) => {
@@ -511,8 +525,9 @@ function onKey(e) {
 // Old callers asked for 'how'; it is the tasks tab now.
 function open(tab, opts) {
   if (!enabled) return;
+  checkinIfNewDay();
   close();
-  scope = opts && ['mario', 'tanks', 'bombs', 'word'].includes(opts.game) ? opts.game : null;
+  scope = opts && ['mario', 'tanks', 'bombs', 'word'].includes(opts.game) && gameOn(opts.game) ? opts.game : null;
   period = 'week';
   const tabs = tabsOf(scope);
   if (tab === 'how' || !tabs.includes(tab)) tab = 'tasks';
@@ -576,12 +591,6 @@ function tell(text) {
   } catch (e) { /* fall through */ }
   window.alert(text);
 }
-
-// Items of a game switched off in config.js (its id there is 'pryg-skok' for 'mario') are not sold.
-const gameOn = (game) => {
-  const c = window.CARTRIDGE;
-  return !c || typeof c.isEnabled !== 'function' || c.isEnabled(game === 'mario' ? 'pryg-skok' : game);
-};
 
 // Telegram Stars are paid inside Telegram only (6.1+ has openInvoice).
 const canStars = () => !!(tg && tg.openInvoice && tg.isVersionAtLeast && tg.isVersionAtLeast('6.1'));
@@ -748,6 +757,14 @@ function start() {
   // An older server answers without `me`; a failed check-in is tried again next launch.
   return loading.then((m) => m || refresh(true), () => refresh(true));
 }
+
+// The game stayed open past 00:00 UTC: the new day's visit counts when the player comes back.
+function checkinIfNewDay() {
+  let last = null;
+  try { last = localStorage.getItem(CHECKIN_KEY); } catch (e) { return; }
+  if (last && last !== Math.floor(Date.now() / 86400000) + ':' + myId && !loading) start().catch(() => {});
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && enabled) checkinIfNewDay(); });
 
 window.Wallet = {
   enabled,
