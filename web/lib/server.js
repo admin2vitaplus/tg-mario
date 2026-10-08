@@ -9,6 +9,8 @@
 // All are checked at once and the first one that answers /api/health wins and is
 // remembered. A just-started tunnel can take a few seconds to become reachable,
 // so the check is retried before giving up.
+// The check costs a round trip over the tunnel, so while it runs, requests go straight
+// to the address from the launch link; if it does not answer, they wait for the check.
 //
 //   Server.base            -> '' until known, then 'https://…'
 //   Server.ready           -> Promise<boolean>: true when a server answered
@@ -30,9 +32,12 @@ function origin(url) {
   } catch (e) { return ''; }
 }
 
+const params = new URLSearchParams(location.search);
+// The bot's buttons carry the live address: it is used before the check is done.
+const fromLink = origin(params.get('api') || '');
+
 function candidates() {
   const list = [];
-  const params = new URLSearchParams(location.search);
   list.push(params.get('api'));
   try { list.push(localStorage.getItem(KEY)); } catch (e) { /* private mode */ }
   const start = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || params.get('tgWebAppStartParam') || '';
@@ -102,22 +107,33 @@ const RETRY = new Set([0, 502, 503, 504, 520, 521, 522, 523, 524, 530]);
 // Browsers take keepalive bodies up to 64 KB.
 const KEEPALIVE_MAX = 60000;
 function request(method, path, body, opts) {
-  return api.ready.then((ok) => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (initData) headers.Authorization = 'tma ' + initData;
+  const json = body ? JSON.stringify(body) : undefined;
+  const keepalive = !!(opts && opts.keepalive && json && json.length < KEEPALIVE_MAX);
+  const once = (base) => fetchTimeout(base + path, { method, headers, body: json, keepalive }, 10000)
+    .then((r) => r.json().catch(() => null).then((j) => {
+      if (r.ok && j) return j;
+      if (r.ok && r.status === 204) return {};
+      // No JSON: an error page of the tunnel, the server itself did not get the request.
+      throw Object.assign(new Error((j && j.error) || 'HTTP ' + r.status), { status: j ? r.status : (r.status || 0), body: j, unreached: !j });
+    }), (e) => {
+      // A timeout may have reached the server; a refused connection or an unknown name did not.
+      throw Object.assign(new Error('network'), { status: 0, cause: e, unreached: !(e && e.name === 'AbortError') });
+    });
+  const checked = () => api.ready.then((ok) => {
     if (!ok) throw Object.assign(new Error('offline'), { status: 0, offline: true });
-    const headers = { 'Content-Type': 'application/json' };
-    if (initData) headers.Authorization = 'tma ' + initData;
-    const json = body ? JSON.stringify(body) : undefined;
-    const keepalive = !!(opts && opts.keepalive && json && json.length < KEEPALIVE_MAX);
-    const once = () => fetchTimeout(api.base + path, { method, headers, body: json, keepalive }, 10000)
-      .then((r) => r.json().catch(() => null).then((j) => {
-        if (r.ok && j) return j;
-        if (r.ok && r.status === 204) return {};
-        throw Object.assign(new Error((j && j.error) || 'HTTP ' + r.status), { status: j ? r.status : (r.status || 0), body: j });
-      }), (e) => { throw Object.assign(new Error('network'), { status: 0, cause: e }); });
     // Only reads are repeated: a game result that did reach the server would come
     // back as a rejected duplicate.
-    return once().catch((e) => (method === 'GET' && RETRY.has(e.status) ? wait(1500).then(once) : Promise.reject(e)));
+    return once(api.base).catch((e) => (method === 'GET' && RETRY.has(e.status) ? wait(1500).then(() => once(api.base)) : Promise.reject(e)));
   });
+  // The check is still running: go straight to the address from the launch link. If it did
+  // not answer (an old link, a tunnel still starting), the request waits for the check;
+  // a write is sent again only when it surely did not reach the server.
+  if (api.online === null && fromLink) {
+    return once(fromLink).catch((e) => (e.unreached ? checked() : Promise.reject(e)));
+  }
+  return checked();
 }
 
 window.Server = api;

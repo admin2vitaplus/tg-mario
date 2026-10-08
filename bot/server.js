@@ -22,7 +22,8 @@ const int = (v, max) => {
 function send(res, status, body, gzip = false) {
   if (body == null) return res.writeHead(status).end();
   const json = JSON.stringify(body);
-  // Ответы панели (сводка, списки) через туннель уходят сжатыми; игре это не нужно — у неё ответы маленькие.
+  // Ответы больше 1 КБ через туннель уходят сжатыми: панель (сводка, списки) и игры — панель жетонов
+  // с заданиями (~15 КБ) и топ-100 (~7 КБ) сжимаются в 5–7 раз.
   if (gzip && json.length > 1024) {
     res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Content-Encoding": "gzip", Vary: "Accept-Encoding" });
     return res.end(gzipSync(json));
@@ -279,6 +280,16 @@ export function createApiServer({
   // Покупка за Telegram Stars: сервер создаёт счёт, игра открывает его (Telegram.WebApp.openInvoice),
   // а товар выдаёт бот, когда Telegram сообщит об оплате (successful_payment, wallet-bot.js).
   if (economy && createInvoice) {
+    // Telegram может отказать в счёте (сеть, лимиты, неверные данные): причина — в журнал бота,
+    // игре — понятный ответ 502 вместо безымянной «ошибки сервера».
+    const invoiceLink = async (item, user) => {
+      try {
+        return [200, { link: await createInvoice(item, user) }];
+      } catch (err) {
+        console.error(`Счёт в звёздах не создан (${item.id}): ${err.description || err.message}`);
+        return [502, { error: "invoice failed" }];
+      }
+    };
     routes["POST /api/wallet/invoice"] = async (body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
       if (typeof body.item !== "string") return [400, { error: "bad data" }];
@@ -286,8 +297,7 @@ export function createApiServer({
       if (!check.ok) return [check.error === "unknown item" ? 404 : 409, { error: check.error }];
       store.touchPlayer(user);
       economy.setLang(user.id, user.language_code);
-      const link = await createInvoice(check.item, user);
-      return [200, { link }];
+      return invoiceLink(check.item, user);
     };
     routes["POST /api/wallet/life-invoice"] = async (body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
@@ -295,8 +305,7 @@ export function createApiServer({
       if (!check.ok) return [check.error === "bad offer" ? 400 : 409, { error: check.error }];
       store.touchPlayer(user);
       economy.setLang(user.id, user.language_code);
-      const link = await createInvoice(check.item, user);
-      return [200, { link }];
+      return invoiceLink(check.item, user);
     };
   }
 
@@ -431,7 +440,7 @@ export function createApiServer({
         return send(res, 429, { error: "too many requests" });
       }
       const [status, out] = await handler(body, user, url, { req, ip });
-      send(res, status, out, own && /\bgzip\b/.test(req.headers["accept-encoding"] || ""));
+      send(res, status, out, /\bgzip\b/.test(req.headers["accept-encoding"] || ""));
     } catch (err) {
       if (err instanceof HttpError) {
         if (err.status === 413) res.setHeader("Connection", "close");

@@ -251,4 +251,5 @@ html, body {
 
 /* «♥ Ещё жизнь» on the game over screen: the price on its own line. */
 #ovLife { flex-direction: column; gap: 0; }
-#ovLife .ovCost { display: block; font-size: 0.8em; opacity: 0.85; margin-top: 2px; }
+/* A dark pill: the yellow ⭐ is not lost on the yellow button. */
+#ovLife .ovCost { display: block; margin-top: 4px; padding: 2px 10px; border-radius: 999px; background: rgba(28, 22, 0, 0.82); color: #fff; font-size: 0.8em; }

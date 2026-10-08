@@ -27,6 +27,10 @@ export const starsInvoice = (bot) => (item, user) => {
   );
 };
 
+// Какие обновления бот берёт у Telegram. Без явного списка Telegram помнит прошлый, и если в нём
+// не было pre_checkout_query, бот не узнаёт о покупке, не отвечает за 10 секунд — оплата падает.
+export const ALLOWED_UPDATES = ["message", "callback_query", "inline_query", "chosen_inline_result", "pre_checkout_query"];
+
 export function installWalletCommands(bot, { economy, admins }) {
   const id = (s) => (/^\d{1,15}$/.test(s || "") ? Number(s) : null);
   const args = (ctx) => String(ctx.match || "").trim().split(/\s+/).filter(Boolean);
@@ -40,20 +44,28 @@ export function installWalletCommands(bot, { economy, admins }) {
     return m && { level: Number(m[1]), offer: m[2] };
   };
 
+  // Отказ и ошибка ответа пишутся в журнал: по нему видно, дошла ли покупка до бота.
+  const answer = (ctx, ok, why) => ctx.answerPreCheckoutQuery(ok, ok ? undefined : { error_message: why })
+    .then(() => console.log(`Звёзды, проверка перед оплатой: ${ctx.preCheckoutQuery.invoice_payload} — ${ok ? "да" : `нет (${why})`}`))
+    .catch((err) => console.error(`Звёзды: ответ на проверку перед оплатой не принят: ${err.description || err.message}`));
+
   bot.on("pre_checkout_query", (ctx) => {
     const q = ctx.preCheckoutQuery;
+    const en = langOf(q.from.language_code) === "en";
     const life = lifeOf(q.invoice_payload);
     if (life) {
       const check = q.currency === "XTR" ? economy.lifeCheck(q.from.id, life.offer, life.level, q.total_amount) : { ok: false };
-      if (check.ok) return ctx.answerPreCheckoutQuery(true);
-      const why = check.error === "already" ? "Эта жизнь уже оплачена." : "Покупка недоступна, вернитесь в игру.";
-      return ctx.answerPreCheckoutQuery(false, { error_message: why });
+      if (check.ok) return answer(ctx, true);
+      return answer(ctx, false, check.error === "already"
+        ? (en ? "This life is already paid for." : "Эта жизнь уже оплачена.")
+        : (en ? "Not available now, go back to the game." : "Покупка недоступна, вернитесь в игру."));
     }
     const m = /^shop:([a-z0-9-]{1,32})$/.exec(q.invoice_payload);
     const check = m && q.currency === "XTR" ? economy.starsCheck(q.from.id, m[1], q.total_amount) : { ok: false };
-    if (check.ok) return ctx.answerPreCheckoutQuery(true);
-    const why = check.error === "already" ? "Этот товар у вас уже есть." : "Товар недоступен, откройте магазин заново.";
-    return ctx.answerPreCheckoutQuery(false, { error_message: why });
+    if (check.ok) return answer(ctx, true);
+    return answer(ctx, false, check.error === "already"
+      ? (en ? "You already have this item." : "Этот товар у вас уже есть.")
+      : (en ? "Not available now, open the shop again." : "Товар недоступен, откройте магазин заново."));
   });
 
   bot.on("message:successful_payment", (ctx) => {

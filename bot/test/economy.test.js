@@ -506,6 +506,33 @@ test("migration 6 lifts the automatic flags caused by the unknown worlds 2-4, an
   }
 });
 
+// Панель жетонов (~15 КБ с заданиями всех игр) и топ-100 идут через туннель сжатыми, маленькие ответы — как есть.
+test("HTTP: big wallet answers are gzipped for a client that takes gzip", async () => {
+  const clock = { t: Date.now() };
+  const { store, economy } = setup({ clock });
+  const server = createApiServer({ store, botToken: TOKEN, allowedOrigins: ["*"], economy, now: () => clock.t });
+  await new Promise((ok) => server.listen(0, ok));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const u = { id: 5, first_name: "Ева" };
+  const get = (path, gzip = true) => fetch(base + path, {
+    headers: { Authorization: `tma ${initData(u, Math.floor(clock.t / 1000))}`, "Accept-Encoding": gzip ? "gzip" : "identity" },
+  });
+  try {
+    let r = await get("/api/wallet/me");
+    assert.equal(r.headers.get("content-encoding"), "gzip");
+    assert.ok((await r.json()).tasks.mario.length > 3, "fetch unpacks it as usual");
+    r = await get("/api/wallet/me", false);
+    assert.equal(r.headers.get("content-encoding"), null);
+    assert.equal(typeof (await r.json()).balance, "number");
+    r = await get("/api/health");
+    assert.equal(r.headers.get("content-encoding"), null, "a small answer is sent as is");
+    await r.json();
+  } finally {
+    server.close();
+    store.close();
+  }
+});
+
 test("the owner (ADMIN_ID) is not flagged automatically for rejected reports", () => {
   const store = openDb(":memory:");
   const economy = createEconomy(store, CFG, { trusted: new Set([7]) });

@@ -5,7 +5,7 @@ import { startTunnel, watchTunnel } from "./tunnel.js";
 import { addSecret, installSafeConsole } from "./log.js";
 import { statsReport } from "./stats.js";
 import { economyReport } from "./economy.js";
-import { installWalletCommands, starsInvoice, walletNotifier } from "./wallet-bot.js";
+import { ALLOWED_UPDATES, installWalletCommands, starsInvoice, walletNotifier } from "./wallet-bot.js";
 import { groupPlay, inlineResults, watchEnabledGames } from "./invites.js";
 import { OWNER_COMMANDS, PLAYER_COMMANDS, supportHandler } from "./support.js";
 
@@ -256,4 +256,5 @@ for (const id of admins) {
     .catch((err) => console.warn(`Меню владельца не установлено: ${err.description || err.message}`));
 }
 
-bot.start({ onStart: (me) => console.log(`Бот @${me.username} запущен, игра: ${gameUrl}`) });
+// Список обновлений задаётся явно: без pre_checkout_query покупки за звёзды не проходят (wallet-bot.js).
+bot.start({ allowed_updates: ALLOWED_UPDATES, onStart: (me) => console.log(`Бот @${me.username} запущен, игра: ${gameUrl}`) });

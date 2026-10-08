@@ -87,6 +87,8 @@ const STR = {
     paid_wait: 'Оплата прошла, товар появится через несколько секунд. Если нет — откройте игру заново.',
     not_enough: 'Не хватает жетонов: нужно {n}, есть {have}.',
     buy_failed: 'Не получилось купить. Проверьте связь и попробуйте ещё раз.',
+    no_shop: 'Покупки работают, когда игра открыта через бота: кнопка «Играть» в чате с ботом.',
+    pay_failed: 'Telegram не провёл оплату, звёзды не списаны. Попробуйте ещё раз; если повторится — напишите боту /paysupport.',
     toast: '+{n} {w}', days: '{n} д.', hours: '{n} ч', minutes: '{n} мин',
     task_play: 'сыграть игру', task_level: 'пройти уровень', task_week: 'игры за неделю', task_all: 'все три игры за день', invite_friend: 'друг доиграл', invite_from: 'по приглашению друга',
   },
@@ -148,6 +150,8 @@ const STR = {
     paid_wait: 'Paid. The item will appear in a few seconds; if not, open the game again.',
     not_enough: 'Not enough tickets: {n} needed, you have {have}.',
     buy_failed: 'Could not buy. Check the connection and try again.',
+    no_shop: 'Purchases work when the game is opened through the bot: the «Play» button in the chat with the bot.',
+    pay_failed: 'Telegram did not take the payment, no Stars were spent. Try again; if it repeats, send /paysupport to the bot.',
     toast: '+{n} {w}', days: '{n} d', hours: '{n} h', minutes: '{n} min',
     task_play: 'play a game', task_level: 'clear a level', task_week: 'games this week', task_all: 'all three games in a day', invite_friend: 'your friend played', invite_from: 'invited by a friend',
   },
@@ -608,9 +612,10 @@ function tell(text) {
 // Telegram Stars are paid inside Telegram only (6.1+ has openInvoice).
 const canStars = () => !!(tg && tg.openInvoice && tg.isVersionAtLeast && tg.isVersionAtLeast('6.1'));
 
-// A choice of how to pay: Telegram's own popup with up to three buttons.
+// A choice of how to pay: Telegram's own popup with up to three buttons. 'tokens' — picked
+// in the popup (that is the confirmation); 'tokens?' — no popup, so жетоны are asked about once more.
 function choose(it, message) {
-  if (!canStars()) return Promise.resolve('tokens');
+  if (!canStars()) return Promise.resolve('tokens?');
   return new Promise((resolve) => {
     try {
       tg.showPopup({
@@ -621,7 +626,7 @@ function choose(it, message) {
           { type: 'cancel' },
         ],
       }, (id) => resolve(id || null));
-    } catch (e) { resolve('tokens'); }
+    } catch (e) { resolve('tokens?'); }
   });
 }
 
@@ -634,20 +639,43 @@ function bought(id, r) {
   return true;
 }
 
-function buyTokens(it) {
-  if (me.balance < it.price) { tell(T('not_enough', { n: it.price, have: me.balance })); return Promise.resolve(false); }
-  return ask(T('confirm', { name: it[lang], n: it.price })).then((yes) => {
-    if (!yes) return false;
-    return request('POST', '/buy', { item: it.id }).then((r) => bought(it.id, r));
+// The balance on the phone can be behind the server's: before saying «not enough» it is asked again.
+function enough(price) {
+  if (me.balance >= price) return Promise.resolve(true);
+  return refresh(true).then(() => me.balance >= price, () => false).then((ok) => {
+    if (!ok) tell(T('not_enough', { n: price, have: me.balance }));
+    return ok;
+  });
+}
+// confirmed: the player already picked «◆ N жетонов» in the choice popup, so a second popup
+// right after the first is not shown (on some phones it did not open, and nothing happened).
+function buyTokens(it, confirmed) {
+  return enough(it.price).then((ok) => {
+    if (!ok) return false;
+    return (confirmed ? Promise.resolve(true) : ask(T('confirm', { name: it[lang], n: it.price }))).then((yes) => {
+      if (!yes) return false;
+      return request('POST', '/buy', { item: it.id }).then((r) => bought(it.id, r));
+    });
   });
 }
 
-// The server makes the invoice; the bot hands the item over once Telegram reports the
-// payment, so after «paid» the page waits for the item to show up.
+// The server makes the invoice; Telegram shows it. «paid» — the bot hands the item over once
+// Telegram reports the payment; «failed» — Telegram did not take the payment, so the player is
+// told (before, nothing happened and the purchase looked broken); «cancelled» — closed by the player.
+function openInvoice(link) {
+  return new Promise((resolve, reject) => {
+    try { tg.openInvoice(link, (status) => resolve(status)); } catch (e) { reject(Object.assign(e, { status: 0 })); }
+  });
+}
+function invoiceClosed(status) {
+  if (status === 'failed') tell(T('pay_failed'));
+  else if (status === 'pending') tell(T('paid_wait'));
+  return status === 'paid';
+}
 function buyStars(it) {
-  return request('POST', '/invoice', { item: it.id }).then((r) => new Promise((resolve) => {
-    tg.openInvoice(r.link, (status) => {
-      if (status !== 'paid') { resolve(false); return; }
+  return request('POST', '/invoice', { item: it.id }).then((r) => openInvoice(r.link)).then((status) => {
+    if (!invoiceClosed(status)) return false;
+    return new Promise((resolve) => {
       let tries = 0;
       const check = () => refresh(true).then(() => {
         if (owned.includes(it.id)) resolve(bought(it.id));
@@ -656,23 +684,28 @@ function buyStars(it) {
       }, () => (++tries < 8 ? setTimeout(check, 1500) : resolve(false)));
       check();
     });
-  }));
+  });
 }
 
+// What went wrong, with the server's answer: «HTTP 502: invoice failed» tells the owner where to look.
+const failed = (e) => tell(T('buy_failed') + (e && (e.status || e.message) ? ' (' +
+  (e.status ? 'HTTP ' + e.status + (e.body && e.body.error ? ': ' + e.body.error : '') : e.message) + ')' : ''));
+
 function buy(id, via) {
-  if (!enabled) return Promise.resolve(false);
+  // Without the server or Telegram's signature nothing can be bought: said aloud, not a dead tap.
+  if (!enabled) { tell(T('no_shop')); return Promise.resolve(false); }
   return (info && me ? Promise.resolve() : refresh()).then(() => {
     const it = info.shop.find((x) => x.id === id);
     if (!it) return false;
     if (owned.includes(id)) return true;
     return (via ? Promise.resolve(via) : choose(it)).then((how) => {
       if (how === 'stars' && canStars()) return buyStars(it);
-      if (how === 'tokens') return buyTokens(it);
+      if (how === 'tokens' || how === 'tokens?') return buyTokens(it, !via && how === 'tokens');
       return false;
     });
   }).catch((e) => {
     if (e && e.status === 409) return refresh(true).then(() => owned.includes(id), () => false);
-    tell(T('buy_failed'));
+    failed(e);
     return false;
   });
 }
@@ -692,13 +725,10 @@ function buyLife(offer, level) {
     if (!o) return false;
     return choose(o, T('life_choose')).then((how) => {
       if (how === 'stars' && canStars()) {
-        return request('POST', '/life-invoice', { offer, level }).then((r) => new Promise((resolve) => {
-          tg.openInvoice(r.link, (status) => resolve(status === 'paid'));
-        }));
+        return request('POST', '/life-invoice', { offer, level }).then((r) => openInvoice(r.link)).then(invoiceClosed);
       }
-      if (how !== 'tokens') return false;
-      if (me.balance < o.price) { tell(T('not_enough', { n: o.price, have: me.balance })); return false; }
-      return ask(T('life_confirm', { n: o.price })).then((yes) => {
+      if (how !== 'tokens' && how !== 'tokens?') return false;
+      return enough(o.price).then((ok) => ok && (how === 'tokens' || ask(T('life_confirm', { n: o.price })))).then((yes) => {
         if (!yes) return false;
         return request('POST', '/life', { offer, level }).then((r) => {
           if (typeof r.balance === 'number') me.balance = r.balance;
@@ -714,7 +744,7 @@ function buyLife(offer, level) {
       tell(T('not_enough', { n: (lifeOffer(level) || {}).price, have: e.body.balance }));
     } else if (e && e.status === 409 && e.body && e.body.error === 'already') {
       return true;
-    } else tell(T('buy_failed'));
+    } else failed(e);
     return false;
   });
 }
