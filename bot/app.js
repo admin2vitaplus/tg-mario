@@ -9,6 +9,9 @@ import { createBombsResults } from "./bombs-results.js";
 import { createWord } from "./word.js";
 import { createAdmin } from "./admin.js";
 import { createAdminAuth } from "./admin-auth.js";
+import { isAdminPath } from "./admin.js";
+import { createServer as createHttpsServer } from "node:https";
+import { readFileSync } from "node:fs";
 
 // Всё, кроме самого бота Telegram и туннеля: база, HTTP API и комнаты «Танкодрома».
 // Вынесено отдельно, чтобы запуск и остановку можно было проверить тестом без сети и токена.
@@ -77,6 +80,10 @@ export async function startApp({
   const listenPort = port ?? (Number(env.API_PORT) || 8080);
   await new Promise((ok, fail) => { server.once("error", fail); server.listen(listenPort, ok); });
 
+  // Отдельный вход в панель по IP сервера, мимо туннеля (ADMIN_HTTPS_PORT + сертификат и ключ).
+  // На этом порту только панель: игры и оплаты по-прежнему идут через туннель.
+  const adminHttps = await startAdminHttps(env, server);
+
   let stopping = null;
   const close = () => stopping ??= (async () => {
     clearInterval(pruneTimer);
@@ -90,11 +97,51 @@ export async function startApp({
       setTimeout(() => { for (const s of sockets) s.destroy(); for (const r of roomSets) for (const ws of r.wss.clients) ws.terminate(); }, 2000).unref();
     });
     for (const r of roomSets) r.wss.close();
+    await adminHttps?.close();
     store.close();
   })();
 
   return {
     server, store, tanks, bombs, tracker, economy, word, commit, gameUrl, allowedOrigins, port: server.address().port, close,
-    adminEnabled: auth.enabled,
+    adminEnabled: auth.enabled, adminHttpsPort: adminHttps?.port ?? null,
+  };
+}
+
+// HTTPS-сервер только для панели. Запросы передаются тому же обработчику, что и на основном порту,
+// всё остальное — 404. Без порта, сертификата или ключа (или если файлы не читаются) — выключен,
+// бот при этом работает как обычно.
+async function startAdminHttps(env, server) {
+  const port = Number(env.ADMIN_HTTPS_PORT);
+  if (!env.ADMIN_HTTPS_PORT || !Number.isInteger(port) || port < 0 || port > 65535) return null;
+  let cert, key;
+  try {
+    cert = readFileSync(env.ADMIN_TLS_CERT || "");
+    key = readFileSync(env.ADMIN_TLS_KEY || "");
+  } catch (err) {
+    console.error(`Панель по HTTPS выключена: не читаются ADMIN_TLS_CERT/ADMIN_TLS_KEY (${err.message})`);
+    return null;
+  }
+  const https = createHttpsServer({ cert, key }, (req, res) => {
+    const path = new URL(req.url, "http://x").pathname.replace(/\/+$/, "");
+    if (path === "") return res.writeHead(302, { Location: "/admin" }).end();
+    if (!isAdminPath(path)) return res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("not found");
+    server.emit("request", req, res);
+  });
+  const sockets = new Set();
+  https.on("connection", (s) => { sockets.add(s); s.on("close", () => sockets.delete(s)); });
+  try {
+    await new Promise((ok, fail) => { https.once("error", fail); https.listen(port, ok); });
+  } catch (err) {
+    console.error(`Панель по HTTPS выключена: порт ${port} не открылся (${err.message})`);
+    return null;
+  }
+  console.log(`Панель по HTTPS на порту ${https.address().port}`);
+  return {
+    port: https.address().port,
+    close: () => new Promise((ok) => {
+      https.close(() => ok());
+      https.closeIdleConnections?.();
+      setTimeout(() => { for (const s of sockets) s.destroy(); }, 2000).unref();
+    }),
   };
 }

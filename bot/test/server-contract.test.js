@@ -7,6 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { MIGRATIONS, openDb } from "../db.js";
 import { startApp } from "../app.js";
 import { redact, addSecret } from "../log.js";
+import { request as httpsRequest } from "node:https";
 
 // Контракт с сервером (ТЗ, P0-3): без сети и без настоящего токена, только во временной папке.
 
@@ -172,4 +173,53 @@ test("bot has no hardcoded GitHub Pages address and requires WEBAPP_URL", async 
   walk(root);
   assert.deepEqual(found, []);
   await assert.rejects(startApp({ env: { DB_FILE: ":memory:" }, port: 0 }), /WEBAPP_URL/);
+});
+
+// Вход в панель по IP: отдельный порт HTTPS только с панелью. Сертификат в fixtures — тестовый, для 127.0.0.1.
+const fixture = (name) => new URL(`./fixtures/${name}`, import.meta.url).pathname;
+const httpsGet = (port, path) => new Promise((ok, fail) => {
+  const req = httpsRequest({ host: "127.0.0.1", port, path, ca: readFileSync(fixture("admin-test.crt")) }, (res) => {
+    let body = "";
+    res.on("data", (c) => { body += c; });
+    res.on("end", () => ok({ status: res.statusCode, headers: res.headers, body }));
+  });
+  req.on("error", fail);
+  req.end();
+});
+
+test("admin https port serves only the panel", async () => {
+  const dir = tmp();
+  const app = await startApp({
+    env: env(dir, { ADMIN_HTTPS_PORT: "0", ADMIN_TLS_CERT: fixture("admin-test.crt"), ADMIN_TLS_KEY: fixture("admin-test.key") }),
+    botToken: "1:x", port: 0,
+  });
+  try {
+    assert.ok(app.adminHttpsPort > 0 && app.adminHttpsPort !== app.port);
+    const page = await httpsGet(app.adminHttpsPort, "/admin");
+    assert.equal(page.status, 200);
+    assert.match(page.headers["content-type"], /text\/html/);
+    const status = await httpsGet(app.adminHttpsPort, "/api/admin/status");
+    assert.deepEqual(JSON.parse(status.body), { enabled: false });
+    assert.equal((await httpsGet(app.adminHttpsPort, "/")).headers.location, "/admin");
+    assert.equal((await httpsGet(app.adminHttpsPort, "/api/health")).status, 404);
+    assert.equal((await httpsGet(app.adminHttpsPort, "/api/mario/top")).status, 404);
+  } finally {
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("admin https stays off without readable certificate", async () => {
+  const dir = tmp();
+  const app = await startApp({
+    env: env(dir, { ADMIN_HTTPS_PORT: "0", ADMIN_TLS_CERT: join(dir, "none.crt"), ADMIN_TLS_KEY: join(dir, "none.key") }),
+    botToken: "1:x", port: 0,
+  });
+  try {
+    assert.equal(app.adminHttpsPort, null);
+    assert.equal((await fetch(`http://127.0.0.1:${app.port}/api/health`)).status, 200);
+  } finally {
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

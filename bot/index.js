@@ -213,14 +213,22 @@ bot.command("stats", (ctx, next) => {
 // Панель владельца (admin.js): ссылка на страницу самого сервера бота, вход по логину и паролю.
 bot.command("admin", (ctx, next) => {
   if (!admins.has(ctx.from?.id) || ctx.chat?.type !== "private") return next();
-  if (!apiUrl) return ctx.reply("У сервера сейчас нет публичного адреса, панель не откроется.");
+  // Постоянный адрес панели по IP (ADMIN_URL, порт ADMIN_HTTPS_PORT) не зависит от туннеля.
+  const direct = /^https:\/\//.test(process.env.ADMIN_URL || "") ? process.env.ADMIN_URL.trim() : "";
+  if (!apiUrl && !direct) return ctx.reply("У сервера сейчас нет публичного адреса, панель не откроется.");
   // Без логина и хэша пароля страница откроется, но войти будет нельзя: подсказываем, что задать.
   if (!app.adminEnabled) {
     return ctx.reply("Панель выключена: в .env бота не заданы ADMIN_LOGIN и ADMIN_PASSWORD_HASH.\n" +
       "В папке бота на сервере: npm run admin:password — напечатает строку ADMIN_PASSWORD_HASH=…; " +
       "впишите её и ADMIN_LOGIN=<логин> в .env и перезапустите бота (sudo systemctl restart tgmario).");
   }
-  const url = new URL("admin", apiUrl.endsWith("/") ? apiUrl : `${apiUrl}/`).toString();
+  const url = apiUrl ? new URL("admin", apiUrl.endsWith("/") ? apiUrl : `${apiUrl}/`).toString() : "";
+  if (direct) {
+    // Сертификат самоподписанный: встроенный браузер Telegram его не пропустит, поэтому ссылка текстом.
+    return ctx.reply("Панель: статистика, игроки, жетоны и покупки. Вход по логину и паролю.\n" +
+      `Откройте в обычном браузере (Chrome, Safari) и один раз примите предупреждение о сертификате:\n${direct}` +
+      (url ? `\n\nЗапасной адрес через туннель:\n${url}` : ""), { link_preview_options: { is_disabled: true } });
+  }
   return ctx.reply(`Панель: статистика, игроки, жетоны и покупки. Вход по логину и паролю.\n${url}`, {
     reply_markup: new InlineKeyboard().url("📊 Открыть панель", url),
   });
