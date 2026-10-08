@@ -23,6 +23,7 @@ if (!process.env.WEBAPP_URL) {
 }
 
 const bot = new Bot(token);
+const createInvoice = starsInvoice(bot);
 
 // ---------- Сервер очков ----------
 const app = await startApp({
@@ -32,7 +33,7 @@ const app = await startApp({
       .sendMessage(userId, "Новые достижения!\n" + list.map((a) => `${a.icon} ${a.title}: ${a.text}`).join("\n"))
       .catch(() => {}),
   notify: walletNotifier(bot),
-  createInvoice: starsInvoice(bot),
+  createInvoice,
   refundStars: (userId, chargeId) => bot.api.refundStarPayment(userId, chargeId),
 });
 const { store, tracker } = app;
@@ -255,6 +256,9 @@ for (const id of admins) {
   await bot.api.setMyCommands(OWNER_COMMANDS, { scope: { type: "chat", chat_id: id } })
     .catch((err) => console.warn(`Меню владельца не установлено: ${err.description || err.message}`));
 }
+
+// Ссылки на счета товаров магазина готовятся заранее (wallet-bot.js), в фоне.
+createInvoice.prepare(app.economy.cfg.shop).catch(() => {});
 
 // Список обновлений задаётся явно: без pre_checkout_query покупки за звёзды не проходят (wallet-bot.js).
 bot.start({ allowed_updates: ALLOWED_UPDATES, onStart: (me) => console.log(`Бот @${me.username} запущен, игра: ${gameUrl}`) });

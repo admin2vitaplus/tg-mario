@@ -15,7 +15,8 @@
 //   Server.base            -> '' until known, then 'https://…'
 //   Server.ready           -> Promise<boolean>: true when a server answered
 //   Server.online          -> null while checking, then true / false
-//   Server.request(method, path, body, { keepalive }) -> Promise<json>; times out; a GET is
+//   Server.request(method, path, body, { keepalive, timeout }) -> Promise<json>; times out
+//                             (10 s, or `timeout` ms); a GET is
 //                             retried once on a network error or a tunnel error page;
 //                             keepalive — the request outlives the page (a game sent on leaving)
 (() => {
@@ -111,7 +112,7 @@ function request(method, path, body, opts) {
   if (initData) headers.Authorization = 'tma ' + initData;
   const json = body ? JSON.stringify(body) : undefined;
   const keepalive = !!(opts && opts.keepalive && json && json.length < KEEPALIVE_MAX);
-  const once = (base) => fetchTimeout(base + path, { method, headers, body: json, keepalive }, 10000)
+  const once = (base) => fetchTimeout(base + path, { method, headers, body: json, keepalive }, (opts && opts.timeout) || 10000)
     .then((r) => r.json().catch(() => null).then((j) => {
       if (r.ok && j) return j;
       if (r.ok && r.status === 204) return {};

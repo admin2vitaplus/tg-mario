@@ -192,7 +192,9 @@ let meAt = 0;          // when `me` came from the server (0: from the phone or n
 let infoFresh = false; // the shop list was asked for in this launch
 const tables = {};     // board:period -> { data: answer of /top, at, loading }
 
-const request = (method, path, body) => server.request(method, '/api/wallet' + path, body);
+const request = (method, path, body, opts) => server.request(method, '/api/wallet' + path, body, opts);
+// The server asks Telegram for the invoice, which can take a while: waited for longer.
+const INVOICE_WAIT = { timeout: 30000 };
 
 function keepOwned(list) {
   owned = list.slice();
@@ -724,7 +726,7 @@ function invoiceClosed(status) {
 // «paid» from Telegram means the Stars are spent: the item is shown at once, and the page then
 // waits for the bot to record the payment (it hears of it from Telegram a moment later).
 function buyStars(it) {
-  return request('POST', '/invoice', { item: it.id }).then((r) => openInvoice(r.link)).then((status) => {
+  return request('POST', '/invoice', { item: it.id }, INVOICE_WAIT).then((r) => openInvoice(r.link)).then((status) => {
     if (!invoiceClosed(status)) return false;
     pending.set(it.id, 0);
     bought(it.id);
@@ -777,7 +779,7 @@ function buyLife(offer, level) {
     if (!o) return false;
     return choose(o, T('life_choose')).then((how) => {
       if (how === 'stars' && canStars()) {
-        return request('POST', '/life-invoice', { offer, level }).then((r) => openInvoice(r.link)).then(invoiceClosed);
+        return request('POST', '/life-invoice', { offer, level }, INVOICE_WAIT).then((r) => openInvoice(r.link)).then(invoiceClosed);
       }
       if (how !== 'tokens' && how !== 'tokens?') return false;
       return enough(o.price).then((ok) => ok && (how === 'tokens' || ask(T('life_confirm', { n: o.price })))).then((yes) => {

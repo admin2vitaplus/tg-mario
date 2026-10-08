@@ -11,20 +11,44 @@ export const walletNotifier = (bot) => async (userId, text, { offText }) => {
 };
 
 // Счёт в Telegram Stars на товар магазина. Товар выдаётся только после successful_payment.
-export const starsInvoice = (bot) => (item, user) => {
-  const en = langOf(user.language_code) === "en";
-  const life = item.kind === "life";
-  return bot.api.createInvoiceLink(
-    item[en ? "en" : "ru"].slice(0, 32),
-    life ? (en ? "The game goes on from the same place right after payment." :
-      "Игра продолжится с того же места сразу после оплаты.") :
-      en ? "Looks for the game. It appears in «Looks» right after payment." :
-        "Оформление для игры. Появится во «Внешнем виде» сразу после оплаты.",
-    item.payload || `shop:${item.id}`,
-    "", // Telegram Stars: без платёжного провайдера
-    "XTR",
-    [{ label: item[en ? "en" : "ru"].slice(0, 32), amount: item.stars }],
-  );
+// Ссылка на счёт товара магазина не привязана к игроку (кто платит, бот узнаёт из pre_checkout_query),
+// поэтому она создаётся один раз на товар и язык и дальше отдаётся сразу: запрос к Telegram с сервера
+// бывает долгим, а игра ждёт ответа не больше 30 секунд. Счёт на жизнь свой у каждого конца игры.
+export const starsInvoice = (bot, { now = Date.now, slowMs = 2000 } = {}) => {
+  const links = new Map(); // `${payload}|${lang}` -> Promise<ссылка>
+  const make = (item, en) => {
+    const life = item.kind === "life";
+    const started = now();
+    return bot.api.createInvoiceLink(
+      item[en ? "en" : "ru"].slice(0, 32),
+      life ? (en ? "The game goes on from the same place right after payment." :
+        "Игра продолжится с того же места сразу после оплаты.") :
+        en ? "Looks for the game. It appears in «Looks» right after payment." :
+          "Оформление для игры. Появится во «Внешнем виде» сразу после оплаты.",
+      item.payload || `shop:${item.id}`,
+      "", // Telegram Stars: без платёжного провайдера
+      "XTR",
+      [{ label: item[en ? "en" : "ru"].slice(0, 32), amount: item.stars }],
+    ).finally(() => {
+      const ms = now() - started;
+      if (ms >= slowMs) console.warn(`Звёзды: Telegram создавал счёт ${(ms / 1000).toFixed(1)} с (${item.payload || item.id})`);
+    });
+  };
+  const invoice = (item, user) => {
+    const en = langOf(user?.language_code) === "en";
+    if (item.kind === "life") return make(item, en);
+    // Цена в ключе: после её смены в economy.json старая ссылка не отдаётся.
+    const key = `shop:${item.id}:${item.stars}|${en ? "en" : "ru"}`;
+    if (!links.has(key)) links.set(key, make(item, en).catch((err) => { links.delete(key); throw err; }));
+    return links.get(key);
+  };
+  // Заранее, по одной и без спешки: к первой покупке ссылки уже готовы.
+  invoice.prepare = async (items) => {
+    for (const item of items) {
+      for (const language_code of ["ru", "en"]) await invoice(item, { language_code }).catch(() => {});
+    }
+  };
+  return invoice;
 };
 
 // Какие обновления бот берёт у Telegram. Без явного списка Telegram помнит прошлый, и если в нём
