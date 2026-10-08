@@ -1,7 +1,7 @@
 import { Bot, InlineKeyboard } from "grammy";
 import { ACHIEVEMENTS_TOTAL, BY_GAME } from "./achievements.js";
 import { startApp } from "./app.js";
-import { startTunnel, watchTunnel } from "./tunnel.js";
+import { fixedPublicUrl, startTunnel, watchTunnel } from "./tunnel.js";
 import { addSecret, installSafeConsole } from "./log.js";
 import { statsReport } from "./stats.js";
 import { economyReport } from "./economy.js";
@@ -43,10 +43,19 @@ const admins = new Set((process.env.ADMIN_ID || "").split(",").map((s) => Number
 const baseGameUrl = app.gameUrl;
 console.log(`Сервер очков слушает порт ${app.port}, коммит ${app.commit}`);
 
-// Публичный https-адрес сервера: свой домен (PUBLIC_API_URL) или бесплатный туннель.
-let apiUrl = process.env.PUBLIC_API_URL || "";
+// Публичный https-адрес сервера: постоянный (PUBLIC_API_URL — свой домен или Caddy) или бесплатный туннель.
+// С постоянным адресом туннель не запускается и не опрашивается, TUNNEL_METRICS не используется.
+let apiUrl = "";
 let tunnel = null;
-if (!apiUrl && process.env.TUNNEL_METRICS) {
+if (process.env.PUBLIC_API_URL) {
+  try {
+    apiUrl = fixedPublicUrl(process.env.PUBLIC_API_URL);
+    console.log(`Постоянный адрес сервера: ${apiUrl}`);
+  } catch (err) {
+    console.error(`${err.message}. Исправьте .env и перезапустите бота.`);
+    process.exit(1);
+  }
+} else if (process.env.TUNNEL_METRICS) {
   // Туннель — отдельная служба: её адрес переживает перезапуски бота.
   try {
     tunnel = await watchTunnel(process.env.TUNNEL_METRICS);
@@ -57,7 +66,7 @@ if (!apiUrl && process.env.TUNNEL_METRICS) {
     console.error(`Туннель не найден: ${err.message}.`);
     process.exit(1);
   }
-} else if (!apiUrl && process.env.TUNNEL !== "off") {
+} else if (process.env.TUNNEL !== "off") {
   try {
     tunnel = await startTunnel(app.port, process.env.CLOUDFLARED || "cloudflared");
     apiUrl = tunnel.url;
