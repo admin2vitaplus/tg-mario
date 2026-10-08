@@ -153,7 +153,7 @@ const SEASON_TEXT = {
 };
 export const langOf = (code) => (/^(ru|uk|be|kk)\b/i.test(code || "") ? "ru" : "en");
 
-export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks = {} } = {}) {
+export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks = {}, trusted = new Set() } = {}) {
   const { db } = store;
   const q = {
     has: db.prepare("SELECT 1 FROM ledger WHERE player_id = ? AND reason = ? AND event = ?"),
@@ -348,7 +348,8 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       const day = dayUtc(now());
       wallet(playerId);
       const { strikes } = q.strike.get(day, day, playerId);
-      if (strikes >= cfg.suspicious.rejectedPerDay && !q.wallet.get(playerId).flagged) {
+      // Владелец (ADMIN_ID) проверяет игры и сам может прислать странный отчёт: его не помечаем.
+      if (strikes >= cfg.suspicious.rejectedPerDay && !q.wallet.get(playerId).flagged && !trusted.has(playerId)) {
         q.flag.run("auto: отклонённые отчёты", now(), playerId);
         dropTop();
       }

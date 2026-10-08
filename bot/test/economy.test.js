@@ -505,3 +505,12 @@ test("migration 6 lifts the automatic flags caused by the unknown worlds 2-4, an
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the owner (ADMIN_ID) is not flagged automatically for rejected reports", () => {
+  const store = openDb(":memory:");
+  const economy = createEconomy(store, CFG, { trusted: new Set([7]) });
+  for (let i = 0; i < CFG.suspicious.rejectedPerDay + 2; i++) { economy.rejected(7); economy.rejected(8); }
+  assert.equal(economy.wallet(7).flagged, null);
+  assert.ok(economy.wallet(8).flagged);
+  store.close();
+});
