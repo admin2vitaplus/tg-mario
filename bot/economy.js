@@ -43,6 +43,8 @@ const MARKED = ["record", "daily", "task"];
 // Игры с жетонами и их ежедневные задания (сбрасываются в 00:00 UTC).
 export const GAMES = ["mario", "tanks", "bombs", "word"];
 export const DAILY_TASKS = ["play", "level", "record"];
+// Игры общего задания «сыграть во все три за день» и задания «N игр за неделю».
+export const ALL_GAMES = ["mario", "tanks", "bombs"];
 const CAPPED_SQL = CAPPED.map((r) => `'${r}'`).join(", ");
 // Таблицы недели: рекорды игр за неделю и общий зачёт (жетоны за неделю без призов и покупок).
 export const BOARDS = ["mario", "tanks", "bombs", "word", "overall"];
@@ -66,7 +68,8 @@ export function validateEconomy(cfg) {
   need(isInt(cfg.achievement), "achievement");
   need(isInt(cfg.record), "record");
   for (const k of ["base", "perStreakDay", "max"]) need(isInt(cfg.daily?.[k]), `daily.${k}`);
-  for (const k of ["play", "level"]) need(isInt(cfg.tasks?.[k]), `tasks.${k}`);
+  for (const k of ["play", "level", "all", "week"]) need(isInt(cfg.tasks?.[k]), `tasks.${k}`);
+  need(isInt(cfg.tasks?.weekGames) && cfg.tasks.weekGames > 0, "tasks.weekGames");
   for (const k of ["inviter", "newcomer", "gamesNeeded", "perWeek"]) need(isInt(cfg.invite?.[k]), `invite.${k}`);
   need(cfg.invite?.gamesNeeded >= 1, "invite.gamesNeeded >= 1");
   need(isInt(cfg.suspicious?.rejectedPerDay) && cfg.suspicious.rejectedPerDay > 0, "suspicious.rejectedPerDay");
@@ -150,7 +153,7 @@ const SEASON_TEXT = {
 };
 export const langOf = (code) => (/^(ru|uk|be|kk)\b/i.test(code || "") ? "ru" : "en");
 
-export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks = {} } = {}) {
+export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks = {}, trusted = new Set() } = {}) {
   const { db } = store;
   const q = {
     has: db.prepare("SELECT 1 FROM ledger WHERE player_id = ? AND reason = ? AND event = ?"),
@@ -182,6 +185,9 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     refund: db.prepare("UPDATE purchases SET refunded_at = ? WHERE charge_id = ? AND refunded_at IS NULL"),
     tanksGames: db.prepare("SELECT COUNT(*) AS n FROM tanks_runs WHERE player_id = ?"),
     bombsGames: db.prepare("SELECT COUNT(*) AS n FROM bombs_runs WHERE player_id = ?"),
+    // Игры одной игры с начала недели (для задания «N игр за неделю»).
+    weekGames: Object.fromEntries(Object.entries(RUN_TABLES).map(([g, t]) => [g,
+      db.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE player_id = ? AND created_at >= ?`)])),
     wordGames: db.prepare("SELECT COUNT(*) AS n FROM word_plays WHERE player_id = ? AND state != 'play'"),
     sum: db.prepare("SELECT COALESCE(SUM(amount), 0) AS n FROM ledger WHERE player_id = ?"),
     meta: db.prepare("SELECT value FROM economy_meta WHERE key = ?"),
@@ -305,6 +311,15 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       const day = dayUtc(at);
       this.task(playerId, game, "play", out, at);
       if (levels > 0) this.task(playerId, game, "level", out, at);
+      // Неделя: N принятых игр этой игры с понедельника (00:00 UTC). Строка игры уже записана.
+      const season = seasonOf(at);
+      if (q.weekGames[game] && q.weekGames[game].get(playerId, seasonStart(season)).n >= cfg.tasks.weekGames) {
+        grant(out, "task", post(playerId, cfg.tasks.week, "task", `${game}:week:${season}`, { at }));
+      }
+      // Общее: сегодня засчитано «сыграть» во всех трёх играх.
+      if (ALL_GAMES.includes(game) && ALL_GAMES.every((g) => q.has.get(playerId, "task", `${g}:play:${day}`))) {
+        grant(out, "task", post(playerId, cfg.tasks.all, "task", `all:${day}`, { at }));
+      }
       if (newRecord) grant(out, "record", post(playerId, cfg.record, "record", `${game}:${day}`, { at }));
       this.inviteCheck(playerId, out, at);
       return out;
@@ -333,7 +348,8 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       const day = dayUtc(now());
       wallet(playerId);
       const { strikes } = q.strike.get(day, day, playerId);
-      if (strikes >= cfg.suspicious.rejectedPerDay && !q.wallet.get(playerId).flagged) {
+      // Владелец (ADMIN_ID) проверяет игры и сам может прислать странный отчёт: его не помечаем.
+      if (strikes >= cfg.suspicious.rejectedPerDay && !q.wallet.get(playerId).flagged && !trusted.has(playerId)) {
         q.flag.run("auto: отклонённые отчёты", now(), playerId);
         dropTop();
       }
@@ -449,10 +465,20 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
             count: invited, max: cfg.invite.perWeek, newcomer: cfg.invite.newcomer, games: cfg.invite.gamesNeeded },
         ],
       };
+      const played = ALL_GAMES.filter((g) => has("task", `${g}:play:${day}`));
+      out.main.splice(1, 0, { id: "all", period: "day", amount: cfg.tasks.all, done: has("task", `all:${day}`),
+        games: played, count: played.length, max: ALL_GAMES.length });
+      const season = seasonOf(at);
       for (const g of GAMES) {
         out[g] = DAILY_TASKS.map((t) => t === "record"
           ? { id: t, period: "day", amount: cfg.record, done: has("record", `${g}:${day}`) }
           : { id: t, period: "day", amount: cfg.tasks[t], done: has("task", `${g}:${t}:${day}`) });
+        if (q.weekGames[g]) {
+          const done = has("task", `${g}:week:${season}`);
+          const count = q.weekGames[g].get(playerId, seasonStart(season)).n;
+          out[g].push({ id: "week", period: "week", amount: cfg.tasks.week, done,
+            count: done ? Math.max(count, cfg.tasks.weekGames) : Math.min(count, cfg.tasks.weekGames), max: cfg.tasks.weekGames });
+        }
       }
       return out;
     },

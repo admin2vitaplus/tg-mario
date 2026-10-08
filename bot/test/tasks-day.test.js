@@ -83,6 +83,7 @@ async function withServer(clock, fn) {
   }
 }
 
+const pick = ({ done, count, max }) => ({ done, count, max });
 const day = (me, game) => Object.fromEntries(me.tasks[game].filter((t) => t.period === "day").map((t) => [t.id, t.done]));
 
 test("a day in all three games: every task is crossed off, and all open again at 00:00 UTC", async () => {
@@ -116,6 +117,12 @@ test("a day in all three games: every task is crossed off, and all open again at
       assert.deepEqual(day(me, game), { play: true, level: stages[game].stages > 0, record: stages[game].score > 0 }, game);
     }
     assert.equal(me.dayEndsAt, Date.UTC(2026, 9, 8));
+    // Общее задание: сыграно во все три игры.
+    assert.deepEqual(pick(me.tasks.main.find((t) => t.id === "all")), { done: true, count: 3, max: 3 });
+    assert.ok(me.history.some((h) => h.reason === "task" && h.event.startsWith("all:") && h.amount === CFG.tasks.all));
+    for (const game of ["mario", "tanks", "bombs"]) {
+      assert.deepEqual(pick(me.tasks[game].find((t) => t.id === "week")), { done: false, count: 1, max: CFG.tasks.weekGames }, game);
+    }
 
     // Полночь по UTC: ежедневные задания снова открыты, достижения остаются.
     clock.t = Date.UTC(2026, 9, 8, 0, 0, 30);
@@ -125,6 +132,8 @@ test("a day in all three games: every task is crossed off, and all open again at
     for (const game of ["mario", "tanks", "bombs"]) {
       assert.deepEqual(day(next, game), { play: false, level: false, record: false }, game);
     }
+    assert.deepEqual(pick(next.tasks.main.find((t) => t.id === "all")), { done: false, count: 0, max: 3 });
+    assert.equal(next.tasks.tanks.find((t) => t.id === "week").count, 1, "the week goes on past midnight");
     assert.ok(next.tasks.mario.some((t) => t.period === "once" && t.done), "achievements stay done");
     const c = (await call("POST", "/api/wallet/checkin")).json;
     assert.deepEqual(c.grants, [{ reason: "daily", amount: CFG.daily.base + CFG.daily.perStreakDay }]);
@@ -174,4 +183,32 @@ test("a flagged player is told so, and achievements held back are paid once the 
     assert.equal(me.flagged, false);
     assert.equal(me.balance, r.json.newAchievements.length * CFG.achievement);
   });
+});
+
+test("the weekly task: the 10th game of a game this week is paid once, and a new week starts it over", () => {
+  const clock = { t: Date.UTC(2026, 9, 7, 12) }; // среда
+  const store = openDb(":memory:");
+  const economy = createEconomy(store, CFG, { now: () => clock.t });
+  store.touchPlayer(ME);
+  const addGame = (seed) => store.db.prepare(`INSERT INTO bombs_runs (player_id, seed, score, stages, frames, players, created_at)
+    VALUES (?, ?, 100, 0, 3000, 1, ?)`).run(ME.id, seed, clock.t);
+  const week = () => economy.tasks(ME.id, clock.t).bombs.find((t) => t.id === "week");
+  const paidWeek = (out) => out.filter((g) => g.reason === "task" && g.amount === CFG.tasks.week).length;
+  let seed = 1;
+  for (let i = 1; i < CFG.tasks.weekGames; i++) {
+    clock.t += 3_600_000; // по разным дням, чтобы не упереться в дневной потолок
+    addGame(seed++);
+    assert.equal(paidWeek(economy.run(ME.id, { game: "bombs" })), 0);
+  }
+  assert.deepEqual(pick(week()), { done: false, count: CFG.tasks.weekGames - 1, max: CFG.tasks.weekGames });
+  addGame(seed++);
+  assert.equal(paidWeek(economy.run(ME.id, { game: "bombs" })), 1);
+  addGame(seed++);
+  assert.equal(paidWeek(economy.run(ME.id, { game: "bombs" })), 0, "once a week");
+  assert.equal(week().done, true);
+  assert.equal(economy.tasks(ME.id, clock.t).tanks.find((t) => t.id === "week").count, 0, "each game counts its own games");
+  // Понедельник 00:00 UTC — новая неделя.
+  clock.t = Date.UTC(2026, 9, 12, 0, 0, 1);
+  assert.deepEqual(pick(week()), { done: false, count: 0, max: CFG.tasks.weekGames });
+  store.close();
 });

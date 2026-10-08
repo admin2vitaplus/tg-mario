@@ -444,7 +444,7 @@ test("HTTP: only verified results pay; the client can look and buy, not credit",
     assert.equal(r.status, 200);
     assert.equal(r.json.balance, 4 * CFG.achievement + CFG.tasks.level + CFG.tasks.play + CFG.record + CFG.daily.base);
     // Задания: вход и задания игры закрыты, достижения «Прыг-Скока» — разовые задания.
-    assert.deepEqual(r.json.tasks.main.map((t) => [t.id, t.done]), [["login", true], ["invite", false]]);
+    assert.deepEqual(r.json.tasks.main.map((t) => [t.id, t.done]), [["login", true], ["all", false], ["invite", false]]);
     assert.deepEqual(r.json.tasks.mario.filter((t) => t.period === "day").map((t) => [t.id, t.done]),
       [["play", true], ["level", true], ["record", true]]);
     assert.equal(r.json.tasks.mario.filter((t) => t.period === "once" && t.done).length, 4);
@@ -531,4 +531,13 @@ test("HTTP: big wallet answers are gzipped for a client that takes gzip", async 
     server.close();
     store.close();
   }
+});
+
+test("the owner (ADMIN_ID) is not flagged automatically for rejected reports", () => {
+  const store = openDb(":memory:");
+  const economy = createEconomy(store, CFG, { trusted: new Set([7]) });
+  for (let i = 0; i < CFG.suspicious.rejectedPerDay + 2; i++) { economy.rejected(7); economy.rejected(8); }
+  assert.equal(economy.wallet(7).flagged, null);
+  assert.ok(economy.wallet(8).flagged);
+  store.close();
 });

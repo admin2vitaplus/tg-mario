@@ -40,7 +40,9 @@ export async function startApp({
   pruneTimer.unref();
   // Жетоны (ТЗ P1-7): правила в economy.json. Прошедшие недели закрываются при запуске
   // и проверяются каждые 10 минут; закрытие продолжается с места, где его прервал перезапуск.
-  const economy = createEconomy(store, loadEconomy(), { notify });
+  // ADMIN_ID (через запятую) не помечаются автоматически за отклонённые отчёты.
+  const trusted = new Set(String(env.ADMIN_ID || "").split(",").map((s) => Number(s.trim())).filter((n) => Number.isSafeInteger(n) && n > 0));
+  const economy = createEconomy(store, loadEconomy(), { notify, trusted });
   let closing = null;
   const closeSeasons = () => closing ??= economy.closeDue()
     .then((list) => { if (list.length) console.log(`Жетоны: закрыты сезоны ${list.join(", ")}`); })
