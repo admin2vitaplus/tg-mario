@@ -107,7 +107,7 @@ function open(opts) {
         b.append(price);
       }
       b.addEventListener('click', () => {
-        if (!open && it.shop && window.Wallet && window.Wallet.enabled) {
+        if (!open && it.shop && window.Wallet) {
           // Bought: the panel opens again with the item available.
           window.Wallet.buy(it.shop).then((ok) => { if (ok && panel === mine) window.Looks.open(opts); });
           return;
