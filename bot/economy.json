@@ -1,10 +1,10 @@
 {
-  "_comment": "Жетоны (ТЗ P1-7). Все суммы — целые числа. Меняются только через PR; проверка — bot/test/economy.test.js. stars — цена товара в Telegram Stars. life — ещё одна жизнь в «Прыг-Скоке» после конца игры: цена по номеру уровня в мире (X-1, X-2, X-3, X-4). daily — вход в сборник за день (серия дней), tasks — ежедневные задания каждой игры, record — личный рекорд в игре раз в день.",
+  "_comment": "Жетоны (ТЗ P1-7). Все суммы — целые числа. Меняются только через PR; проверка — bot/test/economy.test.js. stars — цена товара в Telegram Stars. life — ещё одна жизнь в «Прыг-Скоке» после конца игры: цена по номеру уровня в мире (X-1, X-2, X-3, X-4). daily — вход в сборник за день (серия дней), tasks — задания: play и level каждый день в каждой игре, all — сыграть во все три игры за день (общее), week — сыграть weekGames игр одной игры за неделю, record — личный рекорд в игре раз в день.",
   "dailyCap": 150,
   "achievement": 20,
   "record": 10,
   "daily": { "base": 10, "perStreakDay": 5, "max": 40 },
-  "tasks": { "play": 10, "level": 10 },
+  "tasks": { "play": 10, "level": 10, "all": 20, "week": 30, "weekGames": 10 },
   "invite": { "inviter": 50, "newcomer": 30, "gamesNeeded": 3, "perWeek": 10 },
   "suspicious": { "rejectedPerDay": 3 },
   "season": {

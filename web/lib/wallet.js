@@ -45,6 +45,10 @@ const STR = {
     t_play_note: 'Засчитывается в конце игры или при выходе в меню, если играли от 20 секунд.',
     t_record_note: 'Набрать больше очков, чем твой лучший результат в этой игре. Первая игра тоже считается.',
     t_other: 'Свои задания у каждой игры: откройте игру и нажмите «◆» в её меню.',
+    t_all: 'Сыграть во все три игры: {count} из {max}',
+    t_all_note: 'Хотя бы по одной игре в каждой за день: {games}.',
+    t_week: 'Сыграть {max} {games_w} за неделю: {count} из {max}',
+    t_week_note: 'Считаются игры с понедельника, в том числе прерванные после 20 секунд игры.',
     period_week: 'За неделю', period_all: 'За всё время',
     top_overall: 'Жетоны, полученные за {p}', top_game: 'Лучший счёт за {p}',
     top_word: 'Очки за {p}: каждый день до 6 (6 — с первой попытки)',
@@ -84,7 +88,7 @@ const STR = {
     not_enough: 'Не хватает жетонов: нужно {n}, есть {have}.',
     buy_failed: 'Не получилось купить. Проверьте связь и попробуйте ещё раз.',
     toast: '+{n} {w}', days: '{n} д.', hours: '{n} ч', minutes: '{n} мин',
-    task_play: 'сыграть игру', task_level: 'пройти уровень', invite_friend: 'друг доиграл', invite_from: 'по приглашению друга',
+    task_play: 'сыграть игру', task_level: 'пройти уровень', task_week: 'игры за неделю', task_all: 'все три игры за день', invite_friend: 'друг доиграл', invite_from: 'по приглашению друга',
   },
   en: {
     title: 'TICKETS',
@@ -102,6 +106,10 @@ const STR = {
     t_play_note: 'Counts when the game ends, or when you leave for the menu after 20 seconds of play.',
     t_record_note: 'Score more than your best in this game. Your first game counts too.',
     t_other: 'Each game has its own tasks: open the game and tap «◆» in its menu.',
+    t_all: 'Play all three games: {count} of {max}',
+    t_all_note: 'At least one game of each in a day: {games}.',
+    t_week: 'Play {max} {games_w} this week: {count} of {max}',
+    t_week_note: 'Games since Monday count, including ones left after 20 seconds of play.',
     period_week: 'This week', period_all: 'All time',
     top_overall: 'Tickets got in {p}', top_game: 'Best score in {p}',
     top_word: 'Points in {p}: up to 6 a day (6 for the first try)',
@@ -141,7 +149,7 @@ const STR = {
     not_enough: 'Not enough tickets: {n} needed, you have {have}.',
     buy_failed: 'Could not buy. Check the connection and try again.',
     toast: '+{n} {w}', days: '{n} d', hours: '{n} h', minutes: '{n} min',
-    task_play: 'play a game', task_level: 'clear a level', invite_friend: 'your friend played', invite_from: 'invited by a friend',
+    task_play: 'play a game', task_level: 'clear a level', task_week: 'games this week', task_all: 'all three games in a day', invite_friend: 'your friend played', invite_from: 'invited by a friend',
   },
 };
 // Russian plural for «жетон»: 1 жетон, 2 жетона, 5 жетонов.
@@ -359,6 +367,8 @@ const achText = (a) => (lang === 'en' && a.textEn) || a.text;
 // own panel. What the player already got from it stays in the history.
 // The жетоны id 'mario' is 'pryg-skok' in config.js.
 const CONFIG_ID = { mario: 'pryg-skok' };
+// The games of the collection's «play all three games» task.
+const ALL_GAMES = ['mario', 'tanks', 'bombs'];
 const gameOn = (g) => !g || !window.CARTRIDGE || !window.CARTRIDGE.isEnabled || window.CARTRIDGE.isEnabled(CONFIG_ID[g] || g);
 
 let panel = null;
@@ -380,7 +390,9 @@ function renderTasks(body) {
   let html = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` +
     note(T('today', { n: me.today, cap: me.dailyCap, streak: me.streak })) +
     (me.flagged ? `<p class="wNote wWarn">${esc(T('flagged'))}</p>` : '');
-  const list = (me.tasks && me.tasks[scope || 'main']) || [];
+  // «All three games» needs every one of them switched on in config.js.
+  const list = ((me.tasks && me.tasks[scope || 'main']) || [])
+    .filter((t) => t.id !== 'all' || ALL_GAMES.every(gameOn));
   const day = list.filter((t) => t.period === 'day');
   const week = list.filter((t) => t.period === 'week');
   const once = list.filter((t) => t.period === 'once');
@@ -389,14 +401,18 @@ function renderTasks(body) {
     html += `<h2 class="wSec">${esc(T('sec_day', { left: left(me.dayEndsAt - now) }))}</h2><ul class="wTasks">` +
       day.map((t) => (t.id === 'login'
         ? taskRow(t, T('t_login'), T('t_login_note', { streak: me.streak, step: r.daily.perStreakDay, max: r.daily.max }))
+        : t.id === 'all'
+        ? taskRow(t, T('t_all', { count: t.count, max: t.max }), T('t_all_note', { games: ALL_GAMES.map((g) => T('game_' + g)).join(', ') }))
         : taskRow(t, T(STR.ru['t_' + t.id + '_' + scope] ? 't_' + t.id + '_' + scope : 't_' + t.id),
           scope !== 'word' && STR.ru['t_' + t.id + '_note'] ? T('t_' + t.id + '_note') : ''))).join('') + '</ul>';
   }
   if (week.length) {
     html += `<h2 class="wSec">${esc(T('sec_week', { left: left(me.seasonEndsAt - now) }))}</h2><ul class="wTasks">` +
-      week.map((t) => taskRow(t, T('t_invite', { count: t.count, max: t.max }),
-        T('t_invite_note', { games: t.games, games_w: gamesWord(t.games), inviter: t.amount, inviter_w: word(t.amount), newcomer: t.newcomer }))).join('') + '</ul>';
-    if (botName && myId) html += `<button class="wAct" data-act="invite">${esc(T('invite'))}</button>`;
+      week.map((t) => (t.id === 'week'
+        ? taskRow(t, T('t_week', { count: t.count, max: t.max, games_w: gamesWord(t.max) }), T('t_week_note'))
+        : taskRow(t, T('t_invite', { count: t.count, max: t.max }),
+          T('t_invite_note', { games: t.games, games_w: gamesWord(t.games), inviter: t.amount, inviter_w: word(t.amount), newcomer: t.newcomer })))).join('') + '</ul>';
+    if (!scope && botName && myId) html += `<button class="wAct" data-act="invite">${esc(T('invite'))}</button>`;
   }
   if (once.length) {
     html += `<h2 class="wSec">${esc(T('sec_once'))}</h2><ul class="wTasks">` +
@@ -454,6 +470,7 @@ function render(body) {
       if (h.reason === 'task' || h.reason === 'record') {
         if (STR.ru['game_' + g]) what += ': ' + T('game_' + g);
         if (h.reason === 'task' && STR.ru['task_' + task]) what += ' · ' + T('task_' + task);
+        if (h.reason === 'task' && g === 'all') what += ': ' + T('task_all');
       }
       if (h.reason === 'achievement') {
         const a = me.tasks && me.tasks[g] && me.tasks[g].find((t) => t.id === 'ach:' + task);
