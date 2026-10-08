@@ -283,6 +283,8 @@ export function createApiServer({
     // Telegram может отказать в счёте (сеть, лимиты, неверные данные): причина — в журнал бота,
     // игре — понятный ответ 502 вместо безымянной «ошибки сервера».
     const invoiceLink = async (item, user) => {
+      // Каждый запрос счёта — строка в журнале: по ней видно, дошла ли покупка до сервера.
+      console.log(`Звёзды: запрос счёта ${item.id}`);
       try {
         return [200, { link: await createInvoice(item, user) }];
       } catch (err) {

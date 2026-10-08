@@ -14,7 +14,7 @@ export const walletNotifier = (bot) => async (userId, text, { offText }) => {
 // Ссылка на счёт товара магазина не привязана к игроку (кто платит, бот узнаёт из pre_checkout_query),
 // поэтому она создаётся один раз на товар и язык и дальше отдаётся сразу: запрос к Telegram с сервера
 // бывает долгим, а игра ждёт ответа не больше 30 секунд. Счёт на жизнь свой у каждого конца игры.
-export const starsInvoice = (bot, { now = Date.now, slowMs = 2000 } = {}) => {
+export const starsInvoice = (bot, { now = Date.now, slowMs = 2000, waitMs = 25_000 } = {}) => {
   const links = new Map(); // `${payload}|${lang}` -> Promise<ссылка>
   const make = (item, en) => {
     const life = item.kind === "life";
@@ -29,6 +29,9 @@ export const starsInvoice = (bot, { now = Date.now, slowMs = 2000 } = {}) => {
       "", // Telegram Stars: без платёжного провайдера
       "XTR",
       [{ label: item[en ? "en" : "ru"].slice(0, 32), amount: item.stars }],
+      undefined,
+      // Зависший запрос не держит игру: через waitMs он обрывается, причина — в журнал (server.js).
+      AbortSignal.timeout(waitMs),
     ).finally(() => {
       const ms = now() - started;
       if (ms >= slowMs) console.warn(`Звёзды: Telegram создавал счёт ${(ms / 1000).toFixed(1)} с (${item.payload || item.id})`);
@@ -45,7 +48,10 @@ export const starsInvoice = (bot, { now = Date.now, slowMs = 2000 } = {}) => {
   // Заранее, по одной и без спешки: к первой покупке ссылки уже готовы.
   invoice.prepare = async (items) => {
     for (const item of items) {
-      for (const language_code of ["ru", "en"]) await invoice(item, { language_code }).catch(() => {});
+      for (const language_code of ["ru", "en"]) {
+        await invoice(item, { language_code })
+          .catch((err) => console.error(`Звёзды: счёт ${item.id} заранее не создан: ${err.description || err.message}`));
+      }
     }
   };
   return invoice;

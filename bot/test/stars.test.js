@@ -186,3 +186,18 @@ test("Stars: a shop item's invoice link is made once per item, price and languag
   await assert.rejects(invoice(item, player));
   assert.equal(failing.calls.filter((c) => c.method === "createInvoiceLink").length, 2, "a failed link is asked for again");
 });
+
+test("Stars: a Telegram call that hangs is cut off, so the game gets an answer", async () => {
+  const { economy, bot } = setup();
+  bot.api.config.use((_prev, _method, _payload, signal) => new Promise((_ok, fail) => {
+    signal?.addEventListener("abort", () => fail(Object.assign(new Error("aborted"), { description: "timeout" })));
+  }));
+  const invoice = starsInvoice(bot, { waitMs: 50 });
+  // Таймер AbortSignal.timeout не держит процесс; в боте его держит опрос Telegram, здесь — этот.
+  const alive = setTimeout(() => {}, 2000);
+  try {
+    await assert.rejects(invoice(economy.starsCheck(player.id, CFG.shop[0].id).item, player));
+  } finally {
+    clearTimeout(alive);
+  }
+});
