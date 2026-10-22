@@ -39,7 +39,7 @@ class HttpError extends Error {
 }
 
 // Запись игры «Танкодрома» и «Бомбодрома» (tanks-replay.js, bombs-replay.js) длиннее обычного запроса.
-export const MAX_REPLAY_BODY = 512 * 1024;
+export const MAX_REPLAY_BODY = 1536 * 1024; // запись до трёх часов «Танкодрома»
 
 async function readJson(req, limit = MAX_BODY) {
   if (Number(req.headers["content-length"]) > limit) throw new HttpError(413, "too large");

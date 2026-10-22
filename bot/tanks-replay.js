@@ -11,8 +11,8 @@ import "./tanks-sim.js";
 
 const S = globalThis.TankSim;
 
-export const MAX_FRAMES = 60 * 60 * 60; // час игры
-export const MAX_LOG = 400_000; // символов
+export const MAX_FRAMES = 3 * 60 * 60 * 60; // три часа игры: хватает на все 50 уровней
+export const MAX_LOG = 1_200_000; // символов
 // Незаконченная игра (игрок вышел в меню) засчитывается, если в неё играли хотя бы 20 секунд.
 export const MIN_QUIT_FRAMES = 20 * 60;
 
@@ -54,6 +54,7 @@ export function replay({ seed, players, log }) {
   for (const part of log.split(",")) {
     if (part === "n") {
       if (s.phase !== "clearDone") return bad("next stage before clear");
+      if (s.stage + 1 >= S.STAGES) return bad("no more stages");
       S.startStage(s, s.stage + 1);
       stageDeaths = s.players.map(() => 0);
       continue;
@@ -98,7 +99,7 @@ export function replay({ seed, players, log }) {
   }
   const finished = s.phase === "overDone" || s.phase === "clearDone";
   if (!finished && frames < MIN_QUIT_FRAMES) return bad("game not finished");
-  // Пройденные уровни: текущий засчитывается, если он пройден.
-  const stages = s.stage + (s.phase === "clearDone" || s.phase === "clear" ? 1 : 0);
-  return { ok: true, scores: s.players.map((p) => p.score), stages, frames, phase: s.phase, quit: !finished, stats };
+  // Пройденные уровни: текущий засчитывается, если он пройден (последний — победа).
+  const stages = s.stage + (s.phase === "clearDone" || s.phase === "clear" || s.won ? 1 : 0);
+  return { ok: true, scores: s.players.map((p) => p.score), stages, frames, phase: s.phase, quit: !finished, won: !!s.won, stats };
 }
