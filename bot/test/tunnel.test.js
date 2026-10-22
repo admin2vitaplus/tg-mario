@@ -57,3 +57,12 @@ test("gives up when the tunnel service never answers", async () => {
     await assert.rejects(watchTunnel(m.addr, { retryMs: 10, waitMs: 100 }), /нет адреса от службы туннеля/);
   } finally { m.close(); }
 });
+
+test("a fixed public address is used as is, only https", async () => {
+  const { fixedPublicUrl } = await import("../tunnel.js");
+  assert.equal(fixedPublicUrl("https://206-223-241-130.sslip.io:8443"), "https://206-223-241-130.sslip.io:8443");
+  assert.equal(fixedPublicUrl(" https://game.example.ru/ "), "https://game.example.ru");
+  assert.equal(fixedPublicUrl("https://game.example.ru:443/api/"), "https://game.example.ru");
+  assert.throws(() => fixedPublicUrl("http://206-223-241-130.sslip.io:8080"), /https/);
+  assert.throws(() => fixedPublicUrl("206-223-241-130.sslip.io"), /не похож на адрес|https/);
+});
