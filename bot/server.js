@@ -38,7 +38,7 @@ class HttpError extends Error {
   constructor(status, msg) { super(msg); this.status = status; }
 }
 
-// Запись игры «Танкодрома» и «Бомбодрома» (tanks-replay.js, bombs-replay.js) длиннее обычного запроса.
+// Запись игры «Танкодрома», «Бомбодрома» и «Тира» (tanks-replay.js, bombs-replay.js, range-replay.js) длиннее обычного запроса.
 export const MAX_REPLAY_BODY = 512 * 1024;
 
 async function readJson(req, limit = MAX_BODY) {
@@ -74,7 +74,7 @@ export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
   store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
-  tanks = null, bombs = null, createInvoice = null, word = null, admin = null,
+  tanks = null, bombs = null, range = null, createInvoice = null, word = null, admin = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -98,7 +98,7 @@ export function createApiServer({
   // Отчёты об уровнях текущей игры: после последнего итога игры (plausibility.js, currentGame).
   const sequence = (id) => currentGame(store.levelsSince(id, Math.max(store.lastRunAt(id), now() - SEQUENCE_TTL_MS)));
 
-  // Новые достижения игры (game — mario, tanks, bombs) по проверенному итогу event; totals —
+  // Новые достижения игры (game — mario, tanks, bombs, range) по проверенному итогу event; totals —
   // статистика игрока за все игры (у «Прыг-Скока» — его строка players).
   const newAchievements = (playerId, event, grants = [], game = "mario", totals = null) => {
     const stats = totals ?? store.getPlayer(playerId);
@@ -253,7 +253,7 @@ export function createApiServer({
     routes["GET /api/wallet/top"] = (_body, user, url) => {
       const board = url.searchParams.get("board") || "overall";
       const period = url.searchParams.get("period") || "week";
-      if (!["overall", "mario", "tanks", "bombs", "word"].includes(board) || !["week", "all"].includes(period)) {
+      if (!["overall", "mario", "tanks", "bombs", "range", "word"].includes(board) || !["week", "all"].includes(period)) {
         return [400, { error: "bad data" }];
       }
       return [200, economy.top(board, period, user?.id ?? null)];
@@ -311,9 +311,9 @@ export function createApiServer({
     };
   }
 
-  // «Танкодром» и «Бомбодром»: билет (зерно игры от сервера) и итог игры с записью нажатий
-  // (tanks-results.js; повтор — tanks-replay.js и bombs-replay.js).
-  const replayGames = [["tanks", tanks, "Танкодрома"], ["bombs", bombs, "Бомбодрома"]];
+  // «Танкодром», «Бомбодром» и «Тир»: билет (зерно игры от сервера) и итог игры с записью нажатий
+  // (tanks-results.js; повтор — tanks-replay.js, bombs-replay.js и range-replay.js).
+  const replayGames = [["tanks", tanks, "Танкодрома"], ["bombs", bombs, "Бомбодрома"], ["range", range, "Тира"]];
   for (const [game, results, name] of replayGames) {
     if (!results) continue;
     routes[`POST /api/${game}/ticket`] = (_body, user) => {
@@ -435,7 +435,7 @@ export function createApiServer({
       return send(res, 429, { error: "too many requests" });
     }
     try {
-      const body = req.method === "POST" ? await readJson(req, path === "/api/tanks/run" || path === "/api/bombs/run" ? MAX_REPLAY_BODY : MAX_BODY) : null;
+      const body = req.method === "POST" ? await readJson(req, path === "/api/tanks/run" || path === "/api/bombs/run" || path === "/api/range/run" ? MAX_REPLAY_BODY : MAX_BODY) : null;
       const user = userFrom(req);
       if (req.method === "POST" && user && !byUser.take(user.id)) {
         res.setHeader("Retry-After", String(byUser.retryAfter(user.id)));

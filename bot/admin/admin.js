@@ -14,7 +14,7 @@
       players: 'Игроки', new_players: 'новые', games_done: 'игр', matches: 'матчи',
       by_day: 'По дням (Москва), 30 дней', retention: 'Удержание', d1: 'день 1', d7: 'день 7',
       kfactor: 'K-фактор', sources: 'Новые по источникам', src_direct: 'сами', src_ref: 'по ссылке друга', src_room: 'в комнату',
-      by_game: 'По играм за 7 дней', g_mario: 'Прыг-Скок', g_tanks: 'Танкодром', g_bombs: 'Бомбодром', g_word: 'Слово дня',
+      by_game: 'По играм за 7 дней', g_mario: 'Прыг-Скок', g_tanks: 'Танкодром', g_bombs: 'Бомбодром', g_range: 'Тир', g_word: 'Слово дня',
       opens: 'открыли', starts: 'начали', finishes: 'доиграли', invites: 'приглашений', joined: 'пришли по приглашению',
       search: 'id, имя или @username', find: 'Найти', recent: 'Недавно активные', nothing: 'Ничего не найдено.',
       back: '← Назад', balance: 'Баланс', flagged: 'Помечен', not_flagged: 'Не помечен', record: 'рекорд', place: 'место',
@@ -42,7 +42,7 @@
       players: 'Players', new_players: 'new', games_done: 'games', matches: 'matches',
       by_day: 'By day (Moscow time), 30 days', retention: 'Retention', d1: 'day 1', d7: 'day 7',
       kfactor: 'K-factor', sources: 'New players by source', src_direct: 'direct', src_ref: 'friend link', src_room: 'room link',
-      by_game: 'By game, 7 days', g_mario: 'Hop-Skip', g_tanks: 'Tank Field', g_bombs: 'Bomb Field', g_word: 'Word of the Day',
+      by_game: 'By game, 7 days', g_mario: 'Hop-Skip', g_tanks: 'Tank Field', g_bombs: 'Bomb Field', g_range: 'Shooting Range', g_word: 'Word of the Day',
       opens: 'opened', starts: 'started', finishes: 'finished', invites: 'invites', joined: 'joined by invite',
       search: 'id, name or @username', find: 'Find', recent: 'Recently active', nothing: 'Nothing found.',
       back: '← Back', balance: 'Balance', flagged: 'Flagged', not_flagged: 'Not flagged', record: 'best', place: 'place',
@@ -327,6 +327,7 @@
         (p.mario.rank ? ', ' + T('place') + ' ' + p.mario.rank : '') + ', ' + T('achievements') + ' ' + p.mario.achievements,
       T('g_tanks') + ': ' + T('games_done') + ' ' + p.tanks.games + ', ' + T('record') + ' ' + num(p.tanks.best),
       p.bombs ? T('g_bombs') + ': ' + T('games_done') + ' ' + p.bombs.games + ', ' + T('record') + ' ' + num(p.bombs.best) : '',
+      p.range ? T('g_range') + ': ' + T('games_done') + ' ' + p.range.games + ', ' + T('record') + ' ' + num(p.range.best) : '',
       T('g_word') + ': ' + T('games_done') + ' ' + p.word.games,
     ].filter(Boolean);
     return [

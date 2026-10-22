@@ -6,6 +6,7 @@ import { currentCommit } from "./version.js";
 import { createEconomy, loadEconomy } from "./economy.js";
 import { createTanksResults } from "./tanks-results.js";
 import { createBombsResults } from "./bombs-results.js";
+import { createRangeResults } from "./range-results.js";
 import { createWord } from "./word.js";
 import { createAdmin } from "./admin.js";
 import { createAdminAuth } from "./admin-auth.js";
@@ -56,6 +57,7 @@ export async function startApp({
   const tanksResults = createTanksResults(store, { members: (code) => tanks?.members(code) ?? null });
   let bombs = null;
   const bombsResults = createBombsResults(store, { members: (code) => bombs?.members(code) ?? null });
+  const rangeResults = createRangeResults(store);
   const word = createWord(store, { economy, tracker });
   const auth = createAdminAuth({ login: (env.ADMIN_LOGIN || "").trim(), passwordHash: (env.ADMIN_PASSWORD_HASH || "").trim() });
   if (!auth.enabled) console.log("Панель /admin выключена: не заданы ADMIN_LOGIN и ADMIN_PASSWORD_HASH.");
@@ -64,7 +66,7 @@ export async function startApp({
     live: () => (tanks ? { rooms: tanks.rooms.size + (bombs?.rooms.size ?? 0), sockets: tanks.wss.clients.size + (bombs?.wss.clients.size ?? 0) } : null),
   });
   const server = createApiServer({
-    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, bombs: bombsResults, createInvoice, word, admin,
+    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, bombs: bombsResults, range: rangeResults, createInvoice, word, admin,
   });
   tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
   // Дуэль «Бомбодрома» — такие же комнаты на своём пути.

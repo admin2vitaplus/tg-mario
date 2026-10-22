@@ -21,6 +21,11 @@ export const GAME_LINKS = [
     en: { title: "Bomb Field", about: "Bombs: find the door first", text: "Let's play «Bomb Field»: blow up the blocks and find the door before me." },
   },
   {
+    start: "range", icon: "🎯",
+    ru: { title: "Тир", about: "Сбей мишени наклоном телефона", text: "Сыграем в «Тир»? Целься наклоном телефона и сбивай мишени. Кто больше?" },
+    en: { title: "Shooting Range", about: "Aim by tilting your phone", text: "Let's play «Shooting Range»: aim by tilting your phone and hit the targets. Who scores more?" },
+  },
+  {
     start: "mario", icon: "🏃",
     ru: { title: "Прыг-Скок", about: "Платформер: добеги до флага", text: "Сыграем в «Прыг-Скок»? Платформер прямо в Telegram — кто наберёт больше?" },
     en: { title: "Hop-Skip", about: "Platformer: run to the flag", text: "Let's play «Hop-Skip»: a platformer right in Telegram. Who scores more?" },

@@ -42,6 +42,15 @@ const config = {
       preload: ['bombs/bombs.css', 'bombs/strings.js', 'bombs/sim.js', 'bombs/bombs.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js'],
     },
     {
+      id: 'range',
+      title: 'ТИР',
+      enabled: true,
+      // Its own page: the sight follows the phone's tilt (gyroscope), or a finger / mouse.
+      url: 'range/',
+      start: 'range',
+      preload: ['range/range.css', 'range/strings.js', 'range/sim.js', 'range/aim.js', 'range/range.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js'],
+    },
+    {
       id: 'word',
       title: 'СЛОВО ДНЯ',
       // Hidden 2026-10-06 (owner): the collection is classic cartridge games.
