@@ -88,7 +88,7 @@ function reach(lvl, from) {
 const finished = (lvl, cells) => [...cells].some((k) => Number(k.split(',')[0]) >= lvl.goalX);
 
 test('worlds of four levels, each a full grid ending in a flag or a castle', () => {
-  assert.equal(WORLDS.length, 6);
+  assert.equal(WORLDS.length, 7);
   for (const w of WORLDS) assert.equal(w.length, 4);
   for (const { id, lvl, def } of all) {
     assert.ok(def.name && def.time > 0, id);
@@ -192,8 +192,12 @@ test('worlds 2-4 bring their own features', () => {
   assert.ok(byId['4-1'].rider, '4-1 has the cloud rider');
   assert.equal(byId['4-3'].areas[0].tiles, 'tilesMush', '4-3 is on mushrooms');
   assert.equal(byId['4-4'].loops.length, 2, '4-4 is a maze with two forks');
-  for (const lp of byId['4-4'].loops) {
-    assert.ok(lp.back < lp.x);
-    assert.ok(!SOLID.has(at(byId['4-4'], lp.back, lp.backY - 1)), 'maze sends the hero back to open space');
+  assert.equal(byId['7-4'].loops.length, 3, '7-4 is a maze with three forks');
+  for (const { id, lvl } of all) {
+    for (const lp of lvl.loops || []) {
+      assert.ok(lp.back < lp.x, id);
+      assert.ok(!SOLID.has(at(lvl, lp.back, lp.backY - 1)), `${id}: maze sends the hero back to open space`);
+      assert.ok(SOLID.has(at(lvl, lp.back, lp.backY)), `${id}: and onto solid ground`);
+    }
   }
 });

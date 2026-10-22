@@ -40,6 +40,7 @@ const EN_NAMES = {
   'ЗАМОК-ЛАБИРИНТ': 'MAZE CASTLE', 'ЗОНА ПЕРЕХОДА': 'WARP ZONE',
   'ВЕЧЕРНИЙ ЛУГ': 'EVENING MEADOW', 'ХОЛМЫ И ПРУЖИНЫ': 'HILLS AND SPRINGS', 'ДЕРЕВЬЯ НА ВЕТРУ': 'WINDY TREES',
   'НОЧНОЙ НАЕЗДНИК': 'NIGHT RIDER', 'ДОЛИНА ТРУБ': 'PIPE VALLEY', 'НОЧНЫЕ ГРИБЫ': 'NIGHT MUSHROOMS',
+  'ПОЛЕ МЕТАТЕЛЕЙ': 'THROWERS FIELD', 'ГЛУБОКОЕ МОРЕ': 'DEEP SEA', 'МОСТЫ И РЫБЫ': 'BRIDGES AND FISH',
 };
 const nameOf = (ru) => L(ru, EN_NAMES[ru] || ru);
 
