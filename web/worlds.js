@@ -1,4 +1,4 @@
-// «Прыг-Скок» worlds 2-4: four levels each, in the same order as world 1
+// «Прыг-Скок» worlds 2-5: four levels each, in the same order as world 1
 // (field, a special level, a high level, a castle). Loaded after levels.js and before game.js;
 // also loaded by tests/levels.test.mjs, so it uses no browser or Phaser APIs.
 // Extra chars (see game.js): v water surface, y water, s fish, p springboard, t bolt thrower, n spiky.
@@ -687,6 +687,251 @@ function level44() {
   return L.done(Object.assign(castleEnd(L, 178), { start: [3, 8] }));
 }
 
+// ---------- World 5 (evening) ----------
+const DUSK = '#e8906a';
+
+// 5-1: an evening meadow; bolt throwers stand on brick towers, beetles walk in packs,
+// a pipe leads down to a coin room.
+function level51() {
+  const L = grid(226);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 208, 'tiles', DUSK, 'field');
+  L.area(210, 226, 'tilesCave', BLACK);
+  L.floor('#', 0, 207);
+  L.gap(50, 52);
+  L.gap(96, 98);
+  L.gap(140, 143);
+
+  row(14, 9, '?B?');
+  row(15, 5, 'M');
+  pipe(22, 2);
+  column(30, 3);
+  column(31, 3);
+  put(30, 9, 't');
+  row(36, 9, 'oooo');
+  pipe(42, 3);
+  L.plants.push({ x: 42, y: 10 });
+  stairsUp(54, 3);
+  row(60, 9, 'BBkBB');
+  row(60, 5, 'B?B?B');
+  put(64, 8, 't');
+  row(70, 8, 'oooo');
+  pipe(78, 4);
+  L.plants.push({ x: 78, y: 9 });
+  column(86, 2);
+  column(87, 2);
+  put(86, 10, 't');
+  row(90, 9, 'BMB');
+  stairsUp(100, 4);
+  column(104, 4);
+  row(110, 9, 'B??B');
+  put(112, 5, 'h');
+  pipe(118, 2);
+  column(126, 4);
+  column(127, 4);
+  put(126, 8, 't');
+  row(132, 9, 'oooo');
+  stairsUp(136, 4);
+  stairsDown(144, 4);
+  row(152, 9, 'BBCBB');
+  pipe(160, 3);
+  L.plants.push({ x: 160, y: 10 });
+  column(168, 3);
+  put(168, 9, 't');
+  pipe(176, 2);
+  stairsUp(186, 8);
+  column(194, 8);
+  L.flagpole(203);
+
+  L.enemies([18, 20, 26, 34, 38, 46, 48, 58, 68, 72, 74, 82, 92, 94, 108, 114, 116, 130, 150, 156, 172, 180, 182]);
+
+  coinRoom(L, 210);
+  L.pipes.push({ type: 'down', x: 118, y: 11, to: { area: 1, x: 212, y: 3 } });
+  L.pipes.push({ type: 'side', x: 222, y: 11, to: { area: 0, pipeX: 176, pipeY: 11 } });
+
+  return L.done({ goal: 'pole', goalX: 203, checkpoint: { x: 100, start: [106, 13] } });
+}
+
+// 5-2: hills of hard blocks with springboards up to a high brick road;
+// a pipe on the road leads down into a flooded coin cellar.
+function level52() {
+  const L = grid(232);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 212, 'tiles', DUSK, 'field');
+  L.area(214, 232, 'tilesSea', SEA);
+  L.areas[1].water = true;
+  L.floor('#', 0, 211);
+  L.gap(44, 47);
+  L.gap(120, 123);
+  L.gap(160, 163);
+
+  row(12, 9, 'B?B');
+  stairsUp(20, 4);
+  fill(24, 30, 9, 12, 'H');
+  row(25, 8, 'ooooo');
+  stairsDown(31, 4);
+  // Springboard up to a high brick shelf with coins.
+  put(37, 12, 'p');
+  row(40, 4, 'BBBBBBBBBBBB');
+  row(41, 3, 'oooooooooo');
+  row(52, 9, '?M?');
+  fill(58, 61, 10, 12, 'H');
+  fill(62, 65, 8, 12, 'H');
+  fill(66, 69, 6, 12, 'H');
+  row(66, 5, 'oooo');
+  // The high road: a long brick bridge with a pipe down to the cellar.
+  fill(70, 100, 6, 6, 'B');
+  row(74, 5, 'oooo');
+  // A short pipe standing on the road.
+  row(84, 4, '[]');
+  row(84, 5, '{}');
+  row(92, 5, '?B?');
+  fill(101, 104, 6, 12, 'H');
+  row(110, 9, 'BBkBB');
+  put(116, 12, 'p');
+  row(114, 3, 'oooooo');
+  stairsUp(124, 4);
+  fill(128, 136, 9, 12, 'H');
+  row(130, 8, 'ooooo');
+  row(140, 9, 'B?BMB');
+  pipe(150, 3);
+  L.plants.push({ x: 150, y: 10 });
+  stairsUp(164, 3);
+  row(170, 9, 'BBBB');
+  pipe(178, 2);
+  stairsUp(186, 8);
+  column(194, 8);
+  L.flagpole(203);
+
+  L.enemies([16, 18, 34, 50, 54, 56, 72, 108, 112, 118, 138, 146, 148, 156, 168, 174, 182]);
+  L.enemies([78, 96], 5);
+
+  // Flooded cellar: swim among the coins, then the side pipe back to the road's end.
+  L.floor('#', 214, 231);
+  fill(214, 231, 1, 1, 'v');
+  fill(214, 214, 2, 12, 'H');
+  fill(222, 226, 9, 9, 'H');
+  row(216, 6, 'oooooo');
+  row(216, 8, 'oooooo');
+  row(222, 8, 'ooooo');
+  row(222, 4, 'ooooo');
+  L.sidePipe(226, 11, 2);
+  L.pipes.push({ type: 'down', x: 84, y: 4, to: { area: 1, x: 217, y: 4 } });
+  L.pipes.push({ type: 'side', x: 226, y: 11, to: { area: 0, pipeX: 178, pipeY: 11 } });
+
+  return L.done({ goal: 'pole', goalX: 203, checkpoint: { x: 104, start: [110, 13] } });
+}
+
+// 5-3: evening treetops in the wind; lifts swing between them, spikies guard the wide caps.
+function level53() {
+  const L = grid(196);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 196, 'tiles', DUSK, 'sky');
+  L.floor('#', 0, 14);
+  tree(16, 4, 9);
+  tree(22, 6, 6);
+  row(23, 4, 'oooo');
+  L.lifts.push({ x: 30, y: 8, w: 3, axis: 'x', dist: 5, period: 3.5, phase: 0 });
+  tree(40, 5, 8);
+  row(41, 5, '?M?');
+  tree(47, 3, 5);
+  L.lifts.push({ x: 52, y: 7, w: 3, axis: 'y', dist: 5, period: 3, phase: 0.25 });
+  tree(58, 8, 9);
+  row(60, 7, 'oooo');
+  tree(68, 4, 6);
+  L.lifts.push({ x: 74, y: 8, w: 3, axis: 'x', dist: 4, period: 3, phase: 0.5 });
+  tree(83, 7, 8);
+  row(84, 5, 'ooooo');
+  L.lifts.push({ x: 92, y: 6, w: 3, axis: 'y', dist: 5, period: 3.5, phase: 0 });
+  tree(98, 4, 7);
+  tree(104, 6, 10);
+  row(105, 7, '? ?');
+  L.lifts.push({ x: 112, y: 8, w: 3, axis: 'x', dist: 5, period: 3.5, phase: 0.75 });
+  tree(122, 6, 7);
+  row(123, 5, 'oooo');
+  tree(130, 3, 9);
+  L.lifts.push({ x: 135, y: 7, w: 3, axis: 'y', dist: 4, period: 3, phase: 0.5 });
+  tree(141, 8, 8);
+  row(143, 6, 'oooo');
+  L.lifts.push({ x: 151, y: 8, w: 3, axis: 'x', dist: 4, period: 3, phase: 0.25 });
+  tree(160, 5, 9);
+  L.floor('#', 166, 195);
+  L.stairsUp(170, 4);
+  L.flagpole(182);
+
+  L.enemies([24], 5);
+  put(62, 8, 'n');
+  L.enemies([86], 7);
+  put(108, 9, 'n');
+  L.enemies([124], 6);
+  put(145, 7, 'n');
+  L.enemies([176, 178]);
+  return L.done({ goal: 'pole', goalX: 182, checkpoint: { x: 83, start: [84, 8] } });
+}
+
+// 5-4: castle: rising lifts over a lava lake, long fire bars, the beetle on the bridge.
+function level54() {
+  const L = grid(224);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 224, 'tilesCastle', BLACK);
+  L.floor();
+  fill(0, 169, 0, 2, 'H');
+  fill(0, 5, 8, 12, 'H');
+  fill(6, 12, 9, 12, 'H');
+  put(10, 9, 'r');
+  L.gap(13, 20, true);
+  put(15, 13, 'f');
+  put(19, 13, 'f');
+  L.lifts.push({ x: 14, y: 10, w: 3, axis: 'y', dist: 3, period: 3, phase: 0 });
+  fill(21, 27, 9, 12, 'H');
+  put(24, 9, 'r');
+  fill(28, 46, 3, 4, 'H');
+  put(34, 4, 'r');
+  put(42, 4, 'r');
+  row(31, 9, '?M?');
+  fill(38, 39, 11, 12, 'H');
+  put(38, 11, 'r');
+  // A lava lake with three lifts.
+  L.gap(48, 70, true);
+  L.lifts.push({ x: 49, y: 9, w: 3, axis: 'x', dist: 4, period: 3.5, phase: 0 });
+  L.lifts.push({ x: 57, y: 7, w: 3, axis: 'y', dist: 4, period: 3, phase: 0.5 });
+  L.lifts.push({ x: 63, y: 9, w: 3, axis: 'x', dist: 4, period: 3.5, phase: 0.25 });
+  put(52, 13, 'f');
+  put(60, 13, 'f');
+  put(67, 13, 'f');
+  fill(71, 76, 9, 12, 'H');
+  put(73, 9, 'r');
+  fill(77, 96, 3, 5, 'H');
+  row(80, 10, 'oooooo');
+  put(88, 5, 'r');
+  put(92, 12, 'r');
+  L.gap(98, 110, true);
+  fill(101, 102, 10, 14, 'H');
+  fill(106, 107, 9, 14, 'H');
+  put(101, 10, 'r');
+  put(99, 13, 'f');
+  put(104, 13, 'f');
+  put(109, 13, 'f');
+  fill(111, 115, 8, 12, 'H');
+  put(115, 8, 'r');
+  row(120, 9, '?B?');
+  fill(126, 127, 10, 12, 'H');
+  put(126, 10, 'r');
+  L.gap(130, 146, true);
+  L.lifts.push({ x: 132, y: 9, w: 3, axis: 'x', dist: 5, period: 4, phase: 0 });
+  L.lifts.push({ x: 141, y: 7, w: 3, axis: 'y', dist: 4, period: 3, phase: 0.75 });
+  put(134, 13, 'f');
+  put(143, 13, 'f');
+  fill(147, 169, 3, 4, 'H');
+  fill(147, 151, 10, 12, 'H');
+  put(150, 10, 'r');
+  put(160, 4, 'r');
+
+  L.enemies([11], 8);
+  L.enemies([36, 44, 84, 90, 118, 122, 156, 162]);
+  return L.done(Object.assign(castleEnd(L, 170), { start: [3, 8] }));
+}
+
 WORLDS.push(
   [
     { name: 'ЛУГ', build: level21, time: 400 },
@@ -705,6 +950,12 @@ WORLDS.push(
     { name: 'ГЛУБОКОЕ ПОДЗЕМЕЛЬЕ', build: level42, time: 400 },
     { name: 'ГРИБЫ', build: level43, time: 300 },
     { name: 'ЗАМОК-ЛАБИРИНТ', build: level44, time: 400 },
+  ],
+  [
+    { name: 'ВЕЧЕРНИЙ ЛУГ', build: level51, time: 300 },
+    { name: 'ХОЛМЫ И ПРУЖИНЫ', build: level52, time: 400 },
+    { name: 'ДЕРЕВЬЯ НА ВЕТРУ', build: level53, time: 300 },
+    { name: 'ЗАМОК', build: level54, time: 300 },
   ],
 );
 })();
