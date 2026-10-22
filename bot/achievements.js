@@ -2,7 +2,7 @@
 // который сервер проверил сам (уровня или всей игры), и статистику игрока после его учёта.
 // Коды уникальны во всех играх: в базе (achievements) хранится только код.
 
-// «Прыг-Скок»: e — уровень { level (сквозной 0…15), score, timeLeft, deaths } или игра
+// «Прыг-Скок»: e — уровень { level (сквозной 0…LAST_LEVEL), score, timeLeft, deaths } или игра
 // { score, coins, levels, deaths, completed, bossFire }; p — игрок (games, total_coins).
 export const ACHIEVEMENTS = [
   { code: "first_level", icon: "🚩", title: "Первый флаг", text: "Пройти уровень 1-1",
@@ -47,8 +47,8 @@ export const ACHIEVEMENTS = [
   { code: "world3_clear", icon: "🌙", title: "Ночной дозор", text: "Пройти весь мир 3",
     titleEn: "Night watch", textEn: "Clear the whole world 3",
     check: (e) => e.type === "level" && e.level === 11 },
-  { code: "all_worlds", icon: "🏆", title: "Чемпион", text: "Пройти все четыре мира за одну игру",
-    titleEn: "Champion", textEn: "Clear all four worlds in one game",
+  { code: "all_worlds", icon: "🏆", title: "Чемпион", text: "Пройти все миры за одну игру",
+    titleEn: "Champion", textEn: "Clear every world in one game",
     check: (e) => e.type === "run" && e.completed },
   { code: "castle_clean", icon: "🗡️", title: "Рыцарь без страха", text: "Пройти замок (уровень X-4), не потеряв жизнь",
     titleEn: "Fearless knight", textEn: "Clear a castle (level X-4) without losing a life",

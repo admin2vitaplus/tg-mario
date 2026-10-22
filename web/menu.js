@@ -144,7 +144,7 @@ const COVERS = {
   },
 };
 const SUBTITLES = {
-  'pryg-skok': ['Платформер · 4 мира', 'Platformer · 4 worlds'],
+  'pryg-skok': ['Платформер · 5 миров', 'Platformer · 5 worlds'],
   tanks: ['Танки · онлайн вдвоём', 'Tanks · online for two'],
   bombs: ['Бомбы · 50 этапов и дуэль', 'Bombs · 50 stages and a duel'],
   word: ['Слово из 5 букв', 'A five-letter word'],

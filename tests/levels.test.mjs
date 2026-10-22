@@ -87,8 +87,8 @@ function reach(lvl, from) {
 
 const finished = (lvl, cells) => [...cells].some((k) => Number(k.split(',')[0]) >= lvl.goalX);
 
-test('four worlds of four levels, each a full grid ending in a flag or a castle', () => {
-  assert.equal(WORLDS.length, 4);
+test('worlds of four levels, each a full grid ending in a flag or a castle', () => {
+  assert.equal(WORLDS.length, 5);
   for (const w of WORLDS) assert.equal(w.length, 4);
   for (const { id, lvl, def } of all) {
     assert.ok(def.name && def.time > 0, id);
