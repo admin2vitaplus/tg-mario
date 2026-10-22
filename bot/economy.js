@@ -41,15 +41,16 @@ const EARNED = ["achievement", ...CAPPED];
 // Отмечаются выполненными и после потолка (приглашение — нет: его жетоны дойдут в другой день).
 const MARKED = ["record", "daily", "task"];
 // Игры с жетонами и их ежедневные задания (сбрасываются в 00:00 UTC).
-export const GAMES = ["mario", "tanks", "bombs", "word"];
+export const GAMES = ["mario", "tanks", "bombs", "range", "word"];
 export const DAILY_TASKS = ["play", "level", "record"];
 // Игры общего задания «сыграть во все три за день» и задания «N игр за неделю».
 export const ALL_GAMES = ["mario", "tanks", "bombs"];
 const CAPPED_SQL = CAPPED.map((r) => `'${r}'`).join(", ");
 // Таблицы недели: рекорды игр за неделю и общий зачёт (жетоны за неделю без призов и покупок).
-export const BOARDS = ["mario", "tanks", "bombs", "word", "overall"];
-// Таблица принятых игр для каждой игры: у «Прыг-Скока» runs, у «Танкодрома» tanks_runs, у «Бомбодрома» bombs_runs.
-const RUN_TABLES = { mario: "runs", tanks: "tanks_runs", bombs: "bombs_runs" };
+export const BOARDS = ["mario", "tanks", "bombs", "range", "word", "overall"];
+// Таблица принятых игр для каждой игры: у «Прыг-Скока» runs, у «Танкодрома» tanks_runs, у «Бомбодрома» bombs_runs,
+// у «Тира» range_runs.
+const RUN_TABLES = { mario: "runs", tanks: "tanks_runs", bombs: "bombs_runs", range: "range_runs" };
 // Сколько живёт посчитанная таблица, если в неё ничего не записали (имена игроков и т. п.).
 const TOP_TTL_MS = 60_000;
 // У «Слова дня» (word.js) в таблице не лучший счёт, а сумма очков по дням: за день берётся
@@ -139,14 +140,14 @@ const SEASON_TEXT = {
   ru: {
     head: (label) => `🏁 Неделя ${label} закончилась.`,
     gained: (n) => `Жетонов за неделю: ${n}.`,
-    place: (board, place, prize) => `${{ mario: "Прыг-Скок", tanks: "Танкодром", bombs: "Бомбодром", word: "Слово дня" }[board] || "Общий зачёт"}: ${place} место, приз ${prize}.`,
+    place: (board, place, prize) => `${{ mario: "Прыг-Скок", tanks: "Танкодром", bombs: "Бомбодром", range: "Тир", word: "Слово дня" }[board] || "Общий зачёт"}: ${place} место, приз ${prize}.`,
     balance: (n) => `Баланс: ${n}.`,
     off: "Не присылать итоги",
   },
   en: {
     head: (label) => `🏁 The week ${label} is over.`,
     gained: (n) => `Tickets this week: ${n}.`,
-    place: (board, place, prize) => `${{ mario: "Hop-Skip", tanks: "Tank Field", bombs: "Bomb Field", word: "Word of the Day" }[board] || "Overall"}: place ${place}, prize ${prize}.`,
+    place: (board, place, prize) => `${{ mario: "Hop-Skip", tanks: "Tank Field", bombs: "Bomb Field", range: "Shooting Range", word: "Word of the Day" }[board] || "Overall"}: place ${place}, prize ${prize}.`,
     balance: (n) => `Balance: ${n}.`,
     off: "Stop weekly results",
   },
@@ -185,6 +186,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     refund: db.prepare("UPDATE purchases SET refunded_at = ? WHERE charge_id = ? AND refunded_at IS NULL"),
     tanksGames: db.prepare("SELECT COUNT(*) AS n FROM tanks_runs WHERE player_id = ?"),
     bombsGames: db.prepare("SELECT COUNT(*) AS n FROM bombs_runs WHERE player_id = ?"),
+    rangeGames: db.prepare("SELECT COUNT(*) AS n FROM range_runs WHERE player_id = ?"),
     // Игры одной игры с начала недели (для задания «N игр за неделю»).
     weekGames: Object.fromEntries(Object.entries(RUN_TABLES).map(([g, t]) => [g,
       db.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE player_id = ? AND created_at >= ?`)])),
@@ -303,7 +305,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
       return out;
     },
 
-    // Принятый сервером итог игры (game — mario, tanks или bombs): задание «сыграть», «пройти уровень»
+    // Принятый сервером итог игры (game — mario, tanks, bombs или range): задание «сыграть», «пройти уровень»
     // (levels — сколько пройдено в этой игре), личный рекорд в этой игре, награда за приглашение.
     run(playerId, { newRecord, game = "mario", levels = 0 }, out = []) {
       dropTop(game); // новый результат игры может поменять её таблицу
@@ -330,8 +332,9 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     inviteCheck(playerId, out = [], at = now()) {
       const seen = store.getSeen(playerId);
       if (!seen || seen.source !== "ref" || !seen.inviter || seen.inviter === playerId) return out;
-      // Игры, которые сервер проверил: «Прыг-Скок», «Танкодром», «Бомбодром» и «Слово дня».
-      const games = (id) => (store.getPlayer(id)?.games ?? 0) + q.tanksGames.get(id).n + q.bombsGames.get(id).n + q.wordGames.get(id).n;
+      // Игры, которые сервер проверил: «Прыг-Скок», «Танкодром», «Бомбодром», «Тир» и «Слово дня».
+      const games = (id) => (store.getPlayer(id)?.games ?? 0) + q.tanksGames.get(id).n + q.bombsGames.get(id).n
+        + q.rangeGames.get(id).n + q.wordGames.get(id).n;
       if (games(playerId) < cfg.invite.gamesNeeded || games(seen.inviter) < 1) return out;
       tx(() => {
         if (q.invitesThisSeason.get(seen.inviter, seasonOf(at)).n < cfg.invite.perWeek) {
@@ -555,6 +558,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         mario: best("mario"),
         tanks: best("tanks"),
         bombs: best("bombs"),
+        range: best("range"),
         word: db.prepare(`SELECT t.id AS player_id, t.value FROM (${wordSums(from, to)}) t
           LEFT JOIN wallets w ON w.player_id = t.id WHERE w.flagged IS NULL
           ORDER BY t.value DESC, t.tie ASC LIMIT ?`).all(cfg.season.boards.word.length),

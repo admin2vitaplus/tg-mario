@@ -166,8 +166,52 @@ export const BOMBS_ACHIEVEMENTS = [
     check: (_e, p) => p.games >= 25 },
 ];
 
+// «Тир»: e — игра, которую сервер проиграл по записи выстрелов (range-replay.js):
+// { score, stages (пройденные раунды), won, quit, shots, hits, bestStreak, perfect, gold, discs, doubles }.
+export const RANGE_ACHIEVEMENTS = [
+  { code: "range_round1", icon: "🎯", title: "Первый раунд", text: "Пройти первый раунд",
+    titleEn: "First round", textEn: "Clear the first round",
+    check: (e) => e.stages >= 1 },
+  { code: "range_rounds10", icon: "🔟", title: "Стрелок", text: "Пройти 10 раундов за одну игру",
+    titleEn: "Marksman", textEn: "Clear 10 rounds in one game",
+    check: (e) => e.stages >= 10 },
+  { code: "range_rounds25", icon: "🏅", title: "Ворошиловский стрелок", text: "Пройти 25 раундов за одну игру",
+    titleEn: "Crack shot", textEn: "Clear 25 rounds in one game",
+    check: (e) => e.stages >= 25 },
+  { code: "range_all", icon: "🏆", title: "Снайпер", text: "Пройти все 50 раундов",
+    titleEn: "Sniper", textEn: "Clear all 50 rounds",
+    check: (e) => e.won },
+  { code: "range_perfect", icon: "💯", title: "Десять из десяти", text: "Сбить все 10 мишеней раунда",
+    titleEn: "Ten out of ten", textEn: "Hit all 10 targets of a round",
+    check: (e) => e.perfect >= 1 },
+  { code: "range_perfect5", icon: "✨", title: "Без промаха", text: "Пять раундов «10 из 10» за одну игру",
+    titleEn: "Flawless", textEn: "Five «10 out of 10» rounds in one game",
+    check: (e) => e.perfect >= 5 },
+  { code: "range_streak15", icon: "👁️", title: "Меткий глаз", text: "Попасть 15 раз подряд",
+    titleEn: "Eagle eye", textEn: "Hit 15 times in a row",
+    check: (e) => e.bestStreak >= 15 },
+  { code: "range_gold", icon: "🐤", title: "Золотая птица", text: "Сбить золотую птицу",
+    titleEn: "Golden bird", textEn: "Hit a golden bird",
+    check: (e) => e.gold >= 1 },
+  { code: "range_discs20", icon: "🥏", title: "Тарелочник", text: "Разбить 20 тарелочек за одну игру",
+    titleEn: "Clay breaker", textEn: "Break 20 clay discs in one game",
+    check: (e) => e.discs >= 20 },
+  { code: "range_double", icon: "✌️", title: "Дуплет", text: "Сбить две мишени одним выстрелом",
+    titleEn: "Double", textEn: "Hit two targets with one shot",
+    check: (e) => e.doubles >= 1 },
+  { code: "range_score50k", icon: "🎯", title: "50 000", text: "Набрать 50 000 очков за одну игру",
+    titleEn: "50 000", textEn: "Score 50 000 in one game",
+    check: (e) => e.score >= 50000 },
+  { code: "range_score200k", icon: "🌟", title: "200 000", text: "Набрать 200 000 очков за одну игру",
+    titleEn: "200 000", textEn: "Score 200 000 in one game",
+    check: (e) => e.score >= 200000 },
+  { code: "range_games25", icon: "🎮", title: "Завсегдатай тира", text: "Сыграть 25 игр",
+    titleEn: "Range regular", textEn: "Play 25 games",
+    check: (_e, p) => p.games >= 25 },
+];
+
 // Списки по играм и все коды разом (код → игра).
-export const BY_GAME = { mario: ACHIEVEMENTS, tanks: TANKS_ACHIEVEMENTS, bombs: BOMBS_ACHIEVEMENTS };
+export const BY_GAME = { mario: ACHIEVEMENTS, tanks: TANKS_ACHIEVEMENTS, bombs: BOMBS_ACHIEVEMENTS, range: RANGE_ACHIEVEMENTS };
 export const GAME_OF = new Map(Object.entries(BY_GAME).flatMap(([g, list]) => list.map((a) => [a.code, g])));
 export const byCode = new Map(Object.values(BY_GAME).flat().map((a) => [a.code, a]));
 export const ACHIEVEMENTS_TOTAL = byCode.size;
