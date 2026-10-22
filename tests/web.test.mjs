@@ -165,7 +165,7 @@ test('old links to a switched-off game land on the menu', () => {
   }
 });
 
-for (const id of ['pryg-skok', 'tanks', 'bombs', 'word']) {
+for (const id of ['pryg-skok', 'tanks', 'bombs', 'range', 'word']) {
   test(`switching off ${id} removes it from the menu and breaks nothing`, () => {
     const cfg = loadConfig();
     const title = cfg.game(id).title;
@@ -187,6 +187,7 @@ test('no separate records button: tables live in the tickets panels', () => {
   assert.match(read(path.join(WEB, 'tanks/index.html')), /data-wallet-game="tanks"/);
   assert.match(read(path.join(WEB, 'word/index.html')), /data-wallet-game="word"/);
   assert.match(read(path.join(WEB, 'bombs/index.html')), /data-wallet-game="bombs"/);
+  assert.match(read(path.join(WEB, 'range/index.html')), /data-wallet-game="range"/);
   assert.match(read(path.join(WEB, 'api.js')), /walletGame = 'mario'/);
 });
 
