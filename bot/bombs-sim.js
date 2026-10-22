@@ -61,7 +61,41 @@ const STAGES = [
   { foes: [0, 0, 0, 2, 2, 2, 2, 1], item: 'bomb' },
   { foes: [0, 0, 0, 0, 3, 2, 3, 1], item: 'speed' },
   { foes: [0, 0, 0, 0, 2, 3, 2, 3], item: 'mystery' },
+  // 21–50: more enemies and more of the fast and the smart ones.
+  { foes: [0, 0, 4, 0, 4, 0, 2], item: 'bombpass' },
+  { foes: [0, 0, 0, 4, 0, 4, 0, 2], item: 'fire' },
+  { foes: [0, 0, 3, 0, 3, 3, 1, 1], item: 'remote' },
+  { foes: [0, 0, 0, 0, 0, 4, 4, 2], item: 'speed' },
+  { foes: [0, 3, 3, 0, 0, 0, 2, 2], item: 'bomb' },
+  { foes: [0, 0, 0, 3, 3, 2, 2, 1], item: 'flamepass' },
+  { foes: [0, 0, 2, 2, 2, 2, 2, 1], item: 'bomb' },
+  { foes: [0, 0, 0, 0, 4, 3, 2, 2], item: 'wallpass' },
+  { foes: [0, 0, 0, 2, 2, 3, 3, 1], item: 'fire' },
+  { foes: [0, 0, 0, 0, 3, 3, 3, 2], item: 'mystery' },
+  { foes: [0, 0, 4, 0, 4, 0, 3, 1], item: 'remote' },
+  { foes: [0, 0, 0, 4, 2, 2, 2, 2], item: 'bomb' },
+  { foes: [0, 0, 2, 2, 2, 2, 2, 2], item: 'speed' },
+  { foes: [0, 0, 0, 0, 4, 4, 2, 2], item: 'bombpass' },
+  { foes: [0, 0, 0, 3, 3, 2, 3, 1], item: 'fire' },
+  { foes: [0, 0, 3, 0, 3, 3, 1, 2], item: 'flamepass' },
+  { foes: [0, 0, 0, 2, 3, 3, 2, 2], item: 'bomb' },
+  { foes: [0, 0, 0, 0, 3, 3, 3, 3], item: 'wallpass' },
+  { foes: [0, 0, 2, 2, 2, 2, 3, 2], item: 'remote' },
+  { foes: [0, 0, 0, 0, 4, 3, 3, 3], item: 'mystery' },
+  { foes: [0, 0, 0, 4, 0, 4, 3, 2], item: 'fire' },
+  { foes: [0, 0, 3, 0, 3, 3, 2, 2], item: 'bomb' },
+  { foes: [0, 0, 0, 2, 3, 3, 3, 2], item: 'speed' },
+  { foes: [0, 0, 0, 0, 3, 4, 3, 3], item: 'bombpass' },
+  { foes: [0, 0, 2, 2, 2, 2, 2, 4], item: 'flamepass' },
+  { foes: [0, 0, 0, 3, 3, 3, 2, 3], item: 'fire' },
+  { foes: [0, 0, 0, 0, 4, 3, 4, 3], item: 'remote' },
+  { foes: [0, 0, 0, 2, 2, 3, 3, 4], item: 'mystery' },
+  { foes: [0, 0, 0, 0, 3, 3, 4, 4], item: 'bomb' },
+  { foes: [0, 0, 0, 0, 2, 4, 4, 4], item: 'mystery' },
 ];
+// Clearing one of these stages alone gives a life (stage numbers from 1).
+const LIFE_STAGES = [20, 30, 40];
+const MAX_LIVES = 9;
 
 const NO_INPUT = { dir: -1, a: false, b: false };
 
@@ -120,7 +154,7 @@ function startStage(s, n) {
   s.doorSpawns = 0;
   s.winner = -1;
   const soft = [];
-  const density = 0.24 + Math.min(n, 19) * 0.006;
+  const density = 0.24 + Math.min(n, 19) * 0.006 + Math.max(0, Math.min(n, 39) - 19) * 0.002;
   for (let cy = 0; cy < ROWS; cy++) {
     for (let cx = 0; cx < COLS; cx++) {
       const border = cx === 0 || cy === 0 || cx === COLS - 1 || cy === ROWS - 1;
@@ -312,6 +346,10 @@ function exitStage(s, p) {
   p.score += s.duel ? 2000 : Math.floor(s.time / 60) * 10;
   s.phaseT = 0;
   s.events.push('clear');
+  if (!s.duel && LIFE_STAGES.includes(s.stage + 1) && p.lives < MAX_LIVES) {
+    p.lives++;
+    s.events.push('life');
+  }
   if (s.stage + 1 >= STAGES.length) {
     s.won = true;
     s.phase = 'over';
@@ -496,7 +534,7 @@ function step(s, inputs) {
 
 root.BombSim = {
   COLS, ROWS, TILE, SUB, TS, EMPTY, HARD, SOFT, BURN, UP, RIGHT, DOWN, LEFT, DX, DY,
-  FUSE, FLAME, DIE, INTRO, STAGE_TIME, ENEMY, ITEMS, STAGES, STARTS,
+  FUSE, FLAME, DIE, INTRO, STAGE_TIME, ENEMY, ITEMS, STAGES, STARTS, LIFE_STAGES,
   newGame, startStage, step, cellOf, explode,
 };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -12,8 +12,8 @@ import { MIN_QUIT_FRAMES } from "./tanks-replay.js";
 
 const S = globalThis.BombSim;
 
-export const MAX_FRAMES = 60 * 60 * 60; // час игры
-export const MAX_LOG = 400_000; // символов
+export const MAX_FRAMES = 3 * 60 * 60 * 60; // три часа игры: 50 этапов
+export const MAX_LOG = 500_000; // символов (три часа игры — около 200 000)
 export { MIN_QUIT_FRAMES };
 
 const inputOf = (code) => ({ dir: Math.floor(code / 4) - 1, a: (code & 2) > 0, b: (code & 1) > 0 });
