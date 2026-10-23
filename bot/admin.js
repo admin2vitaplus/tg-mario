@@ -5,6 +5,7 @@ import { loadavg } from "node:os";
 import { collectStats } from "./stats.js";
 import { dayOf } from "./days.js";
 import { economyStats, seasonLabel, seasonOf, seasonStart } from "./economy.js";
+import { telegramText } from "./notices.js";
 
 // Панель владельца: страница /admin и маршруты /api/admin/*. Вход по логину и паролю
 // (ADMIN_LOGIN, ADMIN_PASSWORD_HASH, см. admin-auth.js); без них панель выключена.
@@ -123,6 +124,7 @@ function starsBlock(db) {
 export function createAdmin({
   store, economy = null, auth, refundStars = null, commit = "unknown", startedAt = Date.now(),
   dbFile = null, live = () => null, now = Date.now, logger = console.log,
+  notices = null, message = null,
 }) {
   const { db } = store;
   let cpuMark = { at: Date.now(), usage: process.cpuUsage() };
@@ -220,6 +222,10 @@ export function createAdmin({
     return fn(body, url);
   };
   const needEconomy = (fn) => (economy ? fn : () => [503, { error: "no economy" }]);
+  const needNotices = (fn) => (notices ? fn : () => [503, { error: "no notices" }]);
+  // Повторная отправка той же формы (метка key с кнопки) не создаёт второе уведомление.
+  const noticeKeys = new Map(); // key -> ответ
+
   // Что сделал владелец — в журнал службы (journalctl), без паролей и ключей.
   const log = (what) => logger(`Панель: ${what}`);
 
@@ -234,7 +240,7 @@ export function createAdmin({
       return [r.error === "locked" ? 429 : 401, r];
     },
     "POST /api/admin/logout": (_b, _u, _url, { req }) => { auth.logout(req.headers.authorization); return [200, { ok: true }]; },
-    "GET /api/admin/me": guard(() => [200, { ok: true, refund: !!refundStars, economy: !!economy }]),
+    "GET /api/admin/me": guard(() => [200, { ok: true, refund: !!refundStars, economy: !!economy, notices: !!notices }]),
     "GET /api/admin/overview": guard(() => {
       const at = now();
       const age = overview ? at - overview.at : Infinity;
@@ -286,6 +292,43 @@ export function createAdmin({
       const n = economy.annul(pid, season);
       log(`аннулировал ${-n} у ${pid} за сезон ${season}`);
       return [200, { ok: true, annulled: -n, balance: economy.wallet(pid).balance }];
+    })),
+    // Уведомления (notices.js): список, новое (всем или одному игроку) и «убрать у игроков».
+    "GET /api/admin/notices": guard(needNotices(() => [200, { items: notices.adminList(), telegram: !!message }])),
+    // { kind: update|news, player?, title, body, titleEn?, bodyEn?, telegram?, key }. Личное (player) можно
+    // сразу отправить и сообщением бота: telegram — sent, failed или off.
+    "POST /api/admin/notice": guard(needNotices(async (body) => {
+      const key = typeof body.key === "string" && /^[a-z0-9]{8,32}$/.test(body.key) ? body.key : null;
+      if (!key) return [400, { error: "bad data" }];
+      if (noticeKeys.has(key)) return [200, noticeKeys.get(key)];
+      const pid = body.player == null || body.player === "" ? null : id(body.player);
+      if (body.player != null && body.player !== "" && !pid) return [400, { error: "bad player" }];
+      if (pid && !store.getPlayer(pid) && !store.getSeen(pid)) return [404, { error: "no player" }];
+      const r = notices.add({ kind: body.kind, playerId: pid, title: body.title, body: body.body, titleEn: body.titleEn, bodyEn: body.bodyEn });
+      if (!r.ok) return [400, { error: r.error }];
+      let telegram = "off";
+      if (pid && body.telegram === true && message) {
+        const lang = db.prepare("SELECT lang FROM wallets WHERE player_id = ?").get(pid)?.lang;
+        try {
+          await message(pid, telegramText(r.notice, lang === "en"));
+          telegram = "sent";
+        } catch (err) {
+          telegram = "failed";
+          logger(`Панель: уведомление ${r.notice.id} не ушло в Telegram: ${String(err.description || err.message).slice(0, 200)}`);
+        }
+      }
+      log(`уведомление ${r.notice.id} (${r.notice.kind}${pid ? `, игроку ${pid}` : ", всем"})`);
+      const out = { ok: true, id: r.notice.id, telegram };
+      noticeKeys.set(key, out);
+      if (noticeKeys.size > 200) noticeKeys.delete(noticeKeys.keys().next().value);
+      return [200, out];
+    })),
+    "POST /api/admin/notice/hide": guard(needNotices((body) => {
+      const nid = id(body.id);
+      if (!nid) return [400, { error: "bad data" }];
+      const done = notices.hide(nid);
+      if (done) log(`убрал уведомление ${nid}`);
+      return [200, { ok: true, hidden: done }];
     })),
     "POST /api/admin/refund": guard(needEconomy(async (body) => {
       if (!refundStars) return [503, { error: "no refunds" }];

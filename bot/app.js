@@ -10,15 +10,17 @@ import { createRangeResults } from "./range-results.js";
 import { createWord } from "./word.js";
 import { createAdmin } from "./admin.js";
 import { createAdminAuth } from "./admin-auth.js";
+import { createNotices } from "./notices.js";
 
 // Всё, кроме самого бота Telegram и туннеля: база, HTTP API и комнаты «Танкодрома».
 // Вынесено отдельно, чтобы запуск и остановку можно было проверить тестом без сети и токена.
 // notify(userId, text, { offText }) — сообщение игроку от бота (итоги недели); без него сообщений нет.
 // createInvoice(item, user) — ссылка на счёт в Telegram Stars (bot.api.createInvoiceLink); без неё покупок за звёзды нет.
 // refundStars(userId, chargeId) — возврат звёзд из панели владельца (вход: ADMIN_LOGIN и ADMIN_PASSWORD_HASH).
+// message(userId, text) — сообщение бота игроку: личное уведомление из панели «и в Telegram»; без него только в игре.
 export async function startApp({
   env = process.env, botToken, onAchievements, notify = null, createInvoice = null, port, tanksLimits,
-  refundStars = null,
+  refundStars = null, message = null,
 } = {}) {
   // Адрес игры не вшит в код: он задаётся в .env, чтобы переезд сайта не требовал правки бота.
   const gameUrl = env.WEBAPP_URL;
@@ -61,12 +63,13 @@ export async function startApp({
   const word = createWord(store, { economy, tracker });
   const auth = createAdminAuth({ login: (env.ADMIN_LOGIN || "").trim(), passwordHash: (env.ADMIN_PASSWORD_HASH || "").trim() });
   if (!auth.enabled) console.log("Панель /admin выключена: не заданы ADMIN_LOGIN и ADMIN_PASSWORD_HASH.");
+  const notices = createNotices(store);
   const admin = createAdmin({
-    store, economy, auth, refundStars, commit, dbFile,
+    store, economy, auth, refundStars, commit, dbFile, notices, message,
     live: () => (tanks ? { rooms: tanks.rooms.size + (bombs?.rooms.size ?? 0), sockets: tanks.wss.clients.size + (bombs?.wss.clients.size ?? 0) } : null),
   });
   const server = createApiServer({
-    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, bombs: bombsResults, range: rangeResults, createInvoice, word, admin,
+    store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, bombs: bombsResults, range: rangeResults, createInvoice, word, admin, notices,
   });
   tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
   // Дуэль «Бомбодрома» — такие же комнаты на своём пути.
@@ -96,7 +99,7 @@ export async function startApp({
   })();
 
   return {
-    server, store, tanks, bombs, tracker, economy, word, commit, gameUrl, allowedOrigins, port: server.address().port, close,
+    server, store, tanks, bombs, tracker, economy, word, notices, commit, gameUrl, allowedOrigins, port: server.address().port, close,
     adminEnabled: auth.enabled,
   };
 }

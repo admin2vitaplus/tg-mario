@@ -35,6 +35,8 @@ const app = await startApp({
   notify: walletNotifier(bot),
   createInvoice,
   refundStars: (userId, chargeId) => bot.api.refundStarPayment(userId, chargeId),
+  // Личное уведомление из панели, если владелец отметил «и сообщением в Telegram».
+  message: (userId, text) => bot.api.sendMessage(userId, text),
 });
 const { store, tracker } = app;
 // Telegram id владельца (администраторов) через запятую. Только им доступны служебные команды
