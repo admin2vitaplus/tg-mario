@@ -184,11 +184,13 @@ function cover(g) {
 
 // Covers come alive a little: a few frames redrawn about six times a second while the menu is on screen.
 let coverTick = 0;
-setInterval(() => {
-  if (document.hidden || !list.offsetParent) return;
-  coverTick++;
-  for (const cv of list.querySelectorAll('canvas.cover')) if (cv.draw) cv.draw(coverTick);
-}, 160);
+if (typeof setInterval === 'function') {
+  setInterval(() => {
+    if (document.hidden || !list.offsetParent) return;
+    coverTick++;
+    for (const cv of list.querySelectorAll('canvas.cover')) if (cv.draw) cv.draw(coverTick);
+  }, 160);
+}
 
 function render() {
   list.innerHTML = '';
