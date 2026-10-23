@@ -166,5 +166,21 @@
     "body": "Цены за жетоны изменились, цены в звёздах остались прежними.",
     "titleEn": "New shop prices",
     "bodyEn": "Prices in tickets have changed; prices in Stars stay the same."
+  },
+  {
+    "id": "2026-10-23-pryg-graphics",
+    "date": "2026-10-23",
+    "title": "«Прыг-Скок» стал красивее",
+    "body": "Объёмные облака, горы на горизонте, пыль из-под ног и мерцающие блоки «!».",
+    "titleEn": "Hop-Skip looks better",
+    "bodyEn": "Fluffier clouds, hills on the horizon, dust under the hero's feet and twinkling «!» blocks."
+  },
+  {
+    "id": "2026-10-23-effects",
+    "date": "2026-10-23",
+    "title": "Эффекты во всех играх",
+    "body": "Искры, осколки, тряска экрана и всплывающие очки: попадания и взрывы стали заметнее.",
+    "titleEn": "Effects in every game",
+    "bodyEn": "Sparks, debris, screen shake and pop-up points: hits and blasts stand out more."
   }
 ]
