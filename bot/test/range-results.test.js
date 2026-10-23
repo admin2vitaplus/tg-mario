@@ -22,8 +22,9 @@ test("the server's copy of the game rules is the game's own file", () => {
 
 // Стреляет «как человек»: ждёт, пока мишень взлетит, целится с ошибкой, иногда мажет.
 // rounds — после стольких раундов бросает игру (выходит в меню).
-function play(seed, { skill = 0.75, rounds = Infinity, react = 30 } = {}) {
+function play(seed, { skill = 0.75, rounds = Infinity, react = 30, start = 0 } = {}) {
   const s = S.newGame(seed);
+  if (start) S.startRound(s, start); // игра с выбранного раунда (как в range.js)
   const shots = [];
   let x = seed, wait = 0;
   const rnd = () => (x = (x * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
@@ -75,6 +76,15 @@ test("replay gives the same score as the game, and a changed record is caught", 
   assert.equal(replay({ seed: 11, players: 1, log: "e" + (60 * 60 * 61).toString(36) }).why, "too long");
   // Брошенная игра засчитывается, если в неё играли MIN_QUIT_FRAMES.
   assert.equal(replay({ seed: 11, players: 1, log: "e" + MIN_QUIT_FRAMES.toString(36) }).ok, true);
+});
+
+test("a game from a chosen round is replayed from it; rounds count from it", () => {
+  const g = play(11, { start: 4, rounds: 7 });
+  const r = replay({ seed: 11, players: 1, log: g.log, start: 4 });
+  assert.equal(r.ok, true, r.why);
+  assert.equal(r.scores[0], g.state.score);
+  assert.equal(r.stages, S.cleared(g.state) - 4);
+  assert.equal(replay({ seed: 11, players: 1, log: g.log, start: S.ROUNDS }).why, "bad start");
 });
 
 test("hits faster than a person can react are not accepted", () => {
