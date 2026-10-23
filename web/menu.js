@@ -99,17 +99,21 @@ function sprite(ctx, rows, x, y, pal, k = 1) {
   rows.forEach((row, j) => [...row].forEach((c, i) => { if (pal[c]) px(ctx, pal[c], x + i * k, y + j * k, k, k); }));
 }
 const COVERS = {
-  'pryg-skok'(ctx) {
+  'pryg-skok'(ctx, t = 0) {
     px(ctx, '#6b8cff', 0, 0, COVER_W, COVER_H);
-    px(ctx, '#fff', 8, 6, 10, 3); px(ctx, '#fff', 10, 4, 6, 2); px(ctx, '#fff', 42, 9, 12, 3); px(ctx, '#fff', 45, 7, 6, 2);
+    // Clouds drift slowly to the left and come back from the right.
+    const drift = (t >> 1) % (COVER_W + 20);
+    for (const [x0, y, w] of [[8, 6, 10], [42, 9, 12]]) {
+      for (const x of [x0 - drift, x0 - drift + COVER_W + 20]) { px(ctx, '#fff', x, y, w, 3); px(ctx, '#fff', x + (w >> 2), y - 2, 6, 2); }
+    }
     px(ctx, '#2a9a2a', 30, 26, 24, 8); px(ctx, '#2a9a2a', 34, 22, 16, 4); px(ctx, '#2a9a2a', 38, 19, 8, 3);
     for (let x = 0; x < COVER_W; x += 8) { px(ctx, '#c0601c', x, 34, 8, 6); px(ctx, '#7a3a10', x, 34, 8, 1); px(ctx, '#7a3a10', x + 7, 34, 1, 6); px(ctx, '#7a3a10', x, 37, 8, 1); }
-    px(ctx, '#f8b800', 26, 12, 8, 8); px(ctx, '#8a5a00', 26, 19, 8, 1); px(ctx, '#8a5a00', 33, 12, 1, 8);
+    px(ctx, [0, 0, 0, 1, 2, 1].map((k) => ['#f8b800', '#e8a000', '#d08800'][k])[t % 6], 26, 12, 8, 8); px(ctx, '#8a5a00', 26, 19, 8, 1); px(ctx, '#8a5a00', 33, 12, 1, 8);
     sprite(ctx, ['.11.', '...1', '..1.', '....', '..1.'], 28, 13, { 1: '#7a3a10' });
-    sprite(ctx, ['.CCC.', 'CCCCC', '.SSE.', '.SSS.', 'JJJJJ', '.PPP.', '.P.P.', 'BB.BB'], 8, 18, { C: '#1fa2a8', S: '#f8b878', E: '#222', J: '#f8d020', P: '#2848a8', B: '#6b3a10' }, 2);
+    sprite(ctx, ['.CCC.', 'CCCCC', '.SSE.', '.SSS.', 'JJJJJ', '.PPP.', ...(t & 2 ? ['.PP..', '.BB..'] : ['.P.P.', 'BB.BB'])], 8, 18, { C: '#1fa2a8', S: '#f8b878', E: '#222', J: '#f8d020', P: '#2848a8', B: '#6b3a10' }, 2);
     sprite(ctx, ['.RRRR.', 'RROORR', 'RRRRRR', '.YYYY.', 'K....K'], 46, 24, { R: '#d83010', O: '#f8a060', Y: '#f8d878', K: '#222' }, 2);
   },
-  tanks(ctx) {
+  tanks(ctx, t = 0) {
     px(ctx, '#111', 0, 0, COVER_W, COVER_H);
     const brick = (x, y) => { px(ctx, '#a84810', x, y, 8, 8); px(ctx, '#5a2408', x, y + 3, 8, 1); px(ctx, '#5a2408', x, y + 7, 8, 1); px(ctx, '#5a2408', x + 3, y, 1, 3); px(ctx, '#5a2408', x + 6, y + 4, 1, 3); };
     const steel = (x, y) => { px(ctx, '#9a9aa8', x, y, 8, 8); px(ctx, '#e0e0e8', x + 2, y + 2, 4, 4); };
@@ -118,9 +122,10 @@ const COVERS = {
     const tank = (x, y, body, dark, down) => sprite(ctx, down ? [...TANK].reverse() : TANK, x, y, { B: body, D: dark, T: dark }, 2);
     tank(20, 18, '#f8d020', '#9c7a00', false);
     tank(44, 2, '#c8c8d0', '#606070', true);
-    px(ctx, '#fff', 28, 8, 2, 4);
+    // The shell flies up from the yellow tank.
+    px(ctx, '#fff', 28, 14 - (t % 8) * 2, 2, 4);
   },
-  bombs(ctx) {
+  bombs(ctx, t = 0) {
     px(ctx, '#2a7a2a', 0, 0, COVER_W, COVER_H);
     const steel = (x, y) => { px(ctx, '#8a8a96', x, y, 8, 8); px(ctx, '#d8d8e4', x, y, 8, 1); px(ctx, '#d8d8e4', x, y, 1, 8); px(ctx, '#4a4a56', x, y + 7, 8, 1); px(ctx, '#4a4a56', x + 7, y, 1, 8); };
     const brick = (x, y) => { px(ctx, '#b05020', x, y, 8, 8); px(ctx, '#4a2410', x, y + 3, 8, 1); px(ctx, '#4a2410', x, y + 7, 8, 1); px(ctx, '#4a2410', x + 3, y, 1, 3); px(ctx, '#4a2410', x + 6, y + 4, 1, 3); };
@@ -128,17 +133,18 @@ const COVERS = {
     for (let x = 8; x < COVER_W; x += 16) steel(x, 16);
     brick(40, 8); brick(48, 8); brick(56, 24); brick(0, 24);
     // Flame across the middle row and a bomb.
-    px(ctx, '#e83800', 16, 10, 24, 4); px(ctx, '#f8a800', 16, 11, 24, 2); px(ctx, '#e83800', 26, 8, 4, 8); px(ctx, '#fff8d0', 27, 11, 2, 2);
-    sprite(ctx, ['..ff.', '.kk..', 'kkkk.', 'kkkkk', 'kkkkk', '.kkk.'], 50, 18, { f: '#f8a020', k: '#101018' }, 2);
+    const [hot, mid] = t & 1 ? ['#f8a800', '#e83800'] : ['#e83800', '#f8a800'];
+    px(ctx, hot, 16, 10, 24, 4); px(ctx, mid, 16, 11, 24, 2); px(ctx, hot, 26, 8, 4, 8); px(ctx, '#fff8d0', 27, 11, 2, 2);
+    sprite(ctx, ['..ff.', '.kk..', 'kkkk.', 'kkkkk', 'kkkkk', '.kkk.'], 50, 18, { f: t & 2 ? '#fff060' : '#f8a020', k: '#101018' }, 2);
     sprite(ctx, ['.HHH.', 'HHHHH', '.FFF.', 'BBBBB', '.B.B.'], 6, 16, { H: '#e8e8f0', F: '#f8c890', B: '#f0f0f8' }, 2);
   },
-  range(ctx) {
+  range(ctx, t = 0) {
     px(ctx, '#58a8f8', 0, 0, COVER_W, 30); px(ctx, '#88c8ff', 0, 0, COVER_W, 6);
     px(ctx, '#fff', 6, 6, 10, 3); px(ctx, '#fff', 8, 4, 6, 2);
     px(ctx, '#2a8a2a', 0, 30, COVER_W, 10);
     for (let x = 0; x < COVER_W; x += 8) { px(ctx, '#1e6a1e', x, 28, 6, 3); px(ctx, '#3aa83a', x + 1, 27, 4, 2); }
     // A tin bird in flight and the sight on it.
-    sprite(ctx, ['..ww....', '.wwwwk..', 'wwwwwwoo', '.bbbbb..', '..bb.b..'], 14, 12, { w: '#d8dce8', k: '#202028', o: '#f8a020', b: '#8890a8' }, 2);
+    sprite(ctx, t & 2 ? ['........', '.bbbbk..', 'wwwwwwoo', '.wwwbb..', '..ww.b..'] : ['..ww....', '.wwwwk..', 'wwwwwwoo', '.bbbbb..', '..bb.b..'], 14, 12, { w: '#d8dce8', k: '#202028', o: '#f8a020', b: '#8890a8' }, 2);
     const cx = 44, cy = 16;
     px(ctx, '#e02020', cx - 7, cy, 5, 1); px(ctx, '#e02020', cx + 3, cy, 5, 1); px(ctx, '#e02020', cx, cy - 7, 1, 5); px(ctx, '#e02020', cx, cy + 3, 1, 5);
     px(ctx, '#e02020', cx - 4, cy - 4, 9, 1); px(ctx, '#e02020', cx - 4, cy + 4, 9, 1); px(ctx, '#e02020', cx - 4, cy - 4, 1, 9); px(ctx, '#e02020', cx + 4, cy - 4, 1, 9);
@@ -169,9 +175,20 @@ function cover(g) {
   cv.width = COVER_W;
   cv.height = COVER_H;
   const ctx = cv.getContext && cv.getContext('2d');
-  if (ctx) (COVERS[g.id] || COVERS.soon)(ctx);
+  if (ctx) {
+    cv.draw = (t) => (COVERS[g.id] || COVERS.soon)(ctx, t);
+    cv.draw(coverTick);
+  }
   return cv;
 }
+
+// Covers come alive a little: a few frames redrawn about six times a second while the menu is on screen.
+let coverTick = 0;
+setInterval(() => {
+  if (document.hidden || !list.offsetParent) return;
+  coverTick++;
+  for (const cv of list.querySelectorAll('canvas.cover')) if (cv.draw) cv.draw(coverTick);
+}, 160);
 
 function render() {
   list.innerHTML = '';

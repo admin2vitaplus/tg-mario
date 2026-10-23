@@ -251,6 +251,23 @@ function sceneImage(id) {
     }
     const cloud = (x, y) => { R(x, y + 4, 28, 6, sc.cloud); R(x + 4, y, 12, 6, sc.cloud); R(x + 14, y + 2, 10, 4, sc.cloud); };
     cloud(30, 26); cloud(150, 44); cloud(212, 16);
+    // Two ridges on the horizon, hazy with distance: colors lean to the sky the further they are.
+    const blend = (a, b, k) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - k) + parseInt(b.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
+    const base = GROUND + 8;
+    const ridge = (k, h, f, p, col, top) => {
+      for (let x = 0; x < W; x += 2) {
+        const y = base - Math.round(h + 6 * Math.sin(x * f + p) + 3 * Math.sin(x * f * 2.7 + p * 2));
+        R(x, y, 2, base - y, col);
+        if (top) R(x, y, 2, 1, top);
+      }
+    };
+    ridge(0, 30, 0.031, 1.2, blend(sc.sky[1], sc.crown, 0.3), blend(sc.sky[1], '#ffffff', 0.25));
+    ridge(0, 16, 0.047, 4.1, blend(sc.sky[1], sc.crown, 0.6), null);
+    // Far treetops along the near ridge.
+    for (let x = 6; x < W; x += 13 + (x % 5)) {
+      const y = base - Math.round(16 + 6 * Math.sin(x * 0.047 + 4.1) + 3 * Math.sin(x * 0.047 * 2.7 + 8.2));
+      R(x - 2, y - 4, 5, 4, blend(sc.sky[1], sc.crown, 0.75)); R(x - 1, y - 6, 3, 2, blend(sc.sky[1], sc.crown, 0.75));
+    }
     // A tree on the left, behind the bushes.
     R(28, 70, 10, GROUND - 70, sc.trunk);
     R(10, 30, 46, 46, sc.crown); R(16, 22, 34, 10, sc.crown); R(4, 44, 58, 24, sc.crown);
