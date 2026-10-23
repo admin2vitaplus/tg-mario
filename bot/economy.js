@@ -45,6 +45,8 @@ export const GAMES = ["mario", "tanks", "bombs", "range", "word"];
 export const DAILY_TASKS = ["play", "level", "record"];
 // Игры общего задания «сыграть во все три за день» и задания «N игр за неделю».
 export const ALL_GAMES = ["mario", "tanks", "bombs"];
+// Игры, которые могут быть испытанием дня (challenge.js): у них сервер сам проверяет итог.
+export const CHALLENGE_GAMES = ["mario", "tanks", "bombs", "range"];
 const CAPPED_SQL = CAPPED.map((r) => `'${r}'`).join(", ");
 // Таблицы недели: рекорды игр за неделю и общий зачёт (жетоны за неделю без призов и покупок).
 export const BOARDS = ["mario", "tanks", "bombs", "range", "word", "overall"];
@@ -73,6 +75,12 @@ export function validateEconomy(cfg) {
   need(isInt(cfg.tasks?.weekGames) && cfg.tasks.weekGames > 0, "tasks.weekGames");
   for (const k of ["inviter", "newcomer", "gamesNeeded", "perWeek"]) need(isInt(cfg.invite?.[k]), `invite.${k}`);
   need(cfg.invite?.gamesNeeded >= 1, "invite.gamesNeeded >= 1");
+  const ch = cfg.challenge;
+  need(Array.isArray(ch?.games) && ch.games.length >= 1 && ch.games.every((g) => CHALLENGE_GAMES.includes(g)), "challenge.games");
+  for (const k of ["base", "perStreakDay", "max", "minPlayers"]) need(isInt(ch?.[k]), `challenge.${k}`);
+  need(Array.isArray(ch?.prizes) && ch.prizes.every(isInt), "challenge.prizes");
+  need(typeof ch?.remind === "boolean", "challenge.remind");
+  need(Number.isInteger(ch?.remindHour) && ch.remindHour >= 0 && ch.remindHour <= 23, "challenge.remindHour");
   need(isInt(cfg.suspicious?.rejectedPerDay) && cfg.suspicious.rejectedPerDay > 0, "suspicious.rejectedPerDay");
   need(isInt(cfg.season?.pool), "season.pool");
   need(typeof cfg.season?.notify === "boolean", "season.notify");
@@ -111,11 +119,12 @@ export function loadEconomy(file = new URL("./economy.json", import.meta.url)) {
 }
 
 // Сколько жетонов максимум может появиться за неделю при players активных игроках:
-// у каждого не больше dailyCap в день за 7 дней плюс весь призовой фонд недели.
+// у каждого не больше dailyCap в день за 7 дней плюс весь призовой фонд недели и призы испытаний дня за 7 дней.
 // Сверху — ещё разовые достижения: achievements (их число, achievements.js) × cfg.achievement на
 // игрока один раз за всё время.
 export const maxWeeklyEmission = (cfg, players, achievements = 0) =>
-  7 * cfg.dailyCap * players + cfg.season.pool + achievements * cfg.achievement * players;
+  7 * cfg.dailyCap * players + cfg.season.pool + 7 * challengePool(cfg) + achievements * cfg.achievement * players;
+export const challengePool = (cfg) => cfg.challenge.prizes.reduce((a, n) => a + n, 0);
 
 // Публичная часть настроек: правила для экрана «Как получить» и витрина магазина.
 export const publicRules = (cfg) => ({
@@ -128,6 +137,8 @@ export const publicRules = (cfg) => ({
   season: { pool: cfg.season.pool, boards: cfg.season.boards },
   shop: cfg.shop.map(({ id, game, price, stars, ru, en }) => ({ id, game, price, stars, ru, en })),
   life: { ...cfg.life },
+  challenge: { base: cfg.challenge.base, perStreakDay: cfg.challenge.perStreakDay, max: cfg.challenge.max,
+    prizes: cfg.challenge.prizes, minPlayers: cfg.challenge.minPlayers },
 });
 
 // Ещё одна жизнь: offer — случайный номер конца игры от клиента (повтор с ним ничего не спишет),
@@ -672,7 +683,7 @@ export function economyReport(db, cfg, at = Date.now()) {
     `Выдано: ${s.issued} у ${s.players} игроков${share ? ` (${share})` : ""}`,
     `Потрачено в магазине: ${-of("shop")}, аннулировано: ${-of("annul")}`,
     `Покупки за звёзды за неделю: ${s.stars.n} на ${s.stars.sum} ⭐`,
-    `Предел недели: ${cfg.dailyCap} × 7 × игроков + фонд ${cfg.season.pool} = ` +
+    `Предел недели: ${cfg.dailyCap} × 7 × игроков + фонд ${cfg.season.pool} + испытания 7 × ${challengePool(cfg)} = ` +
       `${maxWeeklyEmission(cfg, s.players)} при ${s.players} игроках; ` +
       `плюс разово достижения: ${ACHIEVEMENTS_TOTAL} × ${cfg.achievement} на игрока за всё время`,
     `Топ получателей: ${s.top.length ? s.top.map((t) => `${t.name || "?"} (${t.player_id}) ${t.n}`).join(", ") : "нет"}`,

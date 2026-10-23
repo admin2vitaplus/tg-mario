@@ -11,6 +11,7 @@ import { createWord } from "./word.js";
 import { createAdmin } from "./admin.js";
 import { createAdminAuth } from "./admin-auth.js";
 import { createNotices, readChangelog } from "./notices.js";
+import { createChallenge } from "./challenge.js";
 
 // Всё, кроме самого бота Telegram и туннеля: база, HTTP API и комнаты «Танкодрома».
 // Вынесено отдельно, чтобы запуск и остановку можно было проверить тестом без сети и токена.
@@ -18,9 +19,10 @@ import { createNotices, readChangelog } from "./notices.js";
 // createInvoice(item, user) — ссылка на счёт в Telegram Stars (bot.api.createInvoiceLink); без неё покупок за звёзды нет.
 // refundStars(userId, chargeId) — возврат звёзд из панели владельца (вход: ADMIN_LOGIN и ADMIN_PASSWORD_HASH).
 // message(userId, text) — сообщение бота игроку: личное уведомление из панели «и в Telegram»; без него только в игре.
+// remind(userId, text, { playText, offText }) — напоминание о серии дней (challenge.js); без него напоминаний нет.
 export async function startApp({
   env = process.env, botToken, onAchievements, notify = null, createInvoice = null, port, tanksLimits,
-  refundStars = null, message = null,
+  refundStars = null, message = null, remind = null,
 } = {}) {
   // Адрес игры не вшит в код: он задаётся в .env, чтобы переезд сайта не требовал правки бота.
   const gameUrl = env.WEBAPP_URL;
@@ -71,12 +73,33 @@ export async function startApp({
   } catch (err) {
     console.error("Журнал изменений не прочитан:", err.message);
   }
+  // Испытание дня: прошедшие дни закрываются (призы) и напоминания уходят вместе с проверкой сезонов.
+  const challenge = createChallenge(store, economy, { remind, notices });
+  let reminding = null;
+  // При запуске только закрытие дней: напоминания начинаются со следующей проверки, когда бот уже готов.
+  const challengeTick = (withRemind = true) => {
+    try {
+      const days = challenge.closeDue();
+      if (days.length) console.log(`Испытание дня: закрыты дни ${days.join(", ")}`);
+    } catch (err) {
+      console.error("Ошибка закрытия испытания дня:", err.message);
+    }
+    if (!withRemind) return;
+    reminding ??= challenge.remindDue()
+      .then((n) => { if (n) console.log(`Испытание дня: напоминаний отправлено ${n}`); })
+      .catch((err) => console.error("Ошибка напоминаний:", err.message))
+      .finally(() => { reminding = null; });
+  };
+  challengeTick(false);
+  const challengeTimer = setInterval(challengeTick, 10 * 60 * 1000);
+  challengeTimer.unref();
   const admin = createAdmin({
     store, economy, auth, refundStars, commit, dbFile, notices, message,
     live: () => (tanks ? { rooms: tanks.rooms.size + (bombs?.rooms.size ?? 0), sockets: tanks.wss.clients.size + (bombs?.wss.clients.size ?? 0) } : null),
   });
   const server = createApiServer({
     store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, bombs: bombsResults, range: rangeResults, createInvoice, word, admin, notices,
+    challenge,
   });
   tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
   // Дуэль «Бомбодрома» — такие же комнаты на своём пути.
@@ -93,7 +116,9 @@ export async function startApp({
   const close = () => stopping ??= (async () => {
     clearInterval(pruneTimer);
     clearInterval(seasonTimer);
+    clearInterval(challengeTimer);
     await closing;
+    await reminding;
     const roomSets = [tanks, bombs];
     for (const r of roomSets) for (const ws of r.wss.clients) ws.close(1001, "server shutdown");
     await new Promise((ok) => {
@@ -106,7 +131,7 @@ export async function startApp({
   })();
 
   return {
-    server, store, tanks, bombs, tracker, economy, word, notices, commit, gameUrl, allowedOrigins, port: server.address().port, close,
+    server, store, tanks, bombs, tracker, economy, word, notices, challenge, commit, gameUrl, allowedOrigins, port: server.address().port, close,
     adminEnabled: auth.enabled,
   };
 }

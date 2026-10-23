@@ -372,3 +372,22 @@ test('notifications: both languages, texts from the server go in only as text', 
   assert.ok(page.indexOf('lib/notices.js') > page.indexOf('lib/wallet.js'), 'the button goes under the жетоны banner');
   assert.match(page, /lib\/notices\.css/);
 });
+
+// ---------- Challenge of the day (lib/challenge.js) ----------
+
+test('challenge of the day: both languages, names from the server go in only as text, sits under the жетоны banner', () => {
+  const src = read(path.join(WEB, 'lib/challenge.js'));
+  const dict = (lang) => Object.keys(eval('(' + new RegExp(lang + ': (\\{[\\s\\S]*?\\n  \\})').exec(src)[1] + ')')).sort();
+  assert.deepEqual(dict('ru'), dict('en'));
+  assert.deepEqual(src.match(/innerHTML\s*=.*/g), ["innerHTML = '<span class=\"cbLabel\"></span><span class=\"cbSub\"></span><i>›</i>';"]);
+  const page = read(path.join(WEB, 'index.html'));
+  assert.ok(page.indexOf('lib/challenge.js') > page.indexOf('lib/wallet.js'));
+  assert.match(page, /lib\/challenge\.css/);
+  // It opens the game through the menu, by the menu's own ids.
+  assert.match(read(path.join(WEB, 'menu.js')), /window\.Cartridge\.play = /);
+  const sw = read(path.join(WEB, 'sw.js'));
+  assert.match(sw, /'lib\/challenge\.js'/);
+  // The server's challenge games all have names on the page.
+  const economy = JSON.parse(read(path.join(WEB, '..', 'bot', 'economy.json')));
+  for (const g of economy.challenge.games) assert.match(src, new RegExp(`game_${g}: '`), g);
+});
