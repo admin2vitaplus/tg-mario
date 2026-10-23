@@ -158,8 +158,8 @@ const LOOK_GROUPS = [{
   title: T('looks_tiles'),
   items: [
     { id: 'classic', name: T('look_classic'), stars: 0, draw: tilePreview('classic') },
-    { id: 'sea', name: T('look_sea'), shop: 'word-tiles-sea', tokens: 150, draw: tilePreview('sea') },
-    { id: 'candy', name: T('look_candy'), shop: 'word-tiles-candy', tokens: 100, draw: tilePreview('candy') },
+    { id: 'sea', name: T('look_sea'), shop: 'word-tiles-sea', tokens: 600, draw: tilePreview('sea') },
+    { id: 'candy', name: T('look_candy'), shop: 'word-tiles-candy', tokens: 400, draw: tilePreview('candy') },
   ],
 }];
 function applyLooks() {

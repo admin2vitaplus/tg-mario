@@ -252,7 +252,7 @@ test("Stars: invoice only for items not owned; payment once per charge; refund t
 test("One more life: жетоны once per offer, Stars invoice by level", () =>
   withServer(async ({ call, economy, invoices }) => {
     assert.equal((await call("POST", "/api/wallet/life", { offer: "run12345", level: 0 })).status, 409);
-    economy.post(5, 150, "prize", "gift");
+    economy.post(5, 350, "prize", "gift");
     let r = await call("POST", "/api/wallet/life", { offer: "run12345", level: 0 });
     assert.deepEqual([r.status, r.json.balance], [200, 50]);
     r = await call("POST", "/api/wallet/life", { offer: "run12345", level: 0 });

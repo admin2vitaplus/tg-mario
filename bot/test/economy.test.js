@@ -63,7 +63,7 @@ test("one event pays once: repeats and restarts add nothing, balance equals the 
     run(store, economy, clock, 1, 3000);
     const rows = ledgerRows(store, 1);
     assert.deepEqual(rows.map((r) => r.reason).sort(), ["achievement", "record", "task"]);
-    assert.deepEqual(economy.checkBalance(1), { cached: 20 + 10 + 10, ledger: 40 });
+    assert.deepEqual(economy.checkBalance(1), { cached: CFG.achievement + 10 + 10, ledger: CFG.achievement + 20 });
     assert.ok(rows.every((r) => Number.isInteger(r.amount)));
     store.close();
   } finally {
@@ -177,13 +177,13 @@ test("tables: top-100 of the week and of all time, with the player's own place",
   const { store, economy, clock } = setup();
   run(store, economy, clock, 1, 5000);
   run(store, economy, clock, 2, 9000);
-  economy.achievements(3, [{ code: "x" }, { code: "y" }]);
+  economy.achievements(3, ["v", "w", "x", "y", "z"].map((code) => ({ code })));
   const mario = economy.top("mario", "week", 1);
   assert.deepEqual(mario.rows.map((r) => [r.place, r.value, r.me]), [[1, 9000, false], [2, 5000, true]]);
   assert.deepEqual(mario.me, { place: 2, value: 5000 });
   const overall = economy.top("overall", "week", 3);
-  assert.equal(overall.rows[0].value, 2 * CFG.achievement);
-  assert.deepEqual(overall.me, { place: 1, value: 2 * CFG.achievement });
+  assert.equal(overall.rows[0].value, 5 * CFG.achievement);
+  assert.deepEqual(overall.me, { place: 1, value: 5 * CFG.achievement });
   clock.t += 8 * DAY_MS;
   assert.deepEqual(economy.top("mario", "week", 1).rows, []);
   assert.equal(economy.top("mario", "all", 1).rows.length, 2);
@@ -280,20 +280,20 @@ test("looks that used to be free stay open for players from before, new players 
 
 test("one more life: price by level in the world, once per offer, not an owned item", () => {
   const { store, economy } = setup();
-  assert.deepEqual(CFG.life.price, [100, 300, 500, 700]);
+  assert.deepEqual(CFG.life.price, [300, 900, 1500, 2100]);
   assert.deepEqual(CFG.life.stars, [10, 30, 50, 70]);
   assert.equal(economy.buyLife(1, "abcd1234", 0).error, "not enough");
-  economy.post(1, 1000, "prize", "gift");
-  assert.deepEqual(economy.buyLife(1, "abcd1234", 2), { ok: true, balance: 500 });
+  economy.post(1, 3000, "prize", "gift");
+  assert.deepEqual(economy.buyLife(1, "abcd1234", 2), { ok: true, balance: 1500 });
   assert.equal(economy.buyLife(1, "abcd1234", 2).already, true, "a repeat with the same offer");
-  assert.equal(economy.me(1).balance, 500);
-  assert.deepEqual(economy.buyLife(1, "efgh5678", 1), { ok: true, balance: 200 });
+  assert.equal(economy.me(1).balance, 1500);
+  assert.deepEqual(economy.buyLife(1, "efgh5678", 1), { ok: true, balance: 600 });
   assert.equal(economy.buyLife(1, "ijkl9012", 1).error, "not enough");
   for (const [offer, level] of [["short", 0], ["ABCD1234", 0], ["abcd1234", 4], ["abcd1234", -1], ["abcd1234", "1"], [5, 0]]) {
     assert.equal(economy.buyLife(1, offer, level).error, "bad offer", `${offer} ${level}`);
   }
   assert.deepEqual(economy.me(1).owned, []);
-  assert.equal(economy.checkBalance(1).ledger, 200);
+  assert.equal(economy.checkBalance(1).ledger, 600);
 
   assert.equal(economy.lifeCheck(2, "mnop3456", 3, 70).item.payload, "life:3:mnop3456");
   assert.equal(economy.lifeCheck(2, "mnop3456", 3, 50).error, "price changed");
