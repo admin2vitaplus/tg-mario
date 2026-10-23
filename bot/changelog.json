@@ -357,5 +357,13 @@
     "body": "Картинки игр в меню двигаются.",
     "titleEn": "Moving covers in the menu",
     "bodyEn": "The game pictures in the menu move."
+  },
+  {
+    "id": "2026-10-23-pryg-backdrops",
+    "size": "minor",
+    "title": "«Прыг-Скок»: заметный герой и новые дали",
+    "body": "У героя появился тёмный контур, его видно на любом фоне. За холмами теперь у каждого мира свои дали: снежные горы, море с островами или стены крепости, а у земли растут кусты.",
+    "titleEn": "Hop-Skip: a clearer hero and new views",
+    "bodyEn": "The hero has a dark outline now, so you see him on any background. Behind the hills each world has its own view: snowy peaks, the sea with islands or fortress walls, and bushes grow by the ground."
   }
 ]
