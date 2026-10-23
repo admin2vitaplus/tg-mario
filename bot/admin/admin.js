@@ -32,7 +32,7 @@
       limit_mem: 'предел 256 МБ', limit_cpu: 'предел 40 %', h: 'ч', m: 'мин', none: 'нет',
       r_achievement: 'достижение', r_record: 'рекорд', r_daily: 'вход за день', r_task: 'задание', r_invite: 'приглашение',
       r_prize: 'приз недели', r_shop: 'покупка', r_annul: 'аннулировано', r_admin: 'вручную',
-      tab_notices: 'Уведомления', n_new: 'Новое уведомление', n_kind: 'Что это', k_update: 'Обновление', k_news: 'Новость',
+      tab_notices: 'Уведомления', n_new: 'Новое уведомление', n_kind: 'Что это', k_update: 'Крупное обновление', k_minor: 'Небольшое обновление', k_news: 'Новость',
       k_personal: 'Личное', n_to: 'Кому', n_all: 'Всем игрокам', n_one: 'Одному игроку', n_player: 'id игрока',
       n_title: 'Заголовок', n_body: 'Текст', n_en: 'По-английски (для игроков с английским Telegram; можно не заполнять)',
       n_title_en: 'Title', n_body_en: 'Text', n_tg: 'Отправить и сообщением бота в Telegram', n_send: 'Опубликовать',
@@ -69,7 +69,7 @@
       limit_mem: 'limit 256 MB', limit_cpu: 'limit 40%', h: 'h', m: 'min', none: 'none',
       r_achievement: 'achievement', r_record: 'record', r_daily: 'daily visit', r_task: 'task', r_invite: 'invite',
       r_prize: 'weekly prize', r_shop: 'purchase', r_annul: 'cancelled', r_admin: 'manual',
-      tab_notices: 'Notifications', n_new: 'New notification', n_kind: 'Kind', k_update: 'Update', k_news: 'News',
+      tab_notices: 'Notifications', n_new: 'New notification', n_kind: 'Kind', k_update: 'Major update', k_minor: 'Minor update', k_news: 'News',
       k_personal: 'Personal', n_to: 'To', n_all: 'All players', n_one: 'One player', n_player: 'player id',
       n_title: 'Title', n_body: 'Text', n_en: 'In English (for players with English Telegram; optional)',
       n_title_en: 'Title', n_body_en: 'Text', n_tg: 'Also send as a bot message in Telegram', n_send: 'Publish',
@@ -394,7 +394,7 @@
   function notices(forPlayer) {
     if (current !== 'notices') { current = 'notices'; tabs(); }
     var formKey = key();
-    var kind = h('select', null, h('option', { value: 'update', text: T('k_update') }), h('option', { value: 'news', text: T('k_news') }));
+    var kind = h('select', null, h('option', { value: 'update', text: T('k_update') }), h('option', { value: 'minor', text: T('k_minor') }), h('option', { value: 'news', text: T('k_news') }));
     var to = h('select', null, h('option', { value: 'all', text: T('n_all') }), h('option', { value: 'one', text: T('n_one') }));
     var pid = h('input', { type: 'number', inputmode: 'numeric', placeholder: T('n_player'), step: '1' });
     var title = h('input', { type: 'text', maxlength: '80', placeholder: T('n_title') });
