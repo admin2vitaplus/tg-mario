@@ -32,10 +32,15 @@ html, body {
   line-height: 1.3;
 }
 
+/* The picture stands at the bottom, right above the buttons; game.js paints the
+   space above it with the level's sky. */
 #game {
   position: relative;
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 #game canvas {

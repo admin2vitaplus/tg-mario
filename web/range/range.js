@@ -508,11 +508,14 @@ function strip(s) {
 
 function fitCanvas() {
   const box = $('game').getBoundingClientRect();
-  let k = Math.min(box.width / W, box.height / H);
-  // Bigger targets are easier to hit: quarter steps rather than whole ones.
-  if (k >= 1) k = Math.floor(k * 4) / 4 || k;
-  canvas.style.width = Math.floor(W * k) + 'px';
-  canvas.style.height = Math.floor(H * k) + 'px';
+  const full = Math.min(box.width / W, box.height / H);
+  // Whole screen pixels per field pixel keep every pixel the same size. That is
+  // used when it costs at most a tenth of the size; otherwise the field fills the space.
+  const dpr = window.devicePixelRatio || 1;
+  const n = Math.floor(full * dpr);
+  const k = n >= 1 && n / dpr >= full * 0.9 ? n / dpr : full;
+  canvas.style.width = Math.floor(W * k * dpr) / dpr + 'px';
+  canvas.style.height = Math.floor(H * k * dpr) / dpr + 'px';
 }
 window.addEventListener('resize', fitCanvas);
 if (window.ResizeObserver) new ResizeObserver(fitCanvas).observe($('game'));

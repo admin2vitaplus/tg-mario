@@ -5,6 +5,7 @@
 const TILE = 16;
 const VIEW_W = 256;
 const VIEW_H = 240;
+let behindColor = '';
 const BEST_KEY = 'prygskok_best';
 // Foes whose spot is this many tiles or fewer from where the hero appears are not placed.
 const SPAWN_CLEAR = 6;
@@ -1710,7 +1711,20 @@ class Play extends Phaser.Scene {
     hud(this.s);
   }
 
+  // The sky goes on above the picture, so a tall phone screen is not half black.
+  // The title card, the menu and a picture with free space at its sides (phone on
+  // its side) keep it black: there the level would seem to end in thin air.
+  paintBehind() {
+    const sc = this.scale;
+    const wide = sc.displaySize.width >= sc.parentSize.width - 2;
+    const c = !started || this.intro || !wide ? '#000' : this.cameras.main.backgroundColor.rgba;
+    if (c === behindColor) return;
+    behindColor = c;
+    $('game').style.background = c;
+  }
+
   update(time, delta) {
+    this.paintBehind();
     if (!started) return;
     const p = this.player;
     const b = p.body;
@@ -2608,7 +2622,8 @@ const game = new Phaser.Game({
   // Touch buttons are plain HTML (bindControls); the engine only needs the keyboard.
   input: { mouse: false, touch: false },
   physics: { default: 'arcade', arcade: { gravity: { y: WORLD_GRAVITY }, tileBias: 20 } },
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  // The picture stands on the buttons and the sky fills the space above it (paintBehind).
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
   scene: [Play],
 });
 window.__game = game;
