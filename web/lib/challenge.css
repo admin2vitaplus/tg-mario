@@ -1,0 +1,42 @@
+/* «⚡ Испытание дня» (lib/challenge.js): the button under the жетоны banner and its panel. */
+#challengeBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  min-height: 46px;
+  margin: -4px 0 14px;
+  padding: 8px 34px 8px 14px;
+  border: 1px solid rgba(255, 140, 60, 0.35);
+  border-radius: 14px;
+  background: #1a120c;
+  color: #fff;
+  font-family: "Courier New", monospace;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease;
+}
+#challengeBtn:active { transform: scale(0.98); }
+#challengeBtn.fresh { border-color: #ff8c3c; box-shadow: 0 4px 14px rgba(255, 140, 60, 0.2); }
+#challengeBtn .cbLabel { flex: none; font-size: 14px; font-weight: bold; color: #ff9c50; }
+#challengeBtn .cbSub { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: rgba(255, 255, 255, 0.7); text-align: right; }
+#challengeBtn i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 22px; color: #ff9c50; }
+
+/* The panel: lib/wallet.css in orange. */
+.wallet.challenge h1 { color: #ff9c50; }
+.wallet.challenge .wTabs button { padding: 10px 2px; font-size: 12px; }
+.wallet.challenge .wTabs button.on { background: #c8601c; color: #fff; }
+.chHead { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 4px 0; text-align: center; }
+.chGame { font-size: 18px; color: #ff9c50; }
+.chLeft { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.wAct.chPlay { background: #c8601c; font-size: 15px; padding: 12px 22px; }
+.chFacts { list-style: none; margin: 8px 0; padding: 0; font-size: 13px; line-height: 1.35; }
+.chFacts li { padding: 5px 2px 5px 18px; position: relative; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.chFacts li::before { content: '◆'; position: absolute; left: 0; color: #ff9c50; }
+.chFacts li.done::before { content: '✓'; color: #8fdf6f; }
+.chFacts li.chTomorrow { color: rgba(255, 255, 255, 0.6); }
+.chYesterday { margin-top: 12px; }

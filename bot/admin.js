@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { loadavg } from "node:os";
 import { collectStats } from "./stats.js";
+import { collectAnalytics } from "./analytics.js";
 import { dayOf } from "./days.js";
 import { economyStats, seasonLabel, seasonOf, seasonStart } from "./economy.js";
 import { telegramText } from "./notices.js";
@@ -47,6 +48,8 @@ export const ADMIN_DAYS = 30;
 // сразу получает прошлую, а новая считается сразу после ответа (следующее открытие увидит её).
 const OVERVIEW_TTL_MS = 30_000;
 const OVERVIEW_STALE_MS = 10 * 60_000;
+// Аналитика тяжелее сводки (удержание по когортам, воронка): считается не чаще раза в 5 минут.
+const ANALYTICS_TTL_MS = 5 * 60_000;
 // Ручное начисление или списание за один раз — не больше этого.
 export const MAX_ADJUST = 100_000;
 
@@ -130,6 +133,7 @@ export function createAdmin({
   let cpuMark = { at: Date.now(), usage: process.cpuUsage() };
   let overview = null;
   let refreshing = false;
+  let analytics = null;
 
   // CPU процесса между двумя просмотрами панели (на сервере предел 40 %).
   const cpuPercent = () => {
@@ -250,6 +254,15 @@ export function createAdmin({
         setImmediate(() => { try { overview = collectOverview(); } finally { refreshing = false; } });
       }
       return [200, { ...overview, server: server() }];
+    }),
+    // Что делают игроки (analytics.js): активность, удержание, воронка, игры, уровни, покупки, серии, испытание дня.
+    // ?fresh=1 — посчитать заново сейчас.
+    "GET /api/admin/analytics": guard((_b, url) => {
+      const at = now();
+      if (!analytics || url.searchParams.get("fresh") === "1" || at - analytics.at > ANALYTICS_TTL_MS || at < analytics.at) {
+        analytics = collectAnalytics(db, economy?.cfg ?? null, at);
+      }
+      return [200, analytics];
     }),
     "GET /api/admin/players": guard((_b, url) => [200, search(url.searchParams.get("q"))]),
     "GET /api/admin/player": guard((_b, url) => {

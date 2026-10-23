@@ -311,6 +311,37 @@ export const MIGRATIONS = [
     }
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS notices_ref ON notices(ref) WHERE ref IS NOT NULL");
   },
+  // 14. Испытание дня (challenge.js): лучший счёт игрока за день в игре дня; challenge_days — закрытые дни
+  // (призы выданы); reminders — кому и когда бот напомнил о серии дней (одно напоминание в день);
+  // wallets.remind — игрок не отключил напоминания.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS challenge_results (
+        day INTEGER NOT NULL,
+        player_id INTEGER NOT NULL,
+        game TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (day, player_id)
+      );
+      CREATE INDEX IF NOT EXISTS challenge_results_top ON challenge_results(day, score DESC, at);
+      CREATE INDEX IF NOT EXISTS challenge_results_player ON challenge_results(player_id, day);
+      CREATE TABLE IF NOT EXISTS challenge_days (
+        day INTEGER PRIMARY KEY,
+        players INTEGER NOT NULL,
+        at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS reminders (
+        day INTEGER NOT NULL,
+        player_id INTEGER NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (day, player_id)
+      );
+    `);
+    if (!db.prepare("PRAGMA table_info(wallets)").all().some((c) => c.name === "remind")) {
+      db.exec("ALTER TABLE wallets ADD COLUMN remind INTEGER NOT NULL DEFAULT 1");
+    }
+  },
 ];
 
 export function migrate(db) {

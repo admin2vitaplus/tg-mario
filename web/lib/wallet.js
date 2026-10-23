@@ -73,7 +73,7 @@ const STR = {
     invite: 'Позвать друга',
     invite_text: 'Сыграем? Ретро-игры прямо в Telegram.',
     no_history: 'Операций пока нет. Сыграй — и здесь появятся первые жетоны.',
-    r_achievement: 'Достижение', r_record: 'Личный рекорд', r_daily: 'Вход за день', r_task: 'Задание',
+    r_achievement: 'Достижение', r_record: 'Личный рекорд', r_daily: 'Вход за день', r_task: 'Задание', r_challenge: 'Испытание дня',
     r_invite: 'Приглашение', r_prize: 'Приз недели', r_shop: 'Покупка', r_annul: 'Отменено администратором', r_admin: 'От администратора',
     prize_place: '{place} место ({board})', board_mario: 'Прыг-Скок', board_tanks: 'Танкодром', board_bombs: 'Бомбодром', board_range: 'Тир', board_word: 'Слово дня', board_overall: 'общий зачёт',
     shop_note: 'Купленное включается в «Внешнем виде» игры.',
@@ -136,7 +136,7 @@ const STR = {
     invite: 'Invite a friend',
     invite_text: 'Want to play? Retro games right in Telegram.',
     no_history: 'Nothing here yet. Play a game to get your first tickets.',
-    r_achievement: 'Achievement', r_record: 'Personal best', r_daily: 'Visit of the day', r_task: 'Task',
+    r_achievement: 'Achievement', r_record: 'Personal best', r_daily: 'Visit of the day', r_task: 'Task', r_challenge: 'Challenge of the day',
     r_invite: 'Invite', r_prize: 'Weekly prize', r_shop: 'Purchase', r_annul: 'Cancelled by admin', r_admin: 'From the admin',
     prize_place: 'place {place} ({board})', board_mario: 'Hop-Skip', board_tanks: 'Tank Field', board_bombs: 'Bomb Field', board_range: 'Shooting Range', board_word: 'Word of the Day', board_overall: 'overall',
     shop_note: 'What you buy is switched on in the game\'s Looks.',
@@ -484,6 +484,7 @@ function render(body) {
         if (STR.ru['game_' + g]) what += ': ' + T('game_' + g);
         if (h.reason === 'task' && STR.ru['task_' + task]) what += ' · ' + T('task_' + task);
         if (h.reason === 'task' && g === 'all') what += ': ' + T('task_all');
+        if (h.reason === 'task' && g === 'challenge') what += ': ' + T('r_challenge');
       }
       if (h.reason === 'achievement') {
         const a = me.tasks && me.tasks[g] && me.tasks[g].find((t) => t.id === 'ach:' + task);
@@ -492,7 +493,8 @@ function render(body) {
       if (h.reason === 'invite' && STR.ru['invite_' + g]) what += ': ' + T('invite_' + g);
       if (h.reason === 'prize') {
         const [, board, place] = String(h.event).split(':');
-        if (place) what += ': ' + T('prize_place', { place, board: T('board_' + board) });
+        // The challenge of the day: challenge:<day>:<place>.
+        if (place) what += ': ' + T('prize_place', { place, board: g === 'challenge' ? T('r_challenge') : T('board_' + board) });
       }
       const d = new Date(h.at);
       const date = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');

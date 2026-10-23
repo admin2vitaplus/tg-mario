@@ -8,7 +8,7 @@ import { openDb } from "../db.js";
 import { createApiServer } from "../server.js";
 import { ACHIEVEMENTS_TOTAL, BY_GAME, publicList } from "../achievements.js";
 import {
-  createEconomy, DAY_MS, economyReport, exportSeason, loadEconomy, maxWeeklyEmission,
+  challengePool, createEconomy, DAY_MS, economyReport, exportSeason, loadEconomy, maxWeeklyEmission,
   seasonOf, seasonStart, validateEconomy,
 } from "../economy.js";
 
@@ -40,7 +40,7 @@ const ledgerRows = (store, id) => store.db.prepare("SELECT * FROM ledger WHERE p
 
 test("economy.json is valid and the weekly emission has a fixed ceiling", () => {
   assert.equal(CFG.season.pool, Object.values(CFG.season.boards).flat().reduce((a, n) => a + n, 0));
-  assert.equal(maxWeeklyEmission(CFG, 100), 7 * CFG.dailyCap * 100 + CFG.season.pool);
+  assert.equal(maxWeeklyEmission(CFG, 100), 7 * CFG.dailyCap * 100 + CFG.season.pool + 7 * challengePool(CFG));
   assert.throws(() => validateEconomy({ ...CFG, dailyCap: 1.5 }), /dailyCap/);
   assert.throws(() => validateEconomy({ ...CFG, season: { ...CFG.season, pool: 1 } }), /season.pool/);
   assert.throws(() => validateEconomy({ ...CFG, shop: [CFG.shop[0], CFG.shop[0]] }), /повтор/);
@@ -103,7 +103,7 @@ test("achievements are one-off: the daily cap neither cuts them nor is used up b
   assert.ok(economy.achievementsDone(1).has("a0"));
   economy.flag(1);
   assert.equal(economy.achievements(1, [{ code: "z" }]).length, 0, "a flagged player gets none");
-  assert.equal(maxWeeklyEmission(CFG, 10, ACHIEVEMENTS_TOTAL), 7 * CFG.dailyCap * 10 + CFG.season.pool + ACHIEVEMENTS_TOTAL * CFG.achievement * 10);
+  assert.equal(maxWeeklyEmission(CFG, 10, ACHIEVEMENTS_TOTAL), 7 * CFG.dailyCap * 10 + CFG.season.pool + 7 * challengePool(CFG) + ACHIEVEMENTS_TOTAL * CFG.achievement * 10);
   store.close();
 });
 
