@@ -41,6 +41,7 @@ const EN_NAMES = {
   'ВЕЧЕРНИЙ ЛУГ': 'EVENING MEADOW', 'ХОЛМЫ И ПРУЖИНЫ': 'HILLS AND SPRINGS', 'ДЕРЕВЬЯ НА ВЕТРУ': 'WINDY TREES',
   'НОЧНОЙ НАЕЗДНИК': 'NIGHT RIDER', 'ДОЛИНА ТРУБ': 'PIPE VALLEY', 'НОЧНЫЕ ГРИБЫ': 'NIGHT MUSHROOMS',
   'ПОЛЕ МЕТАТЕЛЕЙ': 'THROWERS FIELD', 'ГЛУБОКОЕ МОРЕ': 'DEEP SEA', 'МОСТЫ И РЫБЫ': 'BRIDGES AND FISH',
+  'ДОЛГАЯ ДОРОГА': 'LONG ROAD', 'ОБРЫВЫ': 'CLIFFS', 'КРЕПОСТНЫЕ СТЕНЫ': 'FORTRESS WALLS', 'ПОСЛЕДНИЙ ЗАМОК': 'LAST CASTLE',
 };
 const nameOf = (ru) => L(ru, EN_NAMES[ru] || ru);
 
