@@ -566,13 +566,57 @@ function drawFlame(x, y, kind, t) {
   }
 }
 
+// Picture-only effects (lib/fx.js): a shake and sparks for each blast, crumbs of burning blocks,
+// a puff and the points over a beaten enemy. The game state never sees them.
+let fxFire = null, fxCells = null;
+const fxDead = new Set();
+function spotEffects(s) {
+  if (!window.Fx) return;
+  const n = s.cells.length;
+  if (!fxFire || fxFire.length !== n || s.phase === 'intro') {
+    fxFire = new Uint8Array(n);
+    fxCells = Uint8Array.from(s.cells);
+    fxDead.clear();
+  }
+  let blasts = 0;
+  for (let k = 0; k < n; k++) {
+    const f = s.fire[k];
+    const x = (k % COLS) * TILE + 8, y = Math.floor(k / COLS) * TILE + 8;
+    if (f && f > fxFire[k] && s.fireKind[k] === 0) {
+      blasts++;
+      Fx.burst(x, y, { n: 14, speed: 90, life: 420, size: 2, colors: ['#fff8d0', '#f8a800', '#e83800'] });
+    }
+    if (s.cells[k] === BURN && fxCells[k] === SOFT) {
+      const pal = Object.values(lookItem('blocks').pal || {});
+      Fx.burst(x, y, { n: 6, speed: 50, life: 520, grav: 180, vy: -30, size: 2, colors: pal.length ? pal : ['#b85418', '#e89060'] });
+    }
+    fxFire[k] = f;
+    fxCells[k] = s.cells[k];
+  }
+  if (blasts) Fx.shake(Math.min(4, 1 + blasts), 260);
+  for (const e of s.enemies) {
+    // A guest's copy of the game has no enemy ids; a dying enemy stays put, so its place will do.
+    const key = e.id != null ? e.id : e.type + ',' + e.x + ',' + e.y;
+    if (!e.dead || fxDead.has(key)) continue;
+    fxDead.add(key);
+    const x = Math.round(e.x / S.SUB) + 8, y = Math.round(e.y / S.SUB) + 8;
+    Fx.burst(x, y, { n: 8, speed: 40, life: 450, colors: ['#ffffff', '#c8c8c8', '#f8d020'] });
+    const kind = S.ENEMY[e.type];
+    if (kind) Fx.popup(x, y - 6, kind.score, '#f8d020');
+  }
+}
+
 function render(s) {
   const p = s.players[me()] || s.players[0];
   const gr = lookItem('ground');
   const target = Math.round(p.x / S.SUB) + 8 - W / 2;
   camX = Math.max(0, Math.min(COLS * TILE - W, target));
+  spotEffects(s);
+  const [sx, sy] = window.Fx ? Fx.offset() : [0, 0];
+  ctx.fillStyle = '#000';
+  if (sx || sy) ctx.fillRect(0, 0, W, H);
   ctx.save();
-  ctx.translate(-camX, 0);
+  ctx.translate(-camX + sx, sy);
   ctx.drawImage(groundImage(), 0, 0);
   const c0 = Math.max(0, Math.floor(camX / TILE)), c1 = Math.min(COLS - 1, c0 + VIEW_COLS);
   const block = blockTile();
@@ -638,6 +682,7 @@ function render(s) {
       ctx.fillRect(x + 7, y - 4, 2, 1);
     }
   }
+  if (window.Fx) Fx.draw(ctx);
   ctx.restore();
   if (s.phase === 'intro') {
     const k = s.phaseT < 20 ? 1 - s.phaseT / 20 : s.phaseT > 100 ? (s.phaseT - 100) / 20 : 0;
