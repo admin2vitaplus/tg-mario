@@ -1,4 +1,4 @@
-// «Прыг-Скок» worlds 2-5: four levels each, in the same order as world 1
+// «Прыг-Скок» worlds 2-6: four levels each, in the same order as world 1
 // (field, a special level, a high level, a castle). Loaded after levels.js and before game.js;
 // also loaded by tests/levels.test.mjs, so it uses no browser or Phaser APIs.
 // Extra chars (see game.js): v water surface, y water, s fish, p springboard, t bolt thrower, n spiky.
@@ -932,6 +932,243 @@ function level54() {
   return L.done(Object.assign(castleEnd(L, 170), { start: [3, 8] }));
 }
 
+// ---------- World 6 ----------
+
+// 6-1: a night meadow under the cloud rider; brick towers and plant pipes.
+function level61() {
+  const L = grid(226);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 208, 'tiles', SKY, 'field');
+  L.areas[0].night = true;
+  L.area(210, 226, 'tilesCave', BLACK);
+  L.floor('#', 0, 207);
+  L.gap(44, 46);
+  L.gap(92, 95);
+  L.gap(146, 148);
+
+  row(14, 9, 'B?B?B');
+  row(16, 5, 'M');
+  pipe(26, 3);
+  L.plants.push({ x: 26, y: 10 });
+  row(32, 9, 'oooo');
+  stairsUp(38, 3);
+  column(41, 3);
+  row(50, 9, 'BBkBB');
+  row(50, 5, 'BB?BB');
+  pipe(60, 2);
+  row(66, 8, 'oooooo');
+  pipe(74, 4);
+  L.plants.push({ x: 74, y: 9 });
+  row(80, 9, '?M?');
+  stairsUp(86, 4);
+  column(90, 4);
+  row(98, 9, 'BBBB');
+  put(100, 5, 'h');
+  pipe(108, 2);
+  row(116, 9, 'B?B');
+  row(116, 5, 'BBB');
+  pipe(124, 3);
+  L.plants.push({ x: 124, y: 10 });
+  row(132, 8, 'oooo');
+  stairsUp(140, 4);
+  column(144, 4);
+  stairsDown(149, 4);
+  row(158, 9, 'BBMBB');
+  pipe(168, 2);
+  stairsUp(186, 8);
+  column(194, 8);
+  L.flagpole(203);
+
+  L.enemies([20, 22, 30, 36, 56, 58, 64, 70, 84, 104, 112, 114, 130, 136, 156, 164, 174, 178]);
+  coinRoom(L, 210);
+  L.pipes.push({ type: 'down', x: 108, y: 11, to: { area: 1, x: 212, y: 3 } });
+  L.pipes.push({ type: 'side', x: 222, y: 11, to: { area: 0, pipeX: 168, pipeY: 11 } });
+
+  return L.done({ goal: 'pole', goalX: 203, rider: { x0: 10, x1: 178 }, checkpoint: { x: 96, start: [98, 13] } });
+}
+
+// 6-2: a valley of pipes: plants in almost every one, one pipe down to a cellar
+// with coins and another down to a sea grotto.
+function level62() {
+  const L = grid(254);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 212, 'tiles', SKY, 'field');
+  L.area(214, 230, 'tilesCave', BLACK);
+  L.area(232, 254, 'tilesSea', SEA);
+  L.areas[2].water = true;
+  L.floor('#', 0, 211);
+  L.gap(64, 66);
+  L.gap(118, 121);
+  L.gap(170, 172);
+
+  row(12, 9, '?B?');
+  pipe(20, 2);
+  pipe(26, 3);
+  L.plants.push({ x: 26, y: 10 });
+  pipe(32, 4);
+  L.plants.push({ x: 32, y: 9 });
+  row(38, 9, 'BMB');
+  pipe(44, 3);
+  pipe(50, 5);
+  L.plants.push({ x: 50, y: 8 });
+  row(56, 9, 'oooo');
+  pipe(60, 2);
+  L.plants.push({ x: 60, y: 11 });
+  row(70, 9, 'BBBBB');
+  row(71, 5, '?k?');
+  pipe(78, 4);
+  L.plants.push({ x: 78, y: 9 });
+  pipe(84, 3);
+  pipe(90, 6);
+  L.plants.push({ x: 90, y: 7 });
+  row(96, 8, 'oooo');
+  pipe(102, 3);
+  L.plants.push({ x: 102, y: 10 });
+  stairsUp(108, 4);
+  column(112, 4);
+  row(124, 9, 'B?BMB');
+  pipe(132, 2);
+  pipe(138, 4);
+  L.plants.push({ x: 138, y: 9 });
+  row(144, 9, 'oooo');
+  pipe(150, 3);
+  L.plants.push({ x: 150, y: 10 });
+  pipe(156, 5);
+  L.plants.push({ x: 156, y: 8 });
+  row(162, 9, 'BhB');
+  stairsUp(174, 3);
+  pipe(180, 2);
+  stairsUp(186, 8);
+  column(194, 8);
+  L.flagpole(203);
+
+  L.enemies([16, 24, 30, 36, 42, 48, 54, 68, 74, 82, 88, 100, 106, 128, 136, 142, 148, 160, 166, 178]);
+
+  coinRoom(L, 214);
+  L.pipes.push({ type: 'down', x: 44, y: 10, to: { area: 1, x: 216, y: 3 } });
+  L.pipes.push({ type: 'side', x: 226, y: 11, to: { area: 0, pipeX: 84, pipeY: 10 } });
+
+  // Sea grotto under the pipe at 132: swim through the coins to the side pipe.
+  L.floor('#', 232, 253);
+  fill(232, 253, 1, 1, 'v');
+  fill(232, 232, 2, 12, 'H');
+  fill(238, 241, 9, 12, 'H');
+  row(235, 5, 'oooooooooooo');
+  row(242, 9, 'oooooo');
+  put(246, 6, 's');
+  L.sidePipe(250, 11, 2);
+  L.pipes.push({ type: 'down', x: 132, y: 11, to: { area: 2, x: 235, y: 4 } });
+  L.pipes.push({ type: 'side', x: 250, y: 11, to: { area: 0, pipeX: 180, pipeY: 11 } });
+
+  return L.done({ goal: 'pole', goalX: 203, checkpoint: { x: 112, start: [116, 13] } });
+}
+
+// 6-3: grey night mushrooms, lifts and spikies on the caps.
+function level63() {
+  const L = grid(200);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 200, 'tilesMush', SKY, 'sky');
+  L.areas[0].night = true;
+  L.floor('#', 0, 14);
+  tree(16, 4, 9);
+  L.lifts.push({ x: 22, y: 7, w: 3, axis: 'y', dist: 4, period: 3, phase: 0 });
+  tree(28, 6, 6);
+  row(29, 4, 'oooo');
+  tree(37, 3, 9);
+  L.lifts.push({ x: 42, y: 8, w: 3, axis: 'x', dist: 5, period: 3.5, phase: 0.25 });
+  tree(53, 7, 7);
+  row(54, 4, '?M?');
+  put(57, 6, 'n');
+  tree(63, 3, 10);
+  tree(68, 4, 6);
+  L.lifts.push({ x: 74, y: 8, w: 3, axis: 'y', dist: 5, period: 3.5, phase: 0.5 });
+  tree(80, 6, 9);
+  row(81, 7, 'oooo');
+  L.lifts.push({ x: 88, y: 7, w: 3, axis: 'x', dist: 4, period: 3, phase: 0 });
+  tree(96, 5, 7);
+  tree(103, 6, 10);
+  put(106, 9, 'n');
+  L.lifts.push({ x: 111, y: 8, w: 3, axis: 'y', dist: 4, period: 3, phase: 0.75 });
+  tree(117, 4, 6);
+  row(118, 4, 'oo');
+  L.lifts.push({ x: 123, y: 7, w: 3, axis: 'x', dist: 5, period: 3.5, phase: 0.5 });
+  tree(134, 7, 8);
+  row(135, 6, '? ?');
+  tree(143, 3, 6);
+  L.lifts.push({ x: 148, y: 8, w: 3, axis: 'y', dist: 4, period: 3, phase: 0.25 });
+  tree(154, 5, 7);
+  tree(161, 5, 9);
+  L.floor('#', 168, 199);
+  L.stairsUp(172, 4);
+  L.flagpole(184);
+
+  L.enemies([31], 5);
+  L.enemies([82], 8);
+  L.enemies([98], 6);
+  L.enemies([136, 138], 7);
+  L.enemies([156], 6);
+  L.enemies([178, 180]);
+  return L.done({ goal: 'pole', goalX: 184, checkpoint: { x: 80, start: [81, 9] } });
+}
+
+// 6-4: castle: low ceilings with fire bars, lava balls in every pit, lifts over the long lake.
+function level64() {
+  const L = grid(228);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 228, 'tilesCastle', BLACK);
+  L.floor();
+  fill(0, 173, 0, 2, 'H');
+  fill(0, 5, 8, 12, 'H');
+  fill(6, 12, 9, 12, 'H');
+  L.gap(13, 17, true);
+  put(15, 13, 'f');
+  fill(18, 24, 9, 12, 'H');
+  put(21, 9, 'r');
+  fill(25, 40, 3, 5, 'H');
+  put(29, 5, 'r');
+  put(36, 5, 'r');
+  row(30, 9, '?M?');
+  L.gap(42, 45, true);
+  put(44, 13, 'f');
+  fill(46, 52, 10, 12, 'H');
+  put(50, 10, 'r');
+  L.gap(53, 57, true);
+  put(55, 13, 'f');
+  fill(58, 62, 9, 12, 'H');
+  put(60, 9, 'r');
+  fill(63, 84, 3, 5, 'H');
+  row(66, 10, 'oooooooo');
+  put(70, 12, 'r');
+  put(78, 5, 'r');
+  L.gap(86, 112, true);
+  L.lifts.push({ x: 87, y: 9, w: 3, axis: 'x', dist: 4, period: 3.5, phase: 0 });
+  L.lifts.push({ x: 95, y: 7, w: 3, axis: 'y', dist: 4, period: 3, phase: 0.5 });
+  fill(100, 101, 10, 14, 'H');
+  put(100, 10, 'r');
+  L.lifts.push({ x: 104, y: 9, w: 3, axis: 'x', dist: 4, period: 3.5, phase: 0.25 });
+  put(90, 13, 'f');
+  put(98, 13, 'f');
+  put(107, 13, 'f');
+  fill(113, 118, 8, 12, 'H');
+  put(118, 8, 'r');
+  row(122, 9, 'B?B');
+  fill(128, 129, 10, 12, 'H');
+  put(128, 10, 'r');
+  L.gap(132, 150, true);
+  L.lifts.push({ x: 134, y: 9, w: 3, axis: 'x', dist: 5, period: 4, phase: 0 });
+  L.lifts.push({ x: 144, y: 7, w: 3, axis: 'y', dist: 4, period: 3, phase: 0.75 });
+  put(136, 13, 'f');
+  put(147, 13, 'f');
+  fill(151, 173, 3, 4, 'H');
+  fill(151, 155, 10, 12, 'H');
+  put(154, 10, 'r');
+  put(164, 4, 'r');
+
+  L.enemies([11], 8);
+  L.enemies([34, 38, 68, 76, 120, 124, 160, 166]);
+  return L.done(Object.assign(castleEnd(L, 174), { start: [3, 8] }));
+}
+
 WORLDS.push(
   [
     { name: 'ЛУГ', build: level21, time: 400 },
@@ -956,6 +1193,12 @@ WORLDS.push(
     { name: 'ХОЛМЫ И ПРУЖИНЫ', build: level52, time: 400 },
     { name: 'ДЕРЕВЬЯ НА ВЕТРУ', build: level53, time: 300 },
     { name: 'ЗАМОК', build: level54, time: 300 },
+  ],
+  [
+    { name: 'НОЧНОЙ НАЕЗДНИК', build: level61, time: 400 },
+    { name: 'ДОЛИНА ТРУБ', build: level62, time: 400 },
+    { name: 'НОЧНЫЕ ГРИБЫ', build: level63, time: 300 },
+    { name: 'ЗАМОК', build: level64, time: 300 },
   ],
 );
 })();
