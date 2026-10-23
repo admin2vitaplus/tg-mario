@@ -39,6 +39,7 @@ const EN_NAMES = {
   'ОБЛАЧНЫЙ ЛУГ': 'CLOUD MEADOW', 'ГЛУБОКОЕ ПОДЗЕМЕЛЬЕ': 'DEEP UNDERGROUND', 'ГРИБЫ': 'MUSHROOMS',
   'ЗАМОК-ЛАБИРИНТ': 'MAZE CASTLE', 'ЗОНА ПЕРЕХОДА': 'WARP ZONE',
   'ВЕЧЕРНИЙ ЛУГ': 'EVENING MEADOW', 'ХОЛМЫ И ПРУЖИНЫ': 'HILLS AND SPRINGS', 'ДЕРЕВЬЯ НА ВЕТРУ': 'WINDY TREES',
+  'НОЧНОЙ НАЕЗДНИК': 'NIGHT RIDER', 'ДОЛИНА ТРУБ': 'PIPE VALLEY', 'НОЧНЫЕ ГРИБЫ': 'NIGHT MUSHROOMS',
 };
 const nameOf = (ru) => L(ru, EN_NAMES[ru] || ru);
 

@@ -18,6 +18,7 @@ export const WORLD_TIMES = [
   [300, 400, 300, 300],
   [400, 400, 300, 400],
   [300, 400, 300, 300],
+  [400, 400, 300, 300],
 ];
 export const PER_WORLD = 4;
 export const LAST_LEVEL = WORLD_TIMES.length * PER_WORLD - 1;
