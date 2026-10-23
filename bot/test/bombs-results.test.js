@@ -22,8 +22,8 @@ test("the server's copy of the game rules is the game's own file", () => {
 });
 
 // Играет «как человек»: ходит, ставит бомбы, иногда жмёт «взорвать»; проходит этапы, если повезёт.
-function play(seed, players = 1, start = 0) {
-  const s = S.newGame(players, seed);
+function play(seed, players = 1, start = 0, rules = 1) {
+  const s = S.newGame(players, seed, { rules });
   if (start) S.startStage(s, start); // игра с выбранного этапа (как в bombs.js)
   const steps = [];
   let x = seed, dir = 0, hold = 0;
@@ -45,6 +45,19 @@ function play(seed, players = 1, start = 0) {
   }
   return { log: encode(steps), state: s, frames: steps.filter((v) => v !== "n").length };
 }
+
+test("games under rules 2 (kick, glove, closing field) replay with them; unknown rules are refused", () => {
+  for (const players of [1, 2]) {
+    const g = play(21 + players, players, 0, 2);
+    const r = replay({ seed: 21 + players, players, log: g.log, rules: 2 });
+    assert.equal(r.ok, true, r.why);
+    assert.deepEqual(r.scores, g.state.players.map((p) => p.score));
+    assert.equal(r.frames, g.frames);
+  }
+  const g = play(25, 2, 0, 2);
+  assert.equal(replay({ seed: 25, players: 2, log: g.log, rules: S.RULES + 1 }).why, "bad rules");
+  assert.equal(replay({ seed: 25, players: 2, log: g.log, rules: 2, mode: "x" }).why, "bad mode");
+});
 
 test("a game from a chosen stage is replayed from it; stages count from it", () => {
   const g = play(11, 1, 7);

@@ -205,5 +205,13 @@
     "body": "Попадания подряд умножают очки до ×4. С третьего раунда вместе с птицами летают часы (мишени замедляются), патрон (лишний выстрел) и бомба, в которую стрелять нельзя. Новый режим «Без промаха»: улетела одна мишень — игра окончена.",
     "titleEn": "Shooting Range: streaks, new targets and «No misses»",
     "bodyEn": "Hits in a row multiply the points up to ×4. From round 3 a clock (targets slow down), a cartridge (one more shot) and a bomb you must not hit fly with the birds. New «No misses» mode: one target gets away and the game is over."
+  },
+  {
+    "id": "2026-10-23-bombs-kick",
+    "size": "major",
+    "title": "«Бомбодром»: пинок, перчатка и сжатие поля",
+    "body": "Новые находки: пинок (толкай бомбы, они катятся до препятствия) и перчатка (B бросает бомбу через стены). В дуэли через две минуты поле начинает сжиматься стальными блоками, так что матч всегда заканчивается.",
+    "titleEn": "Bomb Field: kick, glove and a closing field",
+    "bodyEn": "New finds: the kick (push bombs and they roll until something stops them) and the glove (B throws a bomb over walls). In a duel the field starts closing in with steel after two minutes, so every match has an ending."
   }
 ]

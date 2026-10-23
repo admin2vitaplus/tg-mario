@@ -95,6 +95,7 @@ function noise(dur, vol, cutoff) {
 
 const notes = (list, step, dur) => list.forEach((f, i) => tone(f, 0, dur, 'square', 0.06, i * step));
 let lastBoom = 0;
+let shrinkTold = false; // «the field closes in» is said once a game
 const SFX = {
   drop: () => tone(220, 160, 0.07, 'triangle', 0.12),
   boom: () => {
@@ -112,6 +113,12 @@ const SFX = {
   start: () => notes([392, 392, 523, 659, 784], 0.1, 0.12),
   over: () => notes([523, 440, 349, 262], 0.2, 0.25),
   hurry: () => { notes([988, 784, 988, 784], 0.08, 0.08); toast(T('hurry')); },
+  kick: () => { tone(330, 180, 0.08, 'square', 0.08); haptic('light'); },
+  throw: () => { tone(260, 620, 0.15, 'triangle', 0.08); haptic('light'); },
+  shrink: () => {
+    tone(140, 90, 0.06, 'square', 0.06);
+    if (!shrinkTold) { shrinkTold = true; toast(T('shrink')); }
+  },
   spawn: () => tone(200, 600, 0.3, 'sawtooth', 0.05),
   life: () => { notes([784, 988, 1175, 1568], 0.07, 0.1); toast(T('extra_life')); },
 };
@@ -320,6 +327,13 @@ function itemSprite(type) {
         break;
       case 'flamepass':
         R(6, 3, 4, 10, '#e83800'); R(4, 6, 8, 7, '#e83800'); R(3, 4, 10, 1, '#60d0ff'); R(3, 4, 1, 9, '#60d0ff'); R(12, 4, 1, 9, '#60d0ff'); R(3, 12, 10, 1, '#60d0ff');
+        break;
+      case 'kick': // a boot
+        R(5, 3, 4, 7, '#c86828'); R(5, 9, 8, 4, '#c86828'); R(5, 12, 9, 1, '#5a2c08'); R(6, 4, 2, 4, '#e89048'); R(11, 9, 2, 2, '#e89048');
+        break;
+      case 'glove': // a glove
+        R(4, 6, 8, 6, '#f8f8f8'); R(4, 3, 2, 4, '#f8f8f8'); R(6, 2, 2, 5, '#f8f8f8'); R(8, 2, 2, 5, '#f8f8f8'); R(10, 3, 2, 4, '#f8f8f8');
+        R(12, 7, 2, 3, '#f8f8f8'); R(4, 12, 8, 2, '#e83030'); R(5, 8, 6, 1, '#b8b8c8');
         break;
       default: // mystery
         R(5, 3, 6, 2, '#f8d020'); R(10, 4, 2, 4, '#f8d020'); R(7, 7, 4, 2, '#f8d020'); R(7, 8, 2, 2, '#f8d020'); R(7, 11, 2, 2, '#f8d020');
@@ -1386,7 +1400,7 @@ function recNext() {
 function sendRun(s, quit) {
   if (!rec.seed || mode === 'guest' || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
   recFlush();
-  const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(',') };
+  const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(','), rules: S.RULES };
   if (rec.start) body.start = rec.start;
   if (mode === 'host' && /^\d{4,8}$/.test(net.code)) body.room = net.code;
   rec.seed = 0;
@@ -1438,7 +1452,8 @@ function begin(players, start) {
   ticket.next = null;
   keepTicket();
   Object.assign(rec, { seed: t ? t.seed : 0, players, start, out: [], prev: -1, n: 0, frames: 0 });
-  state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1);
+  shrinkTold = false;
+  state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1, { rules: S.RULES });
   if (start) S.startStage(state, start); // the same as bot/bombs-replay.js
   fetchTicket();
   track('game_start');

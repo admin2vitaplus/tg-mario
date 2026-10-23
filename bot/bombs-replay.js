@@ -30,14 +30,17 @@ const COUNT = S.STAGES.length;
 // start — этап, с которого начата игра (0 — с первого); stages — сколько этапов пройдено от него.
 // → { ok, why?, scores: [p0, p1?], stages, frames, phase, won, quit, stats: [p0, p1?] }
 // quit — игра не закончена (игрок вышел), но в неё играли не меньше MIN_QUIT_FRAMES.
-export function replay({ seed, players, log, start = 0 }) {
+// rules — версия правил, с которыми сыграна игра (старые игры — 1); режимов у игры нет.
+export function replay({ seed, players, log, start = 0, rules = 1, mode = "" }) {
   const bad = (why) => ({ ok: false, why });
   if (!Number.isSafeInteger(seed) || seed <= 0) return bad("bad seed");
   if (players !== 1 && players !== 2) return bad("bad players");
   if (typeof log !== "string" || !log.length || log.length > MAX_LOG) return bad("bad log");
   if (!Number.isSafeInteger(start) || start < 0 || start >= COUNT || (start > 0 && players !== 1)) return bad("bad start");
   const maxCode = players === 1 ? 19 : 399;
-  const s = S.newGame(players, seed);
+  if (!Number.isSafeInteger(rules) || rules < 1 || rules > S.RULES) return bad("bad rules");
+  if (mode) return bad("bad mode");
+  const s = S.newGame(players, seed, { rules });
   if (start > 0) S.startStage(s, start); // так же делает игра (tanks.js, bombs.js)
   const stats = s.players.map(newStats);
   let stageDeaths = s.players.map(() => 0);

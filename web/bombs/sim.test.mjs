@@ -266,3 +266,101 @@ test('clearing stage 20, 30 or 40 alone gives a life; other stages and duels do 
   clearStage(full);
   assert.equal(full.players[0].lives, 9, 'no more than nine');
 });
+
+// ---------- Rules 2: kick, glove, the closing field in a duel ----------
+function playing2(players = 1, seed = 7, stage = 0) {
+  const s = S.newGame(players, seed, { rules: 2 });
+  if (stage) S.startStage(s, stage);
+  while (s.phase === 'intro') S.step(s, []);
+  return s;
+}
+
+test('rules 2: some stages hide the kick or the glove; rules 1 keep the old items', () => {
+  for (const [n, item] of Object.entries(S.NEW_ITEMS)) {
+    const s = S.newGame(1, 5, { rules: 2 });
+    S.startStage(s, Number(n));
+    assert.equal(s.item.type, item);
+    const old = S.newGame(1, 5);
+    S.startStage(old, Number(n));
+    assert.equal(old.item.type, S.STAGES[n].item);
+  }
+  const d = S.newGame(2, 5, { rules: 2 });
+  assert.equal(d.item.type, 'kick');
+  S.startStage(d, 1);
+  assert.equal(d.item.type, 'glove');
+  S.startStage(d, 2);
+  assert.equal(d.item.type, S.STAGES[2].item);
+});
+
+test('rules 2: the kick sends a bomb sliding until something stops it', () => {
+  const s = playing2();
+  bare(s);
+  const p = s.players[0];
+  p.kick = true;
+  p.x = 1 * TS; p.y = 1 * TS;
+  s.bombs.push({ x: 2, y: 1, t: 999, owner: 0, range: 1, remote: false, passers: 0 });
+  idle(s, 3, [{ dir: RIGHT, a: false, b: false }]);
+  const b = s.bombs[0];
+  assert.equal(b.slide, RIGHT);
+  idle(s, S.SLIDE * 40);
+  assert.equal(b.y, 1);
+  assert.equal(b.x, COLS - 2, 'stops at the steel border');
+  assert.equal(b.slide, -1);
+});
+
+test('rules 2: without the kick a bomb stays put', () => {
+  const s = playing2();
+  bare(s);
+  const p = s.players[0];
+  p.x = 1 * TS; p.y = 1 * TS;
+  s.bombs.push({ x: 2, y: 1, t: 999, owner: 0, range: 1, remote: false, passers: 0 });
+  idle(s, 30, [{ dir: RIGHT, a: false, b: false }]);
+  assert.equal(s.bombs[0].x, 2);
+});
+
+test('rules 2: the glove throws the bomb underfoot three cells ahead, over a pillar', () => {
+  const s = playing2();
+  bare(s);
+  const p = s.players[0];
+  p.glove = true;
+  p.x = 1 * TS; p.y = 1 * TS; p.dir = DOWN;
+  S.step(s, [{ dir: -1, a: true, b: false }]);
+  assert.deepEqual([s.bombs[0].x, s.bombs[0].y], [1, 1]);
+  S.step(s, [{ dir: -1, a: false, b: true }]);
+  assert.deepEqual([s.bombs[0].x, s.bombs[0].y], [1, 4]);
+  assert.equal(s.bombs.length, 1);
+});
+
+test('rules 2, duel: after two minutes steel closes in from the edges and crushes whoever stands there', () => {
+  const s = playing2(2, 9);
+  const steelBefore = s.cells.filter((c) => c === HARD).length;
+  s.enemies = [];
+  for (const q of s.players) q.mystery = 1e6;
+  idle(s, S.SHRINK_AT);
+  assert.equal(s.cells.filter((c) => c === HARD).length, steelBefore, 'nothing yet');
+  const p = s.players[0];
+  p.shield = 0; p.mystery = 0;
+  p.x = 1 * TS; p.y = 1 * TS; // the first cell of the spiral
+  s.enemies = [];
+  idle(s, 1);
+  assert.equal(at(s, 1, 1), HARD);
+  assert.equal(p.alive, false, 'crushed');
+  idle(s, S.SHRINK_EVERY * 40);
+  assert.ok(s.cells.filter((c) => c === HARD).length > steelBefore + 30);
+  if (s.door) assert.notEqual(at(s, s.door[0], s.door[1]), HARD, 'the door stays reachable');
+  // Back after the lost life: on open floor, not inside the steel.
+  idle(s, S.DIE + 1);
+  assert.equal(p.alive, true);
+  const [cx, cy] = S.cellOf(p.x, p.y);
+  assert.equal(at(s, cx, cy), EMPTY);
+});
+
+test('rules 1 and solo games never close in', () => {
+  for (const s of [playing(2, 9), playing2(1, 9)]) {
+    const steel = s.cells.filter((c) => c === HARD).length;
+    s.enemies = [];
+    for (const p of s.players) p.mystery = 1e6;
+    idle(s, S.SHRINK_AT + 600);
+    assert.equal(s.cells.filter((c) => c === HARD).length, steel);
+  }
+});
