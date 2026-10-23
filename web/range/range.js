@@ -575,6 +575,7 @@ function showOverlay(title, html, button, action, panel, alt) {
   $('ovAlt').textContent = alt ? alt.text : '';
   altAction = alt ? alt.action : null;
   $('ovShare').classList.add('hidden');
+  $('ovPick').classList.add('hidden');
   $('ovMenu').classList.add('hidden');
   $('overlay').classList.remove('hidden');
 }
@@ -583,8 +584,21 @@ function showMenu() {
   running = false;
   showOverlay(T('title'), T('intro') + '<br>' + T('best', { n: loadBest() }), null, null);
   $('ovHint').textContent = T(aimCfg.mode === 'gyro' ? 'hint_gyro' : 'hint_touch');
+  showPick($('btnPick'));
   fetchTicket();
 }
+
+// «▦ Выбрать раунд» (../lib/progress.js): a cleared round stays open for good; a game can start
+// from it or from the one after it. The server replays the game from that round too.
+const canPick = () => !!window.Progress && window.Progress.open('range', S.ROUNDS).length > 1;
+function showPick(btn) { btn.classList.toggle('hidden', !canPick()); }
+function openPick() {
+  audio();
+  window.Progress.pick({ game: 'range', count: S.ROUNDS, cols: 5, onPick: (i) => play(i) });
+}
+$('btnPick').addEventListener('click', openPick);
+$('ovPick').addEventListener('click', openPick);
+if (window.Progress) window.Progress.load().then(() => { if (!$('menu').classList.contains('hidden')) showPick($('btnPick')); });
 
 $('btnLook').addEventListener('click', () => { audio(); openLook(); });
 $('ovBtn').addEventListener('click', () => {
@@ -648,7 +662,7 @@ function appLink(label) {
 const MAX_REC_FRAMES = 60 * 60 * 60;
 const QUIT_FRAMES = 20 * 60; // a game left in the middle counts after 20 s (bot/range-replay.js)
 const ticket = { next: null, asking: false, waiters: [] };
-const rec = { seed: 0, out: [], since: 0, frames: 0 };
+const rec = { seed: 0, start: 0, out: [], since: 0, frames: 0 };
 const canCheck = () => !!(window.Server && window.Server.hasServer && tg && tg.initData);
 // The unused ticket is kept on the phone: opening the game again does not ask for a new one.
 const TICKET_KEY = 'range_ticket_' + ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 0);
@@ -703,6 +717,7 @@ function sendRun(quit) {
   if (!rec.seed || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
   if (rec.since > 0) rec.out.push('e' + rec.since.toString(36));
   const body = { seed: rec.seed, players: 1, log: rec.out.join(',') };
+  if (rec.start) body.start = rec.start;
   rec.seed = 0;
   rec.out = [];
   return window.Server.request('POST', '/api/range/run', body, { keepalive: quit })
@@ -723,7 +738,8 @@ let running = false;
 let starting = false;
 
 // «Играть»: sensors on (from this tap), the ticket, then the sight is centred and the game starts.
-function play() {
+// start — the round chosen on «▦ Выбрать раунд», 0 — from the first one.
+function play(start) {
   if (starting) return;
   starting = true;
   const slow = setTimeout(() => document.body.classList.add('ui-starting'), 150);
@@ -732,22 +748,24 @@ function play() {
     document.body.classList.remove('ui-starting');
     starting = false;
     if (aimCfg.mode === 'gyro' && aim.status === 'on') {
-      showOverlay(T('calib_title'), T('calib_text'), T('calib_btn'), () => { aim.recenter(); begin(); }, null, {
+      showOverlay(T('calib_title'), T('calib_text'), T('calib_btn'), () => { aim.recenter(); begin(start); }, null, {
         text: T('calib_touch'),
-        action: () => { aimCfg.mode = 'touch'; saveAim(); applyAim(); aim.stop(); begin(); },
+        action: () => { aimCfg.mode = 'touch'; saveAim(); applyAim(); aim.stop(); begin(start); },
       });
-    } else begin();
+    } else begin(start);
   });
 }
 
-function begin() {
+function begin(start) {
+  start = start > 0 ? start : 0;
   // A game left unfinished is sent before the new one starts.
   if (state && running) sendQuit();
   const t = ticket.next;
   ticket.next = null;
   keepTicket();
-  Object.assign(rec, { seed: t ? t.seed : 0, out: [], since: 0, frames: 0 });
+  Object.assign(rec, { seed: t ? t.seed : 0, start, out: [], since: 0, frames: 0 });
   state = S.newGame(t ? t.seed : (Date.now() & 0x7fffffff) || 1);
+  if (start) S.startRound(state, start); // the same as bot/range-replay.js
   fetchTicket();
   track('game_start');
   lastHud = '';
@@ -769,6 +787,7 @@ function finished(s) {
   $('ovShare').classList.remove('hidden');
   $('ovShare').textContent = T('btn_share');
   $('ovMenu').classList.remove('hidden');
+  showPick($('ovPick'));
 }
 
 let last = 0, acc = 0;
@@ -791,6 +810,8 @@ function frame(now) {
         if (ev === 'double') doubleUntil = Date.now() + 900;
       }
       state.events.length = 0;
+      // A round with its tally passed is cleared: it stays open on «▦ Выбрать раунд».
+      if (window.Progress && S.cleared(state) > state.round) window.Progress.mark('range', state.round);
       if (state.phase === 'overDone') finished(state);
     }
   } else acc = 0;

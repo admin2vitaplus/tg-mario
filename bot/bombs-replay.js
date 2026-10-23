@@ -24,15 +24,21 @@ export { encode } from "./tanks-replay.js";
 // взрыв (врагов за один кадр), найденные предметы, этапы без потери жизни, победа в дуэли.
 const newStats = () => ({ kills: 0, blast: 0, items: 0, clean: 0, deaths: 0, duelWin: false });
 
+// Этапов в игре; игра может начаться с любого из них (start, выбор пройденных уровней).
+const COUNT = S.STAGES.length;
+
+// start — этап, с которого начата игра (0 — с первого); stages — сколько этапов пройдено от него.
 // → { ok, why?, scores: [p0, p1?], stages, frames, phase, won, quit, stats: [p0, p1?] }
 // quit — игра не закончена (игрок вышел), но в неё играли не меньше MIN_QUIT_FRAMES.
-export function replay({ seed, players, log }) {
+export function replay({ seed, players, log, start = 0 }) {
   const bad = (why) => ({ ok: false, why });
   if (!Number.isSafeInteger(seed) || seed <= 0) return bad("bad seed");
   if (players !== 1 && players !== 2) return bad("bad players");
   if (typeof log !== "string" || !log.length || log.length > MAX_LOG) return bad("bad log");
+  if (!Number.isSafeInteger(start) || start < 0 || start >= COUNT || (start > 0 && players !== 1)) return bad("bad start");
   const maxCode = players === 1 ? 19 : 399;
   const s = S.newGame(players, seed);
+  if (start > 0) S.startStage(s, start); // так же делает игра (tanks.js, bombs.js)
   const stats = s.players.map(newStats);
   let stageDeaths = s.players.map(() => 0);
   const kills = s.players.map(() => 0), lives = s.players.map(() => 0);
@@ -76,6 +82,6 @@ export function replay({ seed, players, log }) {
     stats[s.winner].duelWin = true;
   }
   // Пройденные этапы: текущий засчитывается, если из него вышли (или пройдена вся игра).
-  const stages = s.stage + (s.phase === "clearDone" || s.phase === "clear" || s.won ? 1 : 0);
+  const stages = s.stage - start + (s.phase === "clearDone" || s.phase === "clear" || s.won ? 1 : 0);
   return { ok: true, scores: s.players.map((p) => p.score), stages, frames, phase: s.phase, won: !!s.won, quit: !finished, stats };
 }

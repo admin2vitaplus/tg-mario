@@ -36,11 +36,12 @@ function reopenViaBot() {
 const request = (method, path, body, opts) => server.request(method, '/api/mario' + path, body, opts);
 
 // Счётчики текущей игры. at — когда она началась (0 — игры нет или итог уже отправлен),
-// reported — сколько отчётов об уровнях сервер принял, pending — отчёт, который ещё в пути.
+// reported — сколько отчётов об уровнях сервер принял, pending — отчёт, который ещё в пути,
+// first — следующий отчёт первый в игре: с него игра начата (с 1-1 или с выбранного уровня).
 let run;
-function newRun() { run = { deaths: 0, levelDeaths: 0, coins: 0, bossFire: false, at: 0, reported: 0, pending: Promise.resolve() }; }
+function newRun() { run = { deaths: 0, levelDeaths: 0, coins: 0, bossFire: false, at: 0, reported: 0, first: true, pending: Promise.resolve() }; }
 newRun();
-// Новая игра с 1-1 (или с начала мира).
+// Новая игра с 1-1 или с выбранного уровня (lib/progress.js).
 function begin() { newRun(); run.at = Date.now(); }
 // Брошенная посередине игра засчитывается, если в неё играли хотя бы 20 секунд.
 const QUIT_MS = 20000;
@@ -55,10 +56,12 @@ const canSave = () => !!(base && initData && server.online !== false);
 
 function levelDone(level, score, timeLeft, world) {
   const deaths = run.levelDeaths;
+  const start = run.first;
   run.levelDeaths = 0;
+  run.first = false;
   if (!canSave()) return;
   const r0 = run;
-  r0.pending = request('POST', '/level', { world: world || 1, level, score, timeLeft, deaths })
+  r0.pending = request('POST', '/level', { world: world || 1, level, score, timeLeft, deaths, start })
     .then((r) => { r0.reported++; showAchievements(r.newAchievements); if (window.Wallet) window.Wallet.grants(r.wallet); })
     .catch(() => {});
 }

@@ -37,28 +37,41 @@ const timeOf = (abs) => (WORLD_TIMES[Math.floor(abs / PER_WORLD)] || [])[abs % P
 const follows = (prev, e) => e.score >= prev.score &&
   (e.level === prev.level + 1 || (e.level > prev.level + 1 && e.level % PER_WORLD === 0));
 
-// Отчёты текущей игры: с последнего «начала» — уровня, который не продолжает предыдущий.
-// Игра начинается с первого уровня любого мира («Продолжить с мира N»).
+// Отчёты текущей игры: с последнего «начала» — отчёта с пометкой start (первый уровень игры,
+// начатой с выбранного уровня, progress.js) или уровня, который не продолжает предыдущий.
 export function currentGame(rows) {
-  let start = -1;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    if (i > 0 && follows(rows[i - 1], rows[i])) continue;
-    start = rows[i].level % PER_WORLD === 0 ? i : -1;
-    break;
-  }
-  return start < 0 ? [] : rows.slice(start);
+  let i = rows.length - 1;
+  while (i > 0 && !rows[i].start && follows(rows[i - 1], rows[i])) i--;
+  return i < 0 ? [] : rows.slice(i);
 }
 
-// e.level — сквозной номер; seq — отчёты текущей игры по порядку: [{ level, score, timeLeft, at }]
-export function checkLevel(e, seq, now) {
+// Уровни, с которых игрок может начать игру: первый, каждый пройденный и следующий за ним
+// (passed — сквозные номера пройденных уровней, progress.js).
+export function openLevels(passed) {
+  const open = new Set([0]);
+  for (const l of passed) {
+    if (l < 0 || l > LAST_LEVEL) continue;
+    open.add(l);
+    if (l < LAST_LEVEL) open.add(l + 1);
+  }
+  return open;
+}
+
+// Вся игра пройдена «с начала»: первый отчёт игры — о 1-1. Игра, начатая с выбранного уровня,
+// засчитывается, но достижения за прохождение всех миров не даёт.
+export const fromFirstLevel = (seq) => seq.length > 0 && seq[0].level === 0;
+
+// e.level — сквозной номер; e.start — первый уровень игры (игра начата с него);
+// seq — отчёты текущей игры по порядку: [{ level, score, timeLeft, at }];
+// open — уровни, с которых можно начать игру (openLevels), по умолчанию только первый.
+export function checkLevel(e, seq, now, open = new Set([0])) {
   const limit = timeOf(e.level);
   if (limit === undefined) return reject("unknown level");
   if (e.timeLeft > limit - MIN_LEVEL_TICKS) return reject("level too fast");
   const prev = seq[seq.length - 1];
-  // Счёт меньше прошлого на первом уровне мира — это новая игра с этого мира, а не продолжение.
-  const restart = e.level % PER_WORLD === 0 && prev && e.score < prev.score;
-  if (prev && !restart && (e.level === prev.level + 1 || follows(prev, e))) {
-    if (e.score < prev.score) return reject("score went down");
+  // Счёт меньше прошлого — это новая игра с этого уровня, а не продолжение.
+  const restart = e.start || (prev && e.score < prev.score);
+  if (prev && !restart && follows(prev, e)) {
     // Через трубу-переход в отчёт попадает ещё и недопройденный уровень, где была труба.
     const gain = e.level === prev.level + 1 ? LEVEL_GAIN : 2 * LEVEL_GAIN;
     if (e.score - prev.score > prev.timeLeft * 50 + gain) return reject("score too high");
@@ -66,8 +79,8 @@ export function checkLevel(e, seq, now) {
     if (now - prev.at < spentMs) return reject("level too fast");
     return OK;
   }
-  // Начало новой игры: первый уровень мира и счёт с нуля.
-  if (e.level % PER_WORLD !== 0) return reject("levels out of order");
+  // Начало новой игры: с первого уровня или с открытого (пройденного) и счёт с нуля.
+  if (!open.has(e.level)) return reject("level not open");
   return e.score <= LEVEL_GAIN ? OK : reject("score too high");
 }
 

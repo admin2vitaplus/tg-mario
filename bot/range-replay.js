@@ -28,12 +28,15 @@ export function encode(shots, idle = 0) {
 // → { ok, why?, scores: [score], stages, frames, phase, won, quit, stats: [stats] }
 // stats — для достижений (achievements.js): выстрелы, попадания, лучшая серия попаданий подряд,
 // раунды без промаха, золотые птицы, тарелочки, дуплеты.
-export function replay({ seed, players, log }) {
+// start — раунд, с которого начата игра (выбор пройденных уровней), stages — сколько раундов пройдено от него.
+export function replay({ seed, players, log, start = 0 }) {
   const bad = (why) => ({ ok: false, why });
   if (!Number.isSafeInteger(seed) || seed <= 0) return bad("bad seed");
   if (players !== 1) return bad("bad players");
   if (typeof log !== "string" || !log.length || log.length > MAX_LOG) return bad("bad log");
+  if (!Number.isSafeInteger(start) || start < 0 || start >= S.ROUNDS) return bad("bad start");
   const s = S.newGame(seed);
+  if (start > 0) S.startRound(s, start); // так же делает игра (range.js)
   let frames = 0;
   const run = (n, shot) => {
     for (let i = 0; i < n; i++) {
@@ -68,7 +71,7 @@ export function replay({ seed, players, log }) {
   if (!finished && frames < MIN_QUIT_FRAMES) return bad("game not finished");
   const { shots, hits, bestStreak, perfect, gold, discs, doubles } = s.stats;
   return {
-    ok: true, scores: [s.score], stages: S.cleared(s), frames, phase: s.phase, won: !!s.won, quit: !finished,
+    ok: true, scores: [s.score], stages: S.cleared(s) - start, frames, phase: s.phase, won: !!s.won, quit: !finished,
     stats: [{ shots, hits, bestStreak, perfect, gold, discs, doubles }],
   };
 }

@@ -185,8 +185,8 @@ test("impossible scores never reach the leaderboard", () =>
     // Уровень пройден быстрее, чем возможно, или с невозможным счётом.
     assert.equal((await level({ level: 0, score: 1000, timeLeft: 395 })).status, 422);
     assert.equal((await level({ level: 0, score: 90000, timeLeft: 200 })).status, 422);
-    // Уровень 2 без уровней 0 и 1.
-    assert.equal((await level({ level: 2, score: 1000, timeLeft: 100 })).status, 422);
+    // Уровень 2 без уровней 0 и 1: он ещё не открыт.
+    assert.equal((await level({ level: 2, score: 1000, timeLeft: 100 })).status, 409);
 
     assert.equal((await level({ level: 0, score: 5000, timeLeft: 300 })).status, 200);
     // Следующий уровень через 5 секунд после предыдущего, хотя на таймере ушло 300 тиков (2 минуты).
@@ -225,17 +225,47 @@ test("worlds 2-4: a game goes on across worlds, through the warp pipe and from a
     assert.equal((await level({ world: 4, level: 0, score: 26000, timeLeft: 200 })).status, 200);
     wait(120);
     // Но не прыжок в середину мира.
-    assert.equal((await level({ world: 4, level: 2, score: 30000, timeLeft: 100 })).status, 422);
+    assert.equal((await level({ world: 4, level: 2, score: 30000, timeLeft: 100 })).status, 409);
     assert.equal((await run({ score: 30000, levels: 2 })).status, 200);
 
-    // «Продолжить с мира 3»: новая игра с нуля с первого уровня третьего мира.
+    // Новая игра с уровня, следующего за пройденным 4-1 (выбор пройденных уровней): счёт с нуля.
     wait(600);
-    assert.equal((await level({ world: 3, level: 0, score: 4000, timeLeft: 200 })).status, 200);
+    assert.equal((await level({ world: 4, level: 1, score: 4000, timeLeft: 200, start: true })).status, 200);
     wait(120);
-    assert.equal((await level({ world: 3, level: 1, score: 8000, timeLeft: 200 })).status, 200);
+    assert.equal((await level({ world: 4, level: 2, score: 8000, timeLeft: 200 })).status, 200);
     assert.equal((await run({ score: 9000, levels: 2 })).status, 200);
-    // Начать с середины мира нельзя.
-    assert.equal((await level({ world: 3, level: 2, score: 4000, timeLeft: 200 })).status, 422);
+    // Начать с уровня, до которого игрок не доходил, нельзя: ни с начала мира, ни с середины.
+    assert.equal((await level({ world: 3, level: 0, score: 4000, timeLeft: 200, start: true })).status, 409);
+    assert.equal((await level({ world: 3, level: 2, score: 4000, timeLeft: 200 })).status, 409);
+  }));
+
+// Выбор пройденных уровней: пройденный уровень открыт навсегда, сервер помнит его по игроку.
+test("progress: passed levels open for a new game, the rest stay closed, all worlds only from 1-1", () =>
+  withServer(async (call, _n, wait) => {
+    const level = (body) => call("POST", "/api/mario/level", { user: alice, body: { deaths: 0, ...body } });
+    const run = (body) => call("POST", "/api/mario/run", { user: alice, body: { deaths: 0, coins: 0, ...body } });
+    assert.deepEqual((await call("GET", "/api/progress", { user: alice })).json, { mario: [], tanks: [], bombs: [], range: [] });
+    assert.equal((await call("GET", "/api/progress")).status, 401);
+    // С 1-2 сразу — нельзя: 1-1 ещё не пройден.
+    assert.equal((await level({ level: 1, score: 3000, timeLeft: 200, start: true })).status, 409);
+    assert.equal((await level({ level: 0, score: 3000, timeLeft: 200, start: true })).status, 200);
+    assert.equal((await run({ score: 3000, levels: 1 })).status, 200);
+    assert.deepEqual((await call("GET", "/api/progress", { user: alice })).json.mario, [0]);
+    // Теперь 1-2 открыт (следующий за пройденным), 1-3 — нет.
+    wait(600);
+    assert.equal((await level({ level: 2, score: 3000, timeLeft: 200, start: true })).status, 409);
+    assert.equal((await level({ level: 1, score: 3000, timeLeft: 200, start: true })).status, 200);
+    // Новая игра с того же уровня сразу после первой — снова с нуля, а не продолжение.
+    wait(120);
+    assert.equal((await level({ level: 1, score: 2000, timeLeft: 200, start: true })).status, 200);
+    wait(120);
+    assert.equal((await level({ level: 2, score: 9000, timeLeft: 200 })).status, 200);
+    wait(120);
+    assert.equal((await level({ level: 3, score: 15000, timeLeft: 200 })).status, 200);
+    // Игра с 1-2 до конца первого мира — 3 уровня; итог сходится только с отчётами этой игры.
+    assert.equal((await run({ score: 16000, levels: 4 })).status, 422);
+    assert.equal((await run({ score: 16000, levels: 3 })).status, 200);
+    assert.deepEqual((await call("GET", "/api/progress", { user: alice })).json.mario, [0, 1, 2, 3]);
   }));
 
 test("level times on the server are the game's own", async () => {

@@ -879,6 +879,7 @@ function showOverlay(title, html, button, action, panel) {
   btn.textContent = button || '';
   overlayAction = action;
   $('ovShare').classList.add('hidden');
+  $('ovPick').classList.add('hidden');
   $('ovMenu').classList.add('hidden');
   $('overlay').classList.remove('hidden');
 }
@@ -889,8 +890,22 @@ function showMenu() {
   view = null;
   netClose();
   showOverlay(T('title'), T('intro') + '<br>' + T('best', { n: loadBest() }), null, null);
+  showPick($('btnPick'));
   fetchTicket();
 }
+
+// «▦ Выбрать уровень» (../lib/progress.js): a cleared stage stays open for good; a game alone can
+// start from it or from the one after it. The server replays the game from that stage too.
+const STAGE_COUNT = typeof S.STAGES === 'number' ? S.STAGES : S.MAPS.length;
+const canPick = () => !!window.Progress && window.Progress.open('tanks', STAGE_COUNT).length > 1;
+function showPick(btn) { btn.classList.toggle('hidden', !canPick()); }
+function openPick() {
+  audio();
+  window.Progress.pick({ game: 'tanks', count: STAGE_COUNT, cols: 5, onPick: (i) => beginLocal(1, i) });
+}
+$('btnPick').addEventListener('click', openPick);
+$('ovPick').addEventListener('click', openPick);
+if (window.Progress) window.Progress.load().then(() => { if (!$('menu').classList.contains('hidden')) showPick($('btnPick')); });
 
 $('btnLook').addEventListener('click', () => { audio(); openLook(); });
 
@@ -1401,7 +1416,7 @@ function remotePad() {
 const MAX_REC_FRAMES = 3 * 60 * 60 * 60; // the server takes up to three hours of play (all 50 stages)
 const QUIT_FRAMES = 20 * 60; // a game left in the middle counts after 20 s (bot/tanks-replay.js)
 const ticket = { next: null, asking: false, waiters: [] };
-const rec = { seed: 0, players: 1, out: [], prev: -1, n: 0, frames: 0 };
+const rec = { seed: 0, players: 1, start: 0, out: [], prev: -1, n: 0, frames: 0 };
 const canCheck = () => !!(window.Server && window.Server.hasServer && tg && tg.initData);
 // The unused ticket is kept on the phone: opening the game again does not ask for a new one.
 const TICKET_KEY = 'tanks_ticket_' + ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 0);
@@ -1471,6 +1486,7 @@ function sendRun(s, quit) {
   if (!rec.seed || mode === 'guest' || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
   recFlush();
   const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(',') };
+  if (rec.start) body.start = rec.start;
   if (mode === 'host' && /^\d{4,8}$/.test(net.code)) body.room = net.code;
   rec.seed = 0;
   rec.out = [];
@@ -1490,7 +1506,9 @@ window.addEventListener('pagehide', () => { sendQuit(); });
 let state = null;
 let running = false;
 
-function begin(players) {
+// start — the stage chosen on «▦ Выбрать уровень» (alone only), 0 — from the first one.
+function begin(players, start) {
+  start = players === 1 && start > 0 ? start : 0;
   keyMap = players === 2 && mode === 'local' ? KEYS_2P : KEYS_1P;
   skins = [look.tank, mode === 'host' && net.guestSkin ? net.guestSkin : partnerSkin(look.tank)];
   net.remote = { dir: -1, fire: false };
@@ -1504,8 +1522,9 @@ function begin(players) {
   const t = mode !== 'guest' && ticket.next;
   ticket.next = null;
   keepTicket();
-  Object.assign(rec, { seed: t ? t.seed : 0, players, out: [], prev: -1, n: 0, frames: 0 });
+  Object.assign(rec, { seed: t ? t.seed : 0, players, start, out: [], prev: -1, n: 0, frames: 0 });
   state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1);
+  if (start) S.startStage(state, start); // the same as bot/tanks-replay.js
   fetchTicket();
   track('game_start');
   lastHud = '';
@@ -1515,7 +1534,7 @@ function begin(players) {
 
 // Alone or two on one phone: the game waits up to 3 s for its ticket.
 let starting = false;
-function beginLocal(players) {
+function beginLocal(players, start) {
   if (starting) return;
   starting = true;
   // The ticket is usually here already; on a slow line the tapped button shows the game is starting.
@@ -1524,7 +1543,7 @@ function beginLocal(players) {
     clearTimeout(slow);
     document.body.classList.remove('ui-starting');
     starting = false;
-    begin(players);
+    begin(players, start);
   });
 }
 
@@ -1532,6 +1551,7 @@ function afterStep(s) {
   if (s.phase === 'clearDone') {
     running = false;
     const score = s.players.reduce((a, p) => a + p.score, 0);
+    if (window.Progress) window.Progress.mark('tanks', s.stage);
     haptic('success');
     showOverlay(T('stage_clear', { n: s.stage + 1 }), T('kills') + '<br>' + killsTable(s) + '<br><br>' + T('score_line', { n: score }), T('btn_next'), () => {
       recNext();
@@ -1552,6 +1572,7 @@ function afterStep(s) {
     } else {
       showOverlay(T(s.won ? 'won_title' : 'game_over'), resultText(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => beginLocal(s.players.length));
       showShare(s);
+      showPick($('ovPick'));
     }
   }
   // The guest sees the result screen too, so send the final frame.

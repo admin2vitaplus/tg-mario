@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { dayOf } from "./days.js";
 
-// Миграции только вперёд: каждая выполняется один раз, номер последней хранится
+// Миграции только вперёд: каждая (SQL или функция от базы) выполняется один раз, номер последней хранится
 // в PRAGMA user_version. Старые миграции не меняются, новые добавляются в конец.
 // Версия 1 — исходная схема; базы, созданные до появления миграций, имеют user_version 0
 // и те же таблицы, поэтому версия 1 написана через IF NOT EXISTS.
@@ -271,6 +271,17 @@ export const MIGRATIONS = [
     );
     CREATE INDEX IF NOT EXISTS range_runs_time ON range_runs(created_at);
   `,
+  // 11. Выбор пройденных уровней (progress.js). start — игра начата с выбранного уровня:
+  // у отчёта «Прыг-Скока» это первый уровень игры, у «Танкодрома», «Бомбодрома» и «Тира» — номер
+  // этапа (раунда), с которого началась игра (stages — сколько этапов пройдено от него).
+  // ALTER TABLE не знает IF NOT EXISTS, поэтому столбец добавляется, только если его нет.
+  (db) => {
+    for (const table of ["level_results", "tanks_runs", "bombs_runs", "range_runs"]) {
+      if (db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === "start")) continue;
+      db.exec(`ALTER TABLE ${table} ADD COLUMN start INTEGER NOT NULL DEFAULT 0`);
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS level_results_level ON level_results(player_id, level)");
+  },
 ];
 
 export function migrate(db) {
@@ -281,7 +292,8 @@ export function migrate(db) {
   for (let v = from; v < MIGRATIONS.length; v++) {
     db.exec("BEGIN");
     try {
-      db.exec(MIGRATIONS[v]);
+      const m = MIGRATIONS[v];
+      if (typeof m === "function") m(db); else db.exec(m);
       db.exec(`PRAGMA user_version = ${v + 1}`);
       db.exec("COMMIT");
     } catch (err) {
@@ -309,14 +321,15 @@ export function openDb(file) {
         best_at = CASE WHEN ? > best_score THEN ? ELSE best_at END,
         best_score = MAX(best_score, ?)
       WHERE id = ?`),
-    addLevel: db.prepare(`INSERT INTO level_results (player_id, level, score, time_left, deaths, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)`),
+    addLevel: db.prepare(`INSERT INTO level_results (player_id, level, score, time_left, deaths, start, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`),
+    passedLevels: db.prepare("SELECT DISTINCT level FROM level_results WHERE player_id = ? ORDER BY level"),
     earned: db.prepare("SELECT code, earned_at FROM achievements WHERE player_id = ?"),
     earn: db.prepare("INSERT OR IGNORE INTO achievements (player_id, code, earned_at) VALUES (?, ?, ?)"),
     top: db.prepare(`SELECT id, name, username, best_score FROM players WHERE best_score > 0
       ORDER BY best_score DESC, best_at ASC LIMIT ?`),
     lastRunAt: db.prepare("SELECT MAX(created_at) AS at FROM runs WHERE player_id = ?"),
-    levelsSince: db.prepare(`SELECT level, score, time_left AS timeLeft, created_at AS at FROM level_results
+    levelsSince: db.prepare(`SELECT level, score, time_left AS timeLeft, start, created_at AS at FROM level_results
       WHERE player_id = ? AND created_at > ? ORDER BY id`),
     rank: db.prepare(`SELECT COUNT(*) + 1 AS rank FROM players
       WHERE best_score > ? OR (best_score = ? AND best_at < ?)`),
@@ -348,7 +361,9 @@ export function openDb(file) {
       q.addRun.run(id, r.score, r.coins, r.levels, r.deaths, r.completed ? 1 : 0, r.bossFire ? 1 : 0, now);
       q.bumpPlayer.run(r.coins, r.score, now, r.score, id);
     },
-    addLevel: (id, l, at = Date.now()) => q.addLevel.run(id, l.level, l.score, l.timeLeft, l.deaths, at),
+    addLevel: (id, l, at = Date.now()) => q.addLevel.run(id, l.level, l.score, l.timeLeft, l.deaths, l.start ? 1 : 0, at),
+    // Уровни «Прыг-Скока», которые игрок проходил хоть раз (сквозные номера, plausibility.js).
+    passedLevels: (id) => q.passedLevels.all(id).map((r) => r.level),
     lastRunAt: (id) => q.lastRunAt.get(id).at ?? 0,
     levelsSince: (id, since) => q.levelsSince.all(id, since),
     earned: (id) => q.earned.all(id),

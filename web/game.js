@@ -213,6 +213,7 @@ function showOverlay(title, text, button, action) {
   overlayShown++;
   lifeAction = null;
   $('ovLife').classList.add('hidden');
+  $('ovPick').classList.add('hidden');
   $('ovBtn').classList.add('primary');
   $('ovTitle').textContent = title;
   $('ovText').innerHTML = text;
@@ -2344,6 +2345,7 @@ class Play extends Phaser.Scene {
     const offer = !completed && window.Wallet && window.Wallet.enabled && window.Wallet.lifeOffer(this.s.level);
     if (!offer) {
       showOverlay(title, `${scoreLine}<br>${L('Рекорд', 'Best')}: ${best}`, L('Играть снова', 'Play again'), () => { api.begin(); this.scene.restart({}); });
+      showPick();
       shown = overlayShown;
       end(true);
       return;
@@ -2356,6 +2358,7 @@ class Play extends Phaser.Scene {
         api.begin();
         this.scene.restart({});
       });
+    showPick();
     shown = overlayShown;
     const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
     const btn = $('ovLife');
@@ -2416,6 +2419,7 @@ class Play extends Phaser.Scene {
 
   finishLevel() {
     api.levelDone(this.s.level, this.s.score, this.s.timeLeft, this.s.world);
+    if (window.Progress) window.Progress.mark('mario', absLevel(this.s.world, this.s.level));
     this.s.cleared++;
     this.addScore(this.s.timeLeft * 50);
     let next = this.s.level + 1;
@@ -2535,6 +2539,44 @@ $('ovMenu').addEventListener('click', toMenu);
     lifeAction().finally(() => { btn.disabled = false; });
   });
   $('ovBtn').insertAdjacentElement('beforebegin', btn);
+}
+
+// «▦ Выбрать уровень» (lib/progress.js): a cleared level stays open for good, a new game can start
+// from it or from the one after it. Shown on the title and game over screens. Numbers are the
+// server's: (world − 1) × 4 + level (bot/plausibility.js).
+const LEVEL_AT = [];
+WORLD_MAPS.forEach((maps, w) => maps.forEach((_m, l) => LEVEL_AT.push([w + 1, l])));
+function absLevel(world, level) {
+  return LEVEL_AT.findIndex(([w, l]) => w === world && l === level);
+}
+function showPick() {
+  const btn = $('ovPick');
+  const can = window.Progress && window.Progress.open('mario', LEVEL_AT.length).length > 1;
+  btn.classList.toggle('hidden', !can);
+}
+function startAt(i) {
+  const [world, level] = LEVEL_AT[i];
+  // A game over still waiting for «♥ Ещё жизнь» is over now: its result goes to the server.
+  if (endRun) endRun(false);
+  overlayAction = null;
+  $('overlay').classList.add('hidden');
+  started = true;
+  api.begin();
+  game.scene.getScene('play').scene.restart({ world, level });
+}
+$('ovPick').addEventListener('click', () => {
+  audio();
+  window.Progress.pick({
+    game: 'mario', count: LEVEL_AT.length, cols: 4, onPick: startAt,
+    label: (i) => `${LEVEL_AT[i][0]}-${LEVEL_AT[i][1] + 1}`,
+  });
+});
+if (window.Progress) {
+  showPick();
+  // Levels cleared before this screen or on another phone come from the server.
+  window.Progress.load().then(() => {
+    if (!started) showPick();
+  });
 }
 
 $('ovBtn').addEventListener('click', () => {

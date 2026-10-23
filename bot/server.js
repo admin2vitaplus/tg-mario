@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 import { verifyInitData } from "./auth.js";
 import { BY_GAME, GAME_OF, byCode, publicList, publicOf } from "./achievements.js";
 import { createRateLimiter } from "./ratelimit.js";
-import { checkLevel, checkRun, currentGame, LAST_LEVEL, PER_WORLD, SEQUENCE_TTL_MS, WORLD_TIMES } from "./plausibility.js";
+import { checkLevel, checkRun, currentGame, fromFirstLevel, LAST_LEVEL, openLevels, PER_WORLD, SEQUENCE_TTL_MS, WORLD_TIMES } from "./plausibility.js";
 import { CLIENT_EVENTS, GAMES } from "./stats.js";
 import { publicRules, seasonOf, seasonStart } from "./economy.js";
 import { adminPage, isAdminPath } from "./admin.js";
@@ -142,7 +142,20 @@ export function createApiServer({
       return [200, meBody(user.id)];
     },
 
-    // Итог пройденного уровня: { world, level, score, timeLeft, deaths }; world 1…4 (старая игра — без него),
+    // Пройденные уровни игрока во всех играх (выбор уровня, web/lib/progress.js): номера с 0.
+    // «Прыг-Скок» — сквозные номера уровней (plausibility.js), остальные — этапы по порядку.
+    "GET /api/progress": (_body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const upTo = (n) => Array.from({ length: n }, (_, i) => i);
+      return [200, {
+        mario: store.passedLevels(user.id),
+        tanks: upTo(tanks ? tanks.passed(user.id) : 0),
+        bombs: upTo(bombs ? bombs.passed(user.id) : 0),
+        range: upTo(range ? range.passed(user.id) : 0),
+      }];
+    },
+
+    // Итог пройденного уровня: { world, level, score, timeLeft, deaths, start }; world 1…4 (старая игра — без него),
     // level — уровень в мире 0…3. Дальше level — сквозной номер (plausibility.js).
     "POST /api/mario/level": (body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
@@ -156,8 +169,13 @@ export function createApiServer({
         deaths: int(body.deaths, LIMITS.deaths),
       };
       if (Object.values(e).includes(null)) return [400, { error: "bad data" }];
+      // Первый уровень игры, начатой с выбранного уровня (или с 1-1): с него начинается новая игра.
+      e.start = body.start === true;
       store.touchPlayer(user);
-      const verdict = checkLevel(e, sequence(user.id), now());
+      const verdict = checkLevel(e, sequence(user.id), now(), openLevels(store.passedLevels(user.id)));
+      // Уровень ещё не открыт на сервере (телефон отметил его, а отчёт не дошёл): игра не
+      // засчитывается, но это не обман — без пометки игрока.
+      if (verdict.why === "level not open") return [409, { error: "level not open" }];
       if (!verdict.ok) {
         console.warn(`Отклонён отчёт об уровне: ${verdict.why}`);
         economy?.rejected(user.id);
@@ -183,12 +201,15 @@ export function createApiServer({
       };
       if ([e.score, e.coins, e.levels, e.deaths].includes(null)) return [400, { error: "bad data" }];
       store.touchPlayer(user);
-      const verdict = checkRun(e, sequence(user.id));
+      const seq = sequence(user.id);
+      const verdict = checkRun(e, seq);
       if (!verdict.ok) {
         console.warn(`Отклонён итог игры: ${verdict.why}`);
         economy?.rejected(user.id);
         return [422, { error: "implausible" }];
       }
+      // Все миры пройдены засчитывается только игре, начатой с 1-1 (не с выбранного уровня).
+      e.completed = e.completed && fromFirstLevel(seq);
       const before = store.getPlayer(user.id).best_score;
       store.addRun(user.id, e, now());
       const grants = [];
@@ -327,9 +348,12 @@ export function createApiServer({
       const seed = Number(body.seed);
       const players = Number(body.players);
       const room = body.room == null ? null : String(body.room);
+      // start — этап, с которого начата игра (выбор пройденных уровней, progress.js); без него — первый.
+      const start = body.start == null ? 0 : Number(body.start);
       if (typeof body.log !== "string" || (room && !/^\d{4,8}$/.test(room))) return [400, { error: "bad data" }];
+      if (!Number.isSafeInteger(start) || start < 0) return [400, { error: "bad data" }];
       store.touchPlayer(user);
-      const r = results.submit(user.id, { seed, players, log: body.log, room });
+      const r = results.submit(user.id, { seed, players, log: body.log, room, start });
       if (r.status !== 200) {
         if (r.status === 422) {
           console.warn(`Отклонена игра «${name}»: ${r.why}`);
@@ -343,7 +367,8 @@ export function createApiServer({
       for (const res of r.results) {
         const out = res.playerId === user.id ? grants : [];
         economy?.run(res.playerId, { newRecord: res.newRecord, game, levels: res.stages }, out);
-        const e = { type: "run", ...res.stats, ...r.replay, score: res.score, stages: res.stages };
+        // Вся игра пройдена — только если она начата с первого этапа.
+        const e = { type: "run", ...res.stats, ...r.replay, won: r.replay.won && !start, score: res.score, stages: res.stages };
         const got = newAchievements(res.playerId, e, out, game, results.totals(res.playerId));
         tracker?.event(res.playerId, "game_finish", game);
         if (res.playerId === user.id) { mine = res; won = got; }
