@@ -78,14 +78,19 @@ const ru = {
   sight_ring: 'Кольцо',
   sight_frame: 'Рамка',
   sight_laser: 'Лазер',
+  sight_diamond: 'Ромб',
   birds_tin: 'Жестянки',
   birds_wood: 'Деревянные',
   birds_paper: 'Бумажные',
   birds_robot: 'Роботы',
+  birds_candy: 'Карамельные',
+  birds_neon: 'Неоновые',
   scene_day: 'День',
   scene_sunset: 'Закат',
   scene_night: 'Ночь',
   scene_winter: 'Зима',
+  scene_autumn: 'Осень',
+  scene_desert: 'Пустыня',
 };
 
 const en = {
@@ -154,14 +159,19 @@ const en = {
   sight_ring: 'Ring',
   sight_frame: 'Frame',
   sight_laser: 'Laser',
+  sight_diamond: 'Diamond',
   birds_tin: 'Tin',
   birds_wood: 'Wooden',
   birds_paper: 'Paper',
   birds_robot: 'Robots',
+  birds_candy: 'Candy',
+  birds_neon: 'Neon',
   scene_day: 'Day',
   scene_sunset: 'Sunset',
   scene_night: 'Night',
   scene_winter: 'Winter',
+  scene_autumn: 'Autumn',
+  scene_desert: 'Desert',
 };
 
 // Russian for Russian and neighbouring Telegram languages, English for everyone else.

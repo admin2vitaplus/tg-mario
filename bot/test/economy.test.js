@@ -247,6 +247,37 @@ test("shop: not enough, buy, no double charge, unknown item", () => {
   store.close();
 });
 
+test("looks that used to be free stay open for players from before, new players buy them", () => {
+  const dir = tmp();
+  const file = join(dir, "db.sqlite");
+  try {
+    const legacy = CFG.shop.filter((it) => it.legacy).map((it) => it.id);
+    const paid = CFG.shop.find((it) => !it.legacy);
+    assert.ok(legacy.length >= 10 && paid);
+    let { store, economy, clock } = setup({ file });
+    const seen = store.db.prepare("INSERT INTO users_seen (user_id, at, day, source) VALUES (?, ?, 0, 'test')");
+    seen.run(7, T0 - DAY_MS);
+    seen.run(8, T0 + 1);
+    assert.deepEqual(economy.me(7).owned.sort(), legacy.slice().sort());
+    assert.equal(economy.owns(7, legacy[0]), true);
+    assert.equal(economy.owns(7, paid.id), false);
+    assert.equal(economy.buy(7, legacy[0]).already, true);
+    assert.equal(economy.starsCheck(7, legacy[0]).error, "already");
+    assert.deepEqual(economy.me(8).owned, []);
+    assert.equal(economy.buy(8, legacy[0]).error, "not enough");
+    assert.equal(economy.starsCheck(8, legacy[0]).ok, true);
+    store.close();
+    // После перезапуска граница та же: новый игрок не становится «старым».
+    clock = { t: T0 + 10 * DAY_MS };
+    ({ store, economy } = setup({ file, clock }));
+    assert.equal(economy.owns(8, legacy[0]), false);
+    assert.equal(economy.owns(7, legacy[1]), true);
+    store.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("one more life: price by level in the world, once per offer, not an owned item", () => {
   const { store, economy } = setup();
   assert.deepEqual(CFG.life.price, [100, 300, 500, 700]);

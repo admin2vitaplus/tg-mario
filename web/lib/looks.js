@@ -2,13 +2,16 @@
 // A game describes its groups (hero, weather, enemies...) and gets a full
 // screen panel with previews; the choice is saved in localStorage.
 //
-// Every item has a `stars` price. Right now everything is free (stars: 0);
-// once stars are earned, an item with stars > 0 stays locked until it is
-// bought, see Looks.setStars / Looks.unlock.
+// Every item has a `stars` field (0 everywhere now); an item with stars > 0 and no shop id
+// stays locked until Looks.unlock, see Looks.setStars.
 //
 // An item with `shop: '<id>'` is sold for жетоны (lib/wallet.js, docs/TZ.md P1-7): it stays
 // locked until Wallet says it is bought; tapping it offers to buy it for жетоны or Telegram Stars. `tokens` is the price
 // shown before the shop list has loaded.
+//
+// Only the first item of every group is free. Items with `legacy: true` used to be free: the
+// server keeps them open for everyone who played before (bot/economy.js), and this phone keeps the
+// one already chosen in each group, so nobody loses a look they had while the server is not reached.
 //
 //   Looks.load(key, groups)             -> { groupId: itemId }
 //   Looks.open({ key, title, doneText, groups, onChange(sel, groupId), onClose(sel, changed) })
@@ -32,15 +35,35 @@ function write(key, value) {
 }
 
 function unlocked(key, item) {
-  if (item.shop) return !!(window.Wallet && window.Wallet.owns(item.shop));
+  if (item.shop) {
+    if (window.Wallet && window.Wallet.owns(item.shop)) return true;
+    const owned = item.legacy && read(OWNED_KEY, {});
+    return !!(owned && owned[key] && owned[key].includes(item.id));
+  }
   if (!(item.stars > 0)) return true;
   const owned = read(OWNED_KEY, {});
   return !!(owned[key] && owned[key].includes(item.id));
 }
 
 // The saved choice, with the first item of a group when nothing valid is saved.
+// Once on every phone: a former free look chosen before it was sold stays with the player.
+const KEPT_KEY = 'looks_kept';
+function keepChosen(key, groups, saved) {
+  const kept = read(KEPT_KEY, {});
+  if (kept[key]) return;
+  kept[key] = 1;
+  const owned = read(OWNED_KEY, {});
+  for (const g of groups) {
+    const it = g.items.find((i) => i.id === saved[g.id]);
+    if (it && it.legacy) owned[key] = [...new Set([...(owned[key] || []), it.id])];
+  }
+  write(OWNED_KEY, owned);
+  write(KEPT_KEY, kept);
+}
+
 function load(key, groups) {
   const saved = read(key, {});
+  keepChosen(key, groups, saved);
   const sel = {};
   for (const g of groups) {
     const item = g.items.find((it) => it.id === saved[g.id] && unlocked(key, it));

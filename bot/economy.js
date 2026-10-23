@@ -92,6 +92,7 @@ export function validateEconomy(cfg) {
     need(isInt(it.stars) && it.stars > 0, `shop ${it.id}: stars`);
     need(GAMES.includes(it.game), `shop ${it.id}: game`);
     need(typeof it.ru === "string" && typeof it.en === "string", `shop ${it.id}: ru/en`);
+    need(it.legacy === undefined || it.legacy === true, `shop ${it.id}: legacy`);
   }
   need(ids.size >= 1, "shop пуст");
   const life = cfg.life;
@@ -198,7 +199,29 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
     seasonRow: db.prepare("SELECT * FROM seasons WHERE season = ?"),
     setSeason: db.prepare(`INSERT INTO seasons (season, state, at) VALUES (?, ?, ?)
       ON CONFLICT(season) DO UPDATE SET state = excluded.state, at = excluded.at`),
+    // Игрок был в сборнике раньше времени ? (любой след: первый вход, игра, запись в журнале).
+    seenBefore: db.prepare(`SELECT 1 WHERE
+      EXISTS (SELECT 1 FROM users_seen WHERE user_id = ?1 AND at < ?2)
+      OR EXISTS (SELECT 1 FROM players WHERE id = ?1 AND created_at < ?2)
+      OR EXISTS (SELECT 1 FROM ledger WHERE player_id = ?1 AND at < ?2)
+      OR EXISTS (SELECT 1 FROM tanks_runs WHERE player_id = ?1 AND created_at < ?2)
+      OR EXISTS (SELECT 1 FROM bombs_runs WHERE player_id = ?1 AND created_at < ?2)
+      OR EXISTS (SELECT 1 FROM word_plays WHERE player_id = ?1 AND started_at < ?2)`),
   };
+
+  // Оформление, которое раньше было бесплатным (legacy в economy.json), стало платным. У кого оно
+  // уже было открыто, у того и остаётся: у всех игроков, появившихся до первого запуска этой версии.
+  // Время запуска запоминается в базе один раз; записи в журнале для этого не нужны.
+  q.setMeta.run("legacy_looks_at", now());
+  const legacyAt = q.meta.get("legacy_looks_at").value;
+  const legacyItems = cfg.shop.filter((it) => it.legacy).map((it) => it.id);
+  const legacyIds = new Set(legacyItems);
+  const oldPlayers = new Map(); // player -> был до legacyAt (ответ не меняется, поэтому хранится)
+  const isOld = (playerId) => {
+    if (!oldPlayers.has(playerId)) oldPlayers.set(playerId, !!q.seenBefore.get(playerId, legacyAt));
+    return oldPlayers.get(playerId);
+  };
+  const kept = (playerId, itemId) => legacyIds.has(itemId) && isOld(playerId);
 
   // Транзакции через SAVEPOINT: вкладываются друг в друга (призы внутри закрытия сезона).
   let depth = 0;
@@ -219,6 +242,11 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
   };
 
   const wallet = (id) => { q.ensure.run(id); return q.wallet.get(id); };
+  const owned = (playerId) => {
+    const list = q.owned.all(playerId, playerId).map((r) => r.item);
+    if (legacyItems.length && isOld(playerId)) for (const id of legacyItems) if (!list.includes(id)) list.push(id);
+    return list;
+  };
 
   // Запись в журнал. Возвращает начисленную сумму (0 — не начислено: повтор, пометка, потолок).
   function post(playerId, amount, reason, event, { season, at = now() } = {}) {
@@ -411,7 +439,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
 
     wallet,
 
-    owns: (playerId, itemId) => !!(q.has.get(playerId, "shop", itemId) || q.paid.get(playerId, itemId)),
+    owns: (playerId, itemId) => !!(q.has.get(playerId, "shop", itemId) || q.paid.get(playerId, itemId)) || kept(playerId, itemId),
 
     // ---------- Telegram Stars ----------
     // Можно ли продать товар за звёзды (проверка перед оплатой, pre_checkout_query).
@@ -442,7 +470,7 @@ export function createEconomy(store, cfg, { now = Date.now, notify = null, hooks
         today: q.today.get(playerId, day).n,
         dailyCap: cfg.dailyCap,
         streak: w.streak_day === day || w.streak_day === day - 1 ? w.streak : 0,
-        owned: q.owned.all(playerId, playerId).map((r) => r.item),
+        owned: owned(playerId),
         history: q.history.all(playerId, 30).map(({ id, ...r }) => r),
         season: seasonOf(at),
         seasonEndsAt: seasonStart(seasonOf(at) + 1),

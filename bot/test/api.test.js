@@ -93,11 +93,11 @@ test("records levels and runs, awards achievements once, ranks players", () =>
     assert.equal(r.json.rank, 1);
     assert.equal(r.json.newRecord, true);
     assert.deepEqual(r.json.newAchievements.map((a) => a.code).sort(),
-      ["all_worlds", "boss_fire", "coins_run_50", "levels_run_8", "no_death_world", "score_50k"]);
+      ["all_worlds", "boss_fire", "careful_run_4", "coins_run_50", "levels_run_12", "levels_run_8", "no_death_world", "score_50k"]);
     assert.deepEqual(notified.flatMap(([, list]) => list.map((a) => a.code)).sort(), [
-      "all_worlds", "boss_fire", "castle_clean", "coins_run_50", "first_level", "levels_run_8", "lightning",
-      "no_death_level", "no_death_world", "score_50k", "speedrun", "treetops", "underground",
-      "world2_clear", "world3_clear", "world_clear",
+      "all_worlds", "boss_fire", "careful_run_4", "castle_clean", "coins_run_50", "first_level", "levels_run_12",
+      "levels_run_8", "lightning", "no_death_level", "no_death_world", "score_50k", "speedrun", "treetops", "underground",
+      "world2_clear", "world3_clear", "world4_clear", "world_clear",
     ]);
 
     await playLevels(call, wait, bob, [[20000, 300], [45000, 300]]);
@@ -113,7 +113,7 @@ test("records levels and runs, awards achievements once, ranks players", () =>
 
     const me = await call("GET", "/api/mario/me", { user: alice });
     assert.equal(me.json.games, 2);
-    assert.equal(me.json.achievements.length, 16);
+    assert.equal(me.json.achievements.length, 19);
   }));
 
 test("rejects out-of-range or inconsistent results", () =>

@@ -427,22 +427,25 @@ const LOOK_KEY = 'tankodrom_look';
 
 const TANK_SKINS = [
   { id: 'gold', name: 'Золотой', stars: 0, col: { body: '#d8a818', light: '#f8e070', dark: '#6c4800' } },
-  { id: 'green', name: 'Зелёный', stars: 0, col: { body: '#28a048', light: '#88e890', dark: '#0c4818' } },
-  { id: 'camo', name: 'Камуфляж', stars: 0, col: { body: '#5a7a30', light: '#a8c060', dark: '#26340e', spot: '#3c2c12' } },
-  { id: 'desert', name: 'Пустынный', stars: 0, col: { body: '#c8a060', light: '#f0d8a0', dark: '#64441c', spot: '#9a7038' } },
-  { id: 'arctic', name: 'Арктика', stars: 0, col: { body: '#d0dae6', light: '#ffffff', dark: '#5a6a90', spot: '#98a8c8' } },
-  { id: 'crimson', name: 'Багровый', stars: 0, col: { body: '#b82838', light: '#f07080', dark: '#4c0c16' } },
-  { id: 'cobalt', name: 'Кобальт', stars: 0, col: { body: '#3060d0', light: '#90b8ff', dark: '#10205c' } },
+  { id: 'green', name: 'Зелёный', stars: 0, shop: 'tanks-tank-green', tokens: 200, legacy: true, col: { body: '#28a048', light: '#88e890', dark: '#0c4818' } },
+  { id: 'camo', name: 'Камуфляж', stars: 0, shop: 'tanks-tank-camo', tokens: 350, legacy: true, col: { body: '#5a7a30', light: '#a8c060', dark: '#26340e', spot: '#3c2c12' } },
+  { id: 'desert', name: 'Пустынный', stars: 0, shop: 'tanks-tank-desert', tokens: 350, legacy: true, col: { body: '#c8a060', light: '#f0d8a0', dark: '#64441c', spot: '#9a7038' } },
+  { id: 'arctic', name: 'Арктика', stars: 0, shop: 'tanks-tank-arctic', tokens: 500, legacy: true, col: { body: '#d0dae6', light: '#ffffff', dark: '#5a6a90', spot: '#98a8c8' } },
+  { id: 'crimson', name: 'Багровый', stars: 0, shop: 'tanks-tank-crimson', tokens: 500, legacy: true, col: { body: '#b82838', light: '#f07080', dark: '#4c0c16' } },
+  { id: 'cobalt', name: 'Кобальт', stars: 0, shop: 'tanks-tank-cobalt', tokens: 500, legacy: true, col: { body: '#3060d0', light: '#90b8ff', dark: '#10205c' } },
   // Sold for жетоны in the shop (../lib/wallet.js); `tokens` is only the price shown offline.
-  { id: 'emerald', name: 'Изумруд', stars: 0, shop: 'tanks-tank-emerald', tokens: 300, col: { body: '#10a080', light: '#70f0c8', dark: '#04402c' } },
+  { id: 'emerald', name: 'Изумруд', stars: 0, shop: 'tanks-tank-emerald', tokens: 1000, col: { body: '#10a080', light: '#70f0c8', dark: '#04402c' } },
+  { id: 'violet', name: 'Пурпур', stars: 0, shop: 'tanks-tank-violet', tokens: 750, col: { body: '#8030b8', light: '#d0a0f8', dark: '#300c50' } },
+  { id: 'obsidian', name: 'Обсидиан', stars: 0, shop: 'tanks-tank-obsidian', tokens: 1500, col: { body: '#26222e', light: '#a080e0', dark: '#08060c', spot: '#4a3a70' } },
+  { id: 'chrome', name: 'Хром', stars: 0, shop: 'tanks-tank-chrome', tokens: 2500, col: { body: '#b8c0cc', light: '#ffffff', dark: '#4a5260', spot: '#e0e8f0' } },
 ];
 
 const WEATHERS = [
   { id: 'day', name: 'День', stars: 0 },
-  { id: 'dusk', name: 'Закат', stars: 0 },
-  { id: 'night', name: 'Ночь', stars: 0 },
-  { id: 'rain', name: 'Дождь', stars: 0 },
-  { id: 'snow', name: 'Снегопад', stars: 0 },
+  { id: 'dusk', name: 'Закат', stars: 0, shop: 'tanks-weather-dusk', tokens: 350, legacy: true },
+  { id: 'night', name: 'Ночь', stars: 0, shop: 'tanks-weather-night', tokens: 350, legacy: true },
+  { id: 'rain', name: 'Дождь', stars: 0, shop: 'tanks-weather-rain', tokens: 500, legacy: true },
+  { id: 'snow', name: 'Снегопад', stars: 0, shop: 'tanks-weather-snow', tokens: 500, legacy: true },
 ];
 
 const ENEMY_SKINS = [
@@ -450,22 +453,30 @@ const ENEMY_SKINS = [
     e: { body: '#a0a0b0', light: '#f0f0f8', dark: '#44445a' },
     a4: { body: '#5a7a4a', light: '#b8d0a0', dark: '#223018' },
     a3: { body: '#b08830', light: '#f0d890', dark: '#503808' } },
-  { id: 'rust', name: 'Ржавые', stars: 0,
+  { id: 'rust', name: 'Ржавые', stars: 0, shop: 'tanks-enemies-rust', tokens: 200, legacy: true,
     e: { body: '#9a5a30', light: '#e0a070', dark: '#42200c' },
     a4: { body: '#6a4a30', light: '#b08860', dark: '#2a1808' },
     a3: { body: '#b87828', light: '#f0c060', dark: '#503008' } },
-  { id: 'sand', name: 'Песчаные', stars: 0,
+  { id: 'sand', name: 'Песчаные', stars: 0, shop: 'tanks-enemies-sand', tokens: 200, legacy: true,
     e: { body: '#b8a070', light: '#f0e0b0', dark: '#54442a' },
     a4: { body: '#8a7040', light: '#c8b080', dark: '#3a2c10' },
     a3: { body: '#c08848', light: '#f8d090', dark: '#5a3410' } },
-  { id: 'black', name: 'Чёрные', stars: 0,
+  { id: 'black', name: 'Чёрные', stars: 0, shop: 'tanks-enemies-black', tokens: 350, legacy: true,
     e: { body: '#484852', light: '#a0a0b0', dark: '#121216' },
     a4: { body: '#34403a', light: '#78907e', dark: '#0a100c' },
     a3: { body: '#605030', light: '#a89868', dark: '#201808' } },
-  { id: 'ghost', name: 'Призраки', stars: 0, alpha: 0.7,
+  { id: 'ghost', name: 'Призраки', stars: 0, shop: 'tanks-enemies-ghost', tokens: 750, legacy: true, alpha: 0.7,
     e: { body: '#7090c0', light: '#d8ecff', dark: '#203050' },
     a4: { body: '#5060a0', light: '#a8b8f0', dark: '#182040' },
     a3: { body: '#9080d0', light: '#e8d8ff', dark: '#302060' } },
+  { id: 'frost', name: 'Ледяные', stars: 0, shop: 'tanks-enemies-frost', tokens: 500,
+    e: { body: '#80b8e0', light: '#f0faff', dark: '#28507a' },
+    a4: { body: '#5890c0', light: '#c8e8ff', dark: '#18385a' },
+    a3: { body: '#a0d0f0', light: '#ffffff', dark: '#3a6890' } },
+  { id: 'neon', name: 'Неоновые', stars: 0, shop: 'tanks-enemies-neon', tokens: 750,
+    e: { body: '#e030c0', light: '#ffa0f0', dark: '#500848' },
+    a4: { body: '#30c0e0', light: '#a0f8ff', dark: '#084050' },
+    a3: { body: '#a0e030', light: '#f0ffa0', dark: '#305008' } },
 ];
 
 // Breakable walls: the tanks' counterpart of the platformer's pipes.
@@ -473,29 +484,40 @@ const WALL_SKINS = [
   { id: 'brick', name: 'Кирпич', stars: 0, rows: [
     'hrrmhrrr', 'rrrmrrrr', 'rrrmrrrr', 'mmmmmmmm', 'rhrrrmhr', 'rrrrrmrr', 'rrrrrmrr', 'mmmmmmmm',
   ], pal: { r: '#a84818', h: '#e07840', m: '#3c1c0a' } },
-  { id: 'stone', name: 'Камень', stars: 0, rows: [
+  { id: 'stone', name: 'Камень', stars: 0, shop: 'tanks-walls-stone', tokens: 200, legacy: true, rows: [
     'hsssmhss', 'ssssmsss', 'sssdmssd', 'mmmmmmmm', 'shsmhsss', 'sssmssss', 'sdsmsssd', 'mmmmmmmm',
   ], pal: { s: '#80808c', h: '#c0c0cc', d: '#5a5a66', m: '#2c2c34' } },
-  { id: 'crates', name: 'Ящики', stars: 0, rows: [
+  { id: 'crates', name: 'Ящики', stars: 0, shop: 'tanks-walls-crates', tokens: 200, legacy: true, rows: [
     'kkkkkkkk', 'kwhwwwwk', 'kwkwwkwk', 'kwwkkwwk', 'kwwkkwwk', 'kwkwwkwk', 'kwwwwwhk', 'kkkkkkkk',
   ], pal: { w: '#a8702c', h: '#e0a860', k: '#5a3410' } },
-  { id: 'concrete', name: 'Бетон', stars: 0, rows: [
+  { id: 'concrete', name: 'Бетон', stars: 0, shop: 'tanks-walls-concrete', tokens: 350, legacy: true, rows: [
     'cccccccd', 'clcccccd', 'ccccxccd', 'cccxcccd', 'ccxcclcd', 'cccccccd', 'clccccc d', 'dddddddd',
   ], pal: { c: '#a8a89c', l: '#d8d8cc', x: '#6c6c62', d: '#5c5c54' } },
-  { id: 'bags', name: 'Мешки', stars: 0, rows: [
+  { id: 'bags', name: 'Мешки', stars: 0, shop: 'tanks-walls-bags', tokens: 350, legacy: true, rows: [
     'obbbobbb', 'bhbbbhbb', 'bbbbbbbb', 'oooooooo', 'bbobbbob', 'bbbhbbbb', 'bbbbbbbb', 'oooooooo',
   ], pal: { b: '#c8b078', h: '#f0dca8', o: '#7a6438' } },
-  { id: 'gold', name: 'Золото', stars: 0, shop: 'tanks-walls-gold', tokens: 150, rows: [
+  { id: 'gold', name: 'Золото', stars: 0, shop: 'tanks-walls-gold', tokens: 500, rows: [
     'hggmhggg', 'gggmgggg', 'ggdmgggd', 'mmmmmmmm', 'ghgggmhg', 'gggggmgg', 'gdgggmgd', 'mmmmmmmm',
   ], pal: { g: '#d8a820', h: '#fff0a0', d: '#a07810', m: '#5a4008' } },
+  { id: 'ice', name: 'Лёд', stars: 0, shop: 'tanks-walls-ice', tokens: 350, rows: [
+    'wiiiiiid', 'iwiiiiid', 'iiwiiiid', 'iiiiiiid', 'iiiiwiid', 'iiiiiwid', 'iiiiiiid', 'dddddddd',
+  ], pal: { i: '#90c8f0', w: '#ffffff', d: '#4878a8' } },
+  { id: 'jade', name: 'Нефрит', stars: 0, shop: 'tanks-walls-jade', tokens: 500, rows: [
+    'hjjmhjjj', 'jjjmjjjj', 'jjdmjjjd', 'mmmmmmmm', 'jhjjjmhj', 'jjjjjmjj', 'jdjjjmjd', 'mmmmmmmm',
+  ], pal: { j: '#30a070', h: '#a0f0c8', d: '#187048', m: '#0a3020' } },
+  { id: 'crystal', name: 'Кристалл', stars: 0, shop: 'tanks-walls-crystal', tokens: 750, rows: [
+    'wppppppd', 'pwpppdpd', 'ppwpdppd', 'pppdpppd', 'ppdpwppd', 'pdpppwpd', 'dppppppd', 'dddddddd',
+  ], pal: { p: '#a060e0', w: '#f0d8ff', d: '#502080' } },
 ];
 
 const GROUNDS = [
   { id: 'asphalt', name: 'Асфальт', stars: 0, fill: '#000000', frame: '#707070' },
-  { id: 'grass', name: 'Трава', stars: 0, fill: '#1e3a16', dots: ['#2a4c1e', '#36602a'], frame: '#4c5c3c' },
-  { id: 'sand', name: 'Песок', stars: 0, fill: '#5c4c2c', dots: ['#6c5a36', '#4c3e22'], frame: '#8a7a5a' },
-  { id: 'snowfield', name: 'Снег', stars: 0, fill: '#aebccc', dots: ['#c8d4e0', '#98a8bc'], frame: '#6c7c90' },
-  { id: 'space', name: 'Космос', stars: 0, fill: '#05050e', stars_: ['#ffffff', '#8090ff', '#ffe0a0'], frame: '#2c2c48' },
+  { id: 'grass', name: 'Трава', stars: 0, shop: 'tanks-ground-grass', tokens: 200, legacy: true, fill: '#1e3a16', dots: ['#2a4c1e', '#36602a'], frame: '#4c5c3c' },
+  { id: 'sand', name: 'Песок', stars: 0, shop: 'tanks-ground-sand', tokens: 200, legacy: true, fill: '#5c4c2c', dots: ['#6c5a36', '#4c3e22'], frame: '#8a7a5a' },
+  { id: 'snowfield', name: 'Снег', stars: 0, shop: 'tanks-ground-snowfield', tokens: 350, legacy: true, fill: '#aebccc', dots: ['#c8d4e0', '#98a8bc'], frame: '#6c7c90' },
+  { id: 'space', name: 'Космос', stars: 0, shop: 'tanks-ground-space', tokens: 750, legacy: true, fill: '#05050e', stars_: ['#ffffff', '#8090ff', '#ffe0a0'], frame: '#2c2c48' },
+  { id: 'swamp', name: 'Болото', stars: 0, shop: 'tanks-ground-swamp', tokens: 350, fill: '#24301a', dots: ['#34442a', '#1a2412'], frame: '#4a5a3a' },
+  { id: 'lava', name: 'Лава', stars: 0, shop: 'tanks-ground-lava', tokens: 1000, fill: '#3a0c04', dots: ['#a02808', '#f06010'], frame: '#802010' },
 ];
 
 const LOOK_CATS = [
@@ -510,7 +532,7 @@ const LOOK_CATS = [
 const LOOK_GROUPS = LOOK_CATS.map((c) => ({
   id: c.key,
   title: T('cat_' + c.key),
-  items: c.items.map((it) => ({ id: it.id, name: T(c.key + '_' + it.id), stars: it.stars, shop: it.shop, tokens: it.tokens, draw: (g, size) => drawThumb(g, size, c.key, it.id) })),
+  items: c.items.map((it) => ({ id: it.id, name: T(c.key + '_' + it.id), stars: it.stars, shop: it.shop, tokens: it.tokens, legacy: it.legacy, draw: (g, size) => drawThumb(g, size, c.key, it.id) })),
 }));
 const look = {};
 if (window.Looks) Object.assign(look, window.Looks.load(LOOK_KEY, LOOK_GROUPS));

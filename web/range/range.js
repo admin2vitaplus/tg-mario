@@ -148,10 +148,12 @@ const BIRD_ROWS = [
 ];
 const BIRD_LOOKS = [
   { id: 'tin', pal: { B: '#a8b0c8', W: '#e0e4ee', H: '#8890a8', K: '#202028', X: '#ffffff', O: '#f8a020', D: '#505868' } },
-  { id: 'wood', pal: { B: '#a8682c', W: '#d8a060', H: '#7a4818', K: '#201008', X: '#ffffff', O: '#f8d040', D: '#4a2810' } },
-  { id: 'paper', pal: { B: '#f0f0f0', W: '#e83838', H: '#d0d0d8', K: '#202028', X: '#e83838', O: '#f8a020', D: '#8888a0' } },
+  { id: 'wood', shop: 'range-birds-wood', tokens: 200, legacy: true, pal: { B: '#a8682c', W: '#d8a060', H: '#7a4818', K: '#201008', X: '#ffffff', O: '#f8d040', D: '#4a2810' } },
+  { id: 'paper', shop: 'range-birds-paper', tokens: 350, legacy: true, pal: { B: '#f0f0f0', W: '#e83838', H: '#d0d0d8', K: '#202028', X: '#e83838', O: '#f8a020', D: '#8888a0' } },
   // Sold for жетоны or stars in the shop (../lib/wallet.js); `tokens` is only the price shown offline.
-  { id: 'robot', shop: 'range-birds-robot', tokens: 300, pal: { B: '#38c868', W: '#a0f8b8', H: '#208048', K: '#f82020', X: '#f8f820', O: '#c0c0c8', D: '#103820' } },
+  { id: 'robot', shop: 'range-birds-robot', tokens: 1000, pal: { B: '#38c868', W: '#a0f8b8', H: '#208048', K: '#f82020', X: '#f8f820', O: '#c0c0c8', D: '#103820' } },
+  { id: 'candy', shop: 'range-birds-candy', tokens: 500, pal: { B: '#f070b0', W: '#fff0f8', H: '#c04080', K: '#401020', X: '#ffffff', O: '#f8d040', D: '#802050' } },
+  { id: 'neon', shop: 'range-birds-neon', tokens: 2500, pal: { B: '#202030', W: '#30f0f0', H: '#f030d0', K: '#f8f820', X: '#ffffff', O: '#30f070', D: '#080810' } },
 ];
 const GOLD = { B: '#f8c020', W: '#fff090', H: '#d89000', K: '#402000', X: '#ffffff', O: '#f84020', D: '#906000' };
 const DISC = fromRows(['...oooooo...', '.oyyyyyyyyo.', 'oyyyyyyyyyyo', '.oddddddddo.', '...oooooo...'], { o: '#a83810', y: '#f89840', d: '#c85820' });
@@ -178,7 +180,7 @@ const SIGHTS = [
     g.fillRect(x - 9, y, 6, 1); g.fillRect(x + 4, y, 6, 1); g.fillRect(x, y - 9, 1, 6); g.fillRect(x, y + 4, 1, 6);
     g.fillRect(x, y, 1, 1);
   } },
-  { id: 'ring', draw: (g, x, y, col) => {
+  { id: 'ring', shop: 'range-sight-ring', tokens: 200, legacy: true, draw: (g, x, y, col) => {
     g.fillStyle = col;
     for (let a = 0; a < 32; a++) {
       const k = (a / 32) * Math.PI * 2;
@@ -186,7 +188,7 @@ const SIGHTS = [
     }
     g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3);
   } },
-  { id: 'frame', draw: (g, x, y, col) => {
+  { id: 'frame', shop: 'range-sight-frame', tokens: 350, legacy: true, draw: (g, x, y, col) => {
     g.fillStyle = col;
     for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
       g.fillRect(sx < 0 ? x - 8 : x + 5, y + sy * 8, 4, 1);
@@ -194,7 +196,7 @@ const SIGHTS = [
     }
     g.fillRect(x, y, 1, 1);
   } },
-  { id: 'laser', shop: 'range-sight-laser', tokens: 150, draw: (g, x, y) => {
+  { id: 'laser', shop: 'range-sight-laser', tokens: 750, draw: (g, x, y) => {
     g.fillStyle = 'rgba(255, 40, 40, 0.35)';
     g.fillRect(x - 3, y - 2, 7, 5); g.fillRect(x - 2, y - 3, 5, 7);
     g.fillStyle = '#ff3030';
@@ -202,13 +204,23 @@ const SIGHTS = [
     g.fillStyle = '#ffffff';
     g.fillRect(x, y, 1, 1);
   } },
+  { id: 'diamond', shop: 'range-sight-diamond', tokens: 500, draw: (g, x, y, col) => {
+    g.fillStyle = col;
+    for (let i = 0; i < 7; i++) {
+      g.fillRect(x - 7 + i, y - i, 1, 1); g.fillRect(x + 7 - i, y - i, 1, 1);
+      g.fillRect(x - 7 + i, y + i, 1, 1); g.fillRect(x + 7 - i, y + i, 1, 1);
+    }
+    g.fillRect(x, y, 1, 1);
+  } },
 ];
 
 const SCENES = [
   { id: 'day', sky: ['#5c94fc', '#78a8fc'], cloud: '#ffffff', crown: '#1e8a2a', crownLight: '#48b848', trunk: '#7a4818', bush: '#2a9a2a', bushLight: '#58c848', ground: '#c88838', groundDark: '#a06820' },
-  { id: 'sunset', sky: ['#382878', '#e86848'], cloud: '#f8b888', crown: '#1a4a2a', crownLight: '#2a6a38', trunk: '#3a2010', bush: '#1a5a2a', bushLight: '#2a7a38', ground: '#7a4828', groundDark: '#5a3018' },
-  { id: 'night', sky: ['#080820', '#182048'], cloud: '#384068', crown: '#0e3018', crownLight: '#1a4a28', trunk: '#2a1808', bush: '#0e3a18', bushLight: '#1a5a28', ground: '#3a2a18', groundDark: '#281c10', stars: true },
-  { id: 'winter', sky: ['#a8c8e8', '#d8e8f8'], cloud: '#ffffff', crown: '#2a6a48', crownLight: '#f0f8ff', trunk: '#5a3818', bush: '#e8f0f8', bushLight: '#ffffff', ground: '#d8e4f0', groundDark: '#a8b8d0' },
+  { id: 'sunset', shop: 'range-scene-sunset', tokens: 350, legacy: true, sky: ['#382878', '#e86848'], cloud: '#f8b888', crown: '#1a4a2a', crownLight: '#2a6a38', trunk: '#3a2010', bush: '#1a5a2a', bushLight: '#2a7a38', ground: '#7a4828', groundDark: '#5a3018' },
+  { id: 'night', shop: 'range-scene-night', tokens: 500, legacy: true, sky: ['#080820', '#182048'], cloud: '#384068', crown: '#0e3018', crownLight: '#1a4a28', trunk: '#2a1808', bush: '#0e3a18', bushLight: '#1a5a28', ground: '#3a2a18', groundDark: '#281c10', stars: true },
+  { id: 'winter', shop: 'range-scene-winter', tokens: 500, legacy: true, sky: ['#a8c8e8', '#d8e8f8'], cloud: '#ffffff', crown: '#2a6a48', crownLight: '#f0f8ff', trunk: '#5a3818', bush: '#e8f0f8', bushLight: '#ffffff', ground: '#d8e4f0', groundDark: '#a8b8d0' },
+  { id: 'autumn', shop: 'range-scene-autumn', tokens: 500, sky: ['#7898c8', '#c8d8e8'], cloud: '#f0f0f0', crown: '#c86818', crownLight: '#f8b030', trunk: '#5a3010', bush: '#a04818', bushLight: '#e88828', ground: '#8a5a28', groundDark: '#6a4018' },
+  { id: 'desert', shop: 'range-scene-desert', tokens: 750, sky: ['#f0a848', '#f8e0a0'], cloud: '#fff4e0', crown: '#3a8a3a', crownLight: '#68b858', trunk: '#8a6030', bush: '#b89048', bushLight: '#e0c070', ground: '#e8c070', groundDark: '#c09848' },
 ];
 
 // The backdrop is the same every frame: drawn once per scene.
@@ -272,7 +284,7 @@ const LOOK_CATS = [
 const LOOK_GROUPS = LOOK_CATS.map((c) => ({
   id: c.key,
   title: T('cat_' + c.key),
-  items: c.items.map((it) => ({ id: it.id, name: T(c.key + '_' + it.id), stars: 0, shop: it.shop, tokens: it.tokens, draw: (g, size) => drawThumb(g, size, c.key, it.id) })),
+  items: c.items.map((it) => ({ id: it.id, name: T(c.key + '_' + it.id), stars: 0, shop: it.shop, tokens: it.tokens, legacy: it.legacy, draw: (g, size) => drawThumb(g, size, c.key, it.id) })),
 }));
 const look = {};
 if (window.Looks) Object.assign(look, window.Looks.load(LOOK_KEY, LOOK_GROUPS));

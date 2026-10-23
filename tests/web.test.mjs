@@ -337,3 +337,25 @@ test('every game with жетоны is known to config.js by the id the wallet us
   const economy = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'bot', 'economy.json'), 'utf8'));
   for (const g of new Set(economy.shop.map((it) => it.game))) assert.ok(ids.includes(map[g] || g), `${g} is not in config.js`);
 });
+
+// «Внешний вид»: free is only the first (standard) item of every group; every other item is sold
+// for жетоны and stars at the server's price, and former free items carry legacy on both sides.
+test('looks: only the standard item is free, the rest match the server shop', () => {
+  const economy = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'bot', 'economy.json'), 'utf8'));
+  const item = /\{ id: '[\w-]+',[^\n]*?stars: 0\b[^\n]*/g;
+  // «Тир» has no stars field on its items: its looks are the lines with a sight, birds or place.
+  const rangeItem = /^ {2}\{ id: '[\w-]+', (?:shop: [^\n]*?)?(?:draw|pal|sky):[^\n]*/gm;
+  const games = { mario: ['game.js', 5, item], tanks: ['tanks/tanks.js', 5, item], bombs: ['bombs/bombs.js', 3, item], range: ['range/range.js', 3, rangeItem] };
+  for (const [game, [file, groups, re]] of Object.entries(games)) {
+    const js = fs.readFileSync(path.join(WEB, file), 'utf8');
+    const items = [...js.matchAll(re)].map((m) => m[0]);
+    assert.equal(items.filter((l) => !l.includes('shop:')).length, groups, `${game}: free items`);
+    const shop = economy.shop.filter((it) => it.game === game);
+    assert.equal(items.length - groups, shop.length, `${game}: every paid look is in economy.json`);
+    for (const it of shop) {
+      assert.match(js, new RegExp(`shop: '${it.id}', tokens: ${it.price}${it.legacy ? ', legacy: true' : '(?!, legacy)'}\\b`), it.id);
+    }
+  }
+  const prices = new Set(economy.shop.map((it) => it.price));
+  assert.ok(prices.size >= 5, 'prices differ');
+});

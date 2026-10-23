@@ -31,6 +31,8 @@ const EN_NAMES = {
   'Зефирка': 'Candy', 'Рыцарь': 'Knight', 'День': 'Day', 'Ночь': 'Night',
   'Жук': 'Beetle', 'Синий': 'Blue', 'Травяной': 'Grass', 'Золотой': 'Golden', 'Тень': 'Shadow', 'Рубин': 'Ruby',
   'Зелёные': 'Green', 'Красные': 'Red', 'Синие': 'Blue', 'Золотые': 'Golden', 'Стальные': 'Steel', 'Неон': 'Neon',
+  'Король': 'King', 'Робот': 'Robot', 'Самородок': 'Nugget', 'Ледяной': 'Frosty', 'Лава': 'Lava', 'Кислотный': 'Toxic',
+  'Ледяные': 'Frosty', 'Шоколадные': 'Chocolate', 'Мраморные': 'Marble',
   'Холмы': 'Hills', 'Горы': 'Mountains', 'Лес': 'Forest', 'Город': 'City', 'Пустыня': 'Desert',
   'Выбери героя': 'Pick a hero', 'Погода: день или ночь': 'Weather: day or night', 'Враги': 'Enemies', 'Трубы': 'Pipes', 'Фон': 'Backdrop',
   'ПОЛЕ': 'FIELD', 'ПОДЗЕМЕЛЬЕ': 'UNDERGROUND', 'ВЕРХУШКИ ДЕРЕВЬЕВ': 'TREETOPS', 'ЗАМОК': 'CASTLE',
@@ -851,45 +853,54 @@ const WORLD_MAPS = window.PrygLevels.WORLDS;
 const WORLDS = WORLD_MAPS.length;
 
 // ---------- Looks («Внешний вид») ----------
-// Each item has a stars price for later; everything is free for now.
+// Free is only the first item of a group; the rest are sold for жетоны or stars (lib/looks.js).
 // Hero skins recolor the hero: C cap, J jacket, P overalls, B boots, S skin, K hair.
 const SKINS = [
   { id: 'classic', name: 'Классика', stars: 0, pal: {} },
-  { id: 'forest', name: 'Лесник', stars: 0, pal: { C: '#2a7a2a', J: '#a86c30', P: '#4a4a20', B: '#3a2008' } },
-  { id: 'space', name: 'Космонавт', stars: 0, pal: { C: '#e8e8f0', J: '#b8bcc8', P: '#3050c8', B: '#606070', K: '#e8e8f0' } },
-  { id: 'ninja', name: 'Ниндзя', stars: 0, pal: { C: '#303040', J: '#404050', P: '#202028', B: '#101010', K: '#d82800' } },
-  { id: 'pirate', name: 'Пират', stars: 0, pal: { C: '#d82800', J: '#f0f0f0', P: '#202020', B: '#6b3a10', S: '#e0a070' } },
-  { id: 'pink', name: 'Зефирка', stars: 0, pal: { C: '#f878b8', J: '#f8b8d8', P: '#8040c0', B: '#c03080', K: '#8a4a20' } },
+  { id: 'forest', name: 'Лесник', stars: 0, shop: 'pryg-hero-forest', tokens: 350, legacy: true, pal: { C: '#2a7a2a', J: '#a86c30', P: '#4a4a20', B: '#3a2008' } },
+  { id: 'space', name: 'Космонавт', stars: 0, shop: 'pryg-hero-space', tokens: 750, legacy: true, pal: { C: '#e8e8f0', J: '#b8bcc8', P: '#3050c8', B: '#606070', K: '#e8e8f0' } },
+  { id: 'ninja', name: 'Ниндзя', stars: 0, shop: 'pryg-hero-ninja', tokens: 750, legacy: true, pal: { C: '#303040', J: '#404050', P: '#202028', B: '#101010', K: '#d82800' } },
+  { id: 'pirate', name: 'Пират', stars: 0, shop: 'pryg-hero-pirate', tokens: 500, legacy: true, pal: { C: '#d82800', J: '#f0f0f0', P: '#202020', B: '#6b3a10', S: '#e0a070' } },
+  { id: 'pink', name: 'Зефирка', stars: 0, shop: 'pryg-hero-pink', tokens: 350, legacy: true, pal: { C: '#f878b8', J: '#f8b8d8', P: '#8040c0', B: '#c03080', K: '#8a4a20' } },
   // Sold for жетоны in the shop (lib/wallet.js); `tokens` is only the price shown offline.
-  { id: 'knight', name: 'Рыцарь', stars: 0, shop: 'pryg-hero-knight', tokens: 300,
+  { id: 'knight', name: 'Рыцарь', stars: 0, shop: 'pryg-hero-knight', tokens: 1000,
     pal: { C: '#c8c8d8', J: '#8c8ca0', P: '#3c3c50', B: '#202028', K: '#f8d020' } },
+  { id: 'king', name: 'Король', stars: 0, shop: 'pryg-hero-king', tokens: 1500, pal: { C: '#f8d020', J: '#8020a0', P: '#c02040', B: '#401020', K: '#6b3a10' } },
+  { id: 'robot', name: 'Робот', stars: 0, shop: 'pryg-hero-robot', tokens: 1500, pal: { C: '#a0a8b8', J: '#606878', P: '#384050', B: '#202830', S: '#c8d0dc', K: '#40e0f0' } },
+  { id: 'nugget', name: 'Самородок', stars: 0, shop: 'pryg-hero-nugget', tokens: 2500, pal: { C: '#f8e070', J: '#d8a818', P: '#a07010', B: '#604000', K: '#fff0a0' } },
 ];
 
 const DAY_SKY = '#6b8cff';
 const NIGHT_SKY = '#101838';
 const TIMES = [
   { id: 'day', name: 'День', stars: 0 },
-  { id: 'night', name: 'Ночь', stars: 0 },
+  { id: 'night', name: 'Ночь', stars: 0, shop: 'pryg-time-night', tokens: 500, legacy: true },
 ];
 
 // Enemy shells: E shell, O spots.
 const ENEMIES = [
   { id: 'red', name: 'Жук', stars: 0, pal: {} },
-  { id: 'blue', name: 'Синий', stars: 0, pal: { E: '#2848a8', O: '#58a0f8' } },
-  { id: 'green', name: 'Травяной', stars: 0, pal: { E: '#107010', O: '#58d858' } },
-  { id: 'gold', name: 'Золотой', stars: 0, pal: { E: '#c07000', O: '#f8d020' } },
-  { id: 'shadow', name: 'Тень', stars: 0, pal: { E: '#303040', O: '#9090b0', Y: '#c0c0d0' } },
-  { id: 'ruby', name: 'Рубин', stars: 0, shop: 'pryg-enemy-ruby', tokens: 150, pal: { E: '#a01040', O: '#ff6098' } },
+  { id: 'blue', name: 'Синий', stars: 0, shop: 'pryg-enemy-blue', tokens: 200, legacy: true, pal: { E: '#2848a8', O: '#58a0f8' } },
+  { id: 'green', name: 'Травяной', stars: 0, shop: 'pryg-enemy-green', tokens: 200, legacy: true, pal: { E: '#107010', O: '#58d858' } },
+  { id: 'gold', name: 'Золотой', stars: 0, shop: 'pryg-enemy-gold', tokens: 500, legacy: true, pal: { E: '#c07000', O: '#f8d020' } },
+  { id: 'shadow', name: 'Тень', stars: 0, shop: 'pryg-enemy-shadow', tokens: 350, legacy: true, pal: { E: '#303040', O: '#9090b0', Y: '#c0c0d0' } },
+  { id: 'ruby', name: 'Рубин', stars: 0, shop: 'pryg-enemy-ruby', tokens: 500, pal: { E: '#a01040', O: '#ff6098' } },
+  { id: 'frost', name: 'Ледяной', stars: 0, shop: 'pryg-enemy-frost', tokens: 350, pal: { E: '#3890c8', O: '#d8f4ff' } },
+  { id: 'lava', name: 'Лава', stars: 0, shop: 'pryg-enemy-lava', tokens: 750, pal: { E: '#e04000', O: '#f8d020' } },
+  { id: 'toxic', name: 'Кислотный', stars: 0, shop: 'pryg-enemy-toxic', tokens: 750, pal: { E: '#6a1a90', O: '#a0f030' } },
 ];
 
 // Pipe colors: outline, body, highlight, shade.
 const PIPES = [
   { id: 'green', name: 'Зелёные', stars: 0, c: ['#0a300a', '#30a030', '#a0f080', '#107010'] },
-  { id: 'red', name: 'Красные', stars: 0, c: ['#400808', '#c03020', '#f8a080', '#801010'] },
-  { id: 'blue', name: 'Синие', stars: 0, c: ['#081840', '#2860c0', '#90c8f8', '#103880'] },
-  { id: 'gold', name: 'Золотые', stars: 0, c: ['#402800', '#d8a020', '#f8f0a0', '#906000'] },
-  { id: 'steel', name: 'Стальные', stars: 0, c: ['#202020', '#8c8c8c', '#e0e0e0', '#505050'] },
-  { id: 'neon', name: 'Неон', stars: 0, shop: 'pryg-pipe-neon', tokens: 100, c: ['#200040', '#c020f0', '#f8a0ff', '#6010a0'] },
+  { id: 'red', name: 'Красные', stars: 0, shop: 'pryg-pipe-red', tokens: 200, legacy: true, c: ['#400808', '#c03020', '#f8a080', '#801010'] },
+  { id: 'blue', name: 'Синие', stars: 0, shop: 'pryg-pipe-blue', tokens: 200, legacy: true, c: ['#081840', '#2860c0', '#90c8f8', '#103880'] },
+  { id: 'gold', name: 'Золотые', stars: 0, shop: 'pryg-pipe-gold', tokens: 500, legacy: true, c: ['#402800', '#d8a020', '#f8f0a0', '#906000'] },
+  { id: 'steel', name: 'Стальные', stars: 0, shop: 'pryg-pipe-steel', tokens: 350, legacy: true, c: ['#202020', '#8c8c8c', '#e0e0e0', '#505050'] },
+  { id: 'neon', name: 'Неон', stars: 0, shop: 'pryg-pipe-neon', tokens: 350, c: ['#200040', '#c020f0', '#f8a0ff', '#6010a0'] },
+  { id: 'frost', name: 'Ледяные', stars: 0, shop: 'pryg-pipe-frost', tokens: 350, c: ['#103048', '#70c0e8', '#e8f8ff', '#3880b0'] },
+  { id: 'choco', name: 'Шоколадные', stars: 0, shop: 'pryg-pipe-choco', tokens: 500, c: ['#200c04', '#7a4020', '#c88858', '#4a2410'] },
+  { id: 'marble', name: 'Мраморные', stars: 0, shop: 'pryg-pipe-marble', tokens: 750, c: ['#404048', '#e8e4dc', '#ffffff', '#a8a49c'] },
 ];
 
 function hump(ctx, x, w, h, bottom, col) {
@@ -905,7 +916,7 @@ const BACKS = [
     hump(ctx, 0, 80, 34, 36, n ? '#0a3a20' : '#107010');
     hump(ctx, 3, 74, 32, 37, n ? '#185a30' : '#30a030');
   } },
-  { id: 'mountains', name: 'Горы', stars: 0, w: 160, h: 80, paint(ctx, n) {
+  { id: 'mountains', name: 'Горы', stars: 0, shop: 'pryg-back-mountains', tokens: 350, legacy: true, w: 160, h: 80, paint(ctx, n) {
     const peak = (x, w, h, col, snow) => {
       ctx.fillStyle = col;
       ctx.beginPath();
@@ -923,7 +934,7 @@ const BACKS = [
     peak(60, 100, 64, n ? '#232a50' : '#5868a8', n ? '#8890b8' : '#ffffff');
     peak(0, 110, 80, n ? '#2c3460' : '#7080c0', n ? '#a0a8c8' : '#ffffff');
   } },
-  { id: 'forest', name: 'Лес', stars: 0, w: 128, h: 52, paint(ctx, n) {
+  { id: 'forest', name: 'Лес', stars: 0, shop: 'pryg-back-forest', tokens: 350, legacy: true, w: 128, h: 52, paint(ctx, n) {
     for (const [x, r] of [[14, 14], [40, 18], [70, 15], [100, 19], [120, 10]]) {
       ctx.fillStyle = n ? '#3a2410' : '#6b3a10';
       ctx.fillRect(x - 2, 52 - 14, 4, 14);
@@ -937,7 +948,7 @@ const BACKS = [
       ctx.fill();
     }
   } },
-  { id: 'city', name: 'Город', stars: 0, w: 144, h: 76, paint(ctx, n) {
+  { id: 'city', name: 'Город', stars: 0, shop: 'pryg-back-city', tokens: 500, legacy: true, w: 144, h: 76, paint(ctx, n) {
     [[0, 22, 46], [24, 26, 70], [52, 20, 38], [74, 30, 58], [106, 18, 44], [126, 18, 64]].forEach(([x, w, h], i) => {
       ctx.fillStyle = n ? '#202840' : '#506080';
       ctx.fillRect(x, 76 - h, w, h);
@@ -950,7 +961,7 @@ const BACKS = [
       }
     });
   } },
-  { id: 'desert', name: 'Пустыня', stars: 0, w: 128, h: 40, paint(ctx, n) {
+  { id: 'desert', name: 'Пустыня', stars: 0, shop: 'pryg-back-desert', tokens: 500, legacy: true, w: 128, h: 40, paint(ctx, n) {
     hump(ctx, 0, 128, 22, 40, n ? '#605030' : '#e0b060');
     hump(ctx, 60, 68, 30, 41, n ? '#706038' : '#f0c878');
     ctx.fillStyle = n ? '#185a30' : '#30a030';
