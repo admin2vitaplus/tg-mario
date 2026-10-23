@@ -18,7 +18,7 @@ const config = {
       scores: true,
       // Loaded on this page only when the game is chosen, in this order.
       styles: ['lib/looks.css'],
-      scripts: ['lib/phaser.min.js', 'lib/looks.js', 'lib/back.js', 'lib/progress.js', 'levels.js', 'worlds.js', 'game.js'],
+      scripts: ['lib/phaser.min.js', 'lib/looks.js', 'lib/back.js', 'lib/progress.js', 'lib/fx.js', 'levels.js', 'worlds.js', 'game.js'],
       // startapp=mario (or ref_<id>-mario from an invite in a chat) opens it straight away.
       start: 'mario',
     },

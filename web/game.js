@@ -1821,6 +1821,19 @@ class Play extends Phaser.Scene {
     hud(this.s);
   }
 
+  // Points rise from a beaten enemy and fade, as on the console (pixel digits from lib/fx.js).
+  popScore(obj, n) {
+    if (!window.Fx) return;
+    const key = 'pts' + n;
+    if (!this.textures.exists(key)) {
+      const c = this.textures.createCanvas(key, String(n).length * 4 + 1, 7);
+      Fx.digits(c.getContext(), n, c.width / 2, 3, '#ffffff');
+      c.refresh();
+    }
+    const t = this.add.image(Math.round(obj.x), Math.round(obj.y) - 14, key).setDepth(DEPTH.HERO + 1);
+    this.tweens.add({ targets: t, y: t.y - 18, duration: 700, onComplete: () => t.destroy() });
+  }
+
   gainCoin() {
     this.s.coins++;
     api.track('coin');
@@ -2157,7 +2170,9 @@ class Play extends Phaser.Scene {
     f.body.checkCollision.none = true;
     f.body.allowGravity = true;
     f.body.setVelocity(20, -150);
-    this.addScore(f.getData('kind') === 'rider' ? 1000 : 200);
+    const pts = f.getData('kind') === 'rider' ? 1000 : 200;
+    this.addScore(pts);
+    this.popScore(f, pts);
     SFX.stomp();
     if (f === this.rider) {
       this.rider = null;
@@ -2311,6 +2326,7 @@ class Play extends Phaser.Scene {
     this.layerAt(tx).removeTileAt(tx, ty);
     SFX.brick();
     haptic('medium');
+    this.cameras.main.shake(90, 0.006);
     this.addScore(50);
     for (const [dx, dy, vx, vy] of [[-4, -4, -60, -260], [4, -4, 60, -260], [-4, 4, -60, -180], [4, 4, 60, -180]]) {
       const d = this.physics.add.image(tx * TILE + 8 + dx, ty * TILE + 8 + dy, 'debris');
@@ -2353,12 +2369,13 @@ class Play extends Phaser.Scene {
     }
   }
 
-  flipEnemy(e) {
+  flipEnemy(e, extra = 0) {
     e.setData('state', 'dead');
     e.setFlipY(true);
     e.body.checkCollision.none = true;
     e.body.setVelocity(20, -200);
-    this.addScore(100);
+    this.addScore(100 + extra);
+    this.popScore(e, 100 + extra);
     SFX.stomp();
     this.time.delayedCall(1500, () => e.destroy());
   }
@@ -2370,8 +2387,7 @@ class Play extends Phaser.Scene {
     // Spikies can't be stomped, and under water nothing can.
     if (kind !== 'spiky' && !this.inWater && b.velocity.y > 0 && b.bottom <= e.body.top + 8) {
       if (kind === 'thrower') {
-        this.flipEnemy(e);
-        this.addScore(900);
+        this.flipEnemy(e, 900);
         b.setVelocityY(-240);
         this.jumpKind = 0;
         haptic('light');
@@ -2384,6 +2400,9 @@ class Play extends Phaser.Scene {
       b.setVelocityY(-240);
       this.jumpKind = 0;
       this.addScore(100);
+      this.popScore(e, 100);
+      this.puff(e.x - 4, e.body.bottom, -1);
+      this.puff(e.x + 4, e.body.bottom, 1);
       SFX.stomp();
       haptic('light');
     } else {

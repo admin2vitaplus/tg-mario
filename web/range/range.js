@@ -445,7 +445,31 @@ $('invY').addEventListener('change', () => { aimCfg.iy = $('invY').checked; save
 $('aimDone').addEventListener('click', () => showMenu());
 
 // ---------- Drawing ----------
+// Picture-only effects (lib/fx.js): feathers or shards and the points over each hit target.
+const fxHit = new WeakSet();
+let fxScore = 0;
+function spotEffects(s) {
+  if (!window.Fx) return;
+  const fresh = s.targets.filter((t) => t.state === 'hit' && !fxHit.has(t));
+  const gain = s.score - fxScore;
+  fxScore = s.score;
+  fresh.forEach((t, i) => {
+    fxHit.add(t);
+    const x = Math.floor(t.x / SUB) + BOX / 2, y = Math.floor(t.y / SUB) + BOX / 2;
+    if (t.kind === 'disc') {
+      Fx.burst(x, y, { n: 10, speed: 70, life: 500, grav: 220, size: 2, colors: ['#f89838', '#c85818', '#fff0c0'] });
+    } else {
+      const gold = t.kind === 'gold';
+      Fx.burst(x, y, { n: 9, speed: 45, life: 650, grav: 60, size: 2,
+        colors: gold ? ['#f8d020', '#fff8c0', '#c89000'] : ['#ffffff', '#c8c8c8', '#a87848'] });
+    }
+    // Several targets in one shot share the points.
+    if (gain > 0) Fx.popup(x, y - 10, Math.round(gain / fresh.length), fresh.length > 1 ? '#60f0ff' : '#f8d020');
+  });
+}
+
 function render(s) {
+  spotEffects(s);
   const scene = usable('scene').id;
   const birds = usable('birds').id;
   ctx.drawImage(sceneImage(scene), 0, 0);
@@ -463,6 +487,7 @@ function render(s) {
     else ctx.drawImage(birdImg(birds, t.kind, (t.age >> 3) & 1, left, false), x, y);
   }
   ctx.drawImage(bushImage(scene), 0, GROUND - 4);
+  if (window.Fx) Fx.draw(ctx);
   // Where the last shot went: a quick ring.
   if (flash && s.frame - flash.t < 8) {
     ctx.strokeStyle = 'rgba(255, 255, 255, ' + (1 - (s.frame - flash.t) / 8) + ')';

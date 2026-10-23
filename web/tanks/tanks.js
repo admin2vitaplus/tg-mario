@@ -772,13 +772,51 @@ function drawBoom(b) {
   }
 }
 
+// Picture-only effects (lib/fx.js): sparks where a shell hits, bricks crumbling, a shake for a big blast.
+let fxCells = null;
+const fxBooms = new Set();
+function spotEffects(s) {
+  if (!window.Fx) return;
+  const seen = new Set();
+  for (const b of s.booms) {
+    const key = b.x + ',' + b.y + ',' + (b.big ? 1 : 0);
+    seen.add(key);
+    if (fxBooms.has(key) || b.t > 6) continue;
+    if (b.big) {
+      Fx.shake(3, 320);
+      Fx.burst(b.x, b.y, { n: 16, speed: 70, life: 520, colors: ['#fff8c0', '#f89020', '#d82800', '#f8d020'] });
+      Fx.burst(b.x, b.y, { n: 6, speed: 25, life: 700, vy: -12, colors: ['#9c9c9c', '#6c6c6c'], size: 2 });
+    } else {
+      Fx.burst(b.x, b.y, { n: 4, speed: 45, life: 220, colors: ['#fff8c0', '#f89020'] });
+    }
+  }
+  fxBooms.clear();
+  for (const k of seen) fxBooms.add(k);
+  // Bricks that vanished since the last picture fall apart; a whole new map is not a hit.
+  const cells = s.cells;
+  if (fxCells && fxCells.length === cells.length) {
+    const gone = [];
+    for (let i = 0; i < cells.length; i++) if (fxCells[i] === BRICK && cells[i] === S.EMPTY) gone.push(i);
+    if (gone.length <= 24) {
+      for (const i of gone) {
+        Fx.burst((i % N) * CELL + 4, Math.floor(i / N) * CELL + 4,
+          { n: 3, speed: 35, life: 360, grav: 160, size: 2, colors: ['#b85418', '#e89060', '#6b2a08'] });
+      }
+    }
+  }
+  if (fxCells && fxCells.length === cells.length) fxCells.set(cells);
+  else fxCells = Uint8Array.from(cells);
+}
+
 function render(s) {
   const ground = lookItem('ground');
   ctx.fillStyle = ground.frame;
   ctx.fillRect(0, 0, W, H);
-  ctx.drawImage(groundImage(), OX, OY);
+  spotEffects(s);
+  const [sx, sy] = window.Fx ? Fx.offset() : [0, 0];
+  ctx.drawImage(groundImage(), OX + sx, OY + sy);
   ctx.save();
-  ctx.translate(OX, OY);
+  ctx.translate(OX + sx, OY + sy);
   drawCells(s, false);
   ctx.drawImage(s.baseAlive ? BASE_OK : BASE_DEAD, 96, 192);
   for (const sp of s.spawns) drawSpawn(sp);
@@ -787,6 +825,7 @@ function render(s) {
   for (const b of s.bullets) drawBullet(b);
   drawCells(s, true);
   for (const b of s.booms) drawBoom(b);
+  if (window.Fx) Fx.draw(ctx);
   s.baseCenter = [104, 200];
   drawWeather(s, FIELD, FIELD);
   if ((s.frame % 32) < 24) for (const b of s.bonuses) ctx.drawImage(BONUS[b.type], b.x, b.y);
