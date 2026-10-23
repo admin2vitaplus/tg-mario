@@ -273,6 +273,23 @@ function pix(scene, key, rows, scale = 1, pal = PAL) {
     }
   });
   c.refresh();
+  return c;
+}
+
+// A one-pixel dark rim around a sprite, so it stands out on any background.
+// The bottom row is left open: the feet stand on the ground.
+function outline(c, col = '#1a1018') {
+  const ctx = c.getContext();
+  const w = c.width, h = c.height;
+  const img = ctx.getImageData(0, 0, w, h).data;
+  const solid = (x, y) => x >= 0 && y >= 0 && x < w && y < h && img[(y * w + x) * 4 + 3] > 0;
+  ctx.fillStyle = col;
+  for (let y = 0; y < h - 1; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!solid(x, y) && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  c.refresh();
 }
 
 const HEAD = [
@@ -875,7 +892,77 @@ function ridgeTint(sky, dark) {
   return (mix(c.red, 0x5a) << 16) | (mix(c.green, 0xb0) << 8) | mix(c.blue, 0x78);
 }
 
+// The far plane differs by world: snowy peaks, the open sea or a line of fortress towers.
+// Painted in greys and tinted by each area's sky, like the ridge.
+const FAR_W = 192;
+const FAR_H = 96;
+const FAR_OF_WORLD = { 2: 'sea', 7: 'sea', 8: 'fort' };
+const farTheme = (world) => FAR_OF_WORLD[world] || 'peaks';
+
+function paintFar(ctx, theme) {
+  const r = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
+  if (theme === 'peaks') {
+    for (const [cx, h, half] of [[34, 78, 40], [104, 92, 52], [160, 70, 38], [192 + 34, 78, 40], [-192 + 160, 70, 38]]) {
+      for (let x = cx - half; x <= cx + half; x++) {
+        if (x < 0 || x >= FAR_W) continue;
+        const top = FAR_H - Math.round(h * (1 - Math.abs(x - cx) / half));
+        r(x, top, 1, FAR_H - top, x < cx ? '#d4d4d4' : '#bcbcbc');
+        // Snow on the upper third, with a ragged edge.
+        const snow = Math.round(h * 0.28) + ((x * 7) % 5) - 2;
+        if (FAR_H - top > FAR_H - (FAR_H - h + snow) && top < FAR_H - h + snow) r(x, top, 1, Math.max(0, FAR_H - h + snow - top), '#ffffff');
+      }
+    }
+  } else if (theme === 'sea') {
+    // Distant islands, then the water up to the horizon with lines of light.
+    for (const [cx, h, half] of [[40, 14, 26], [140, 9, 18]]) {
+      for (let x = cx - half; x <= cx + half; x++) {
+        const top = FAR_H - 22 - Math.round(h * Math.sqrt(1 - ((x - cx) / half) ** 2));
+        r(x, top, 1, FAR_H - 22 - top, '#b0b0b0');
+      }
+    }
+    r(0, FAR_H - 22, FAR_W, 22, '#c8c8c8');
+    r(0, FAR_H - 22, FAR_W, 1, '#ffffff');
+    for (let i = 0; i < 26; i++) r((i * 53) % FAR_W, FAR_H - 19 + ((i * 7) % 18), 4 + (i % 3) * 2, 1, '#f0f0f0');
+  } else {
+    // Fortress: walls with battlements and towers with lit slits.
+    r(0, FAR_H - 26, FAR_W, 26, '#b8b8b8');
+    for (let x = 0; x < FAR_W; x += 8) r(x, FAR_H - 30, 4, 4, '#b8b8b8');
+    for (const [x, w, h] of [[14, 18, 58], [84, 24, 74], [150, 16, 50]]) {
+      r(x, FAR_H - h, w, h, '#c8c8c8');
+      r(x + w - 3, FAR_H - h, 3, h, '#a8a8a8');
+      for (let k = 0; k < w; k += 6) r(x + k, FAR_H - h - 4, 3, 4, '#c8c8c8');
+      for (let y = FAR_H - h + 8; y < FAR_H - 30; y += 14) r(x + (w >> 1) - 1, y, 2, 5, '#ffffff');
+    }
+  }
+}
+
+function farTint(sky, dark) {
+  if (dark) return 0x384870;
+  const c = Phaser.Display.Color.HexStringToColor(sky);
+  const mix = (v, w) => Math.round(v * 0.7 + w * 0.3);
+  return (mix(c.red, 0x90) << 16) | (mix(c.green, 0xa8) << 8) | mix(c.blue, 0xc0);
+}
+
+// Low bushes along the ground in open fields, the nearest layer behind the tiles.
+function paintBushes(ctx, n) {
+  const dark = n ? '#0f4424' : '#188818', mid = n ? '#185a30' : '#30a030', light = n ? '#22703c' : '#58c048';
+  for (const [x, rad] of [[8, 7], [18, 9], [29, 7]]) pxDisc(ctx, x, 16 - rad + 2, rad, dark);
+  for (const [x, rad] of [[8, 6], [18, 8], [29, 6]]) pxDisc(ctx, x, 16 - rad + 2, rad, mid);
+  ctx.fillStyle = light;
+  for (const [x, y] of [[6, 7], [16, 4], [27, 8], [20, 8]]) ctx.fillRect(x, y, 2, 1);
+  ctx.clearRect(0, 16, 40, 4);
+}
+
 function drawScenery(scene) {
+  for (const theme of ['peaks', 'sea', 'fort']) {
+    const fc = canvasTex(scene, 'far_' + theme, FAR_W, FAR_H);
+    paintFar(fc.getContext(), theme);
+    fc.refresh();
+  }
+  const bc = canvasTex(scene, 'bushes', 40, 16);
+  paintBushes(bc.getContext(), night());
+  bc.refresh();
+
   // Far ridge: light top edge, body, and a dithered lower half that fades into the haze.
   let rc = canvasTex(scene, 'ridge', RIDGE_W, RIDGE_H);
   let rctx = rc.getContext();
@@ -1191,7 +1278,7 @@ const fire = (rows) => rows.map((r) => r.replace(/J/g, 'F').replace(/C/g, 'W'));
 
 function makeHeroTextures(scene) {
   const pal = skinPal(lookOf('hero'));
-  const hp = (key, rows) => pix(scene, key, rows, 1, pal);
+  const hp = (key, rows) => outline(pix(scene, key, rows, 1, pal));
   hp('hs0', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS]);
   hp('hs1', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS_WALK]);
   hp('hs2', [...HEAD, ...SMALL_BODY_JUMP, ...SMALL_LEGS_WALK]);
@@ -1323,8 +1410,15 @@ class Play extends Phaser.Scene {
           if (dark) far.setTint(0x46507a);
           box.push(far);
         }
-        // Far ridge on the horizon, slowest of all, in the colors of this area's sky.
-        const [ra, rb] = span(0.3);
+        // The far plane of this world, slowest of all.
+        const theme = farTheme(this.s.world);
+        const [fa, fb] = span(0.15);
+        for (let x = fa - (fa % FAR_W); x < fb; x += FAR_W) {
+          box.push(this.add.image(x, 13 * TILE, 'far_' + theme).setOrigin(0, 1).setScrollFactor(0.15)
+            .setDepth(DEPTH.SCENERY - 1).setTint(farTint(ar.sky, dark)));
+        }
+        // Far ridge on the horizon, in the colors of this area's sky; over the sea there is none.
+        const [ra, rb] = theme === 'sea' ? [0, 0] : span(0.3);
         const tint = ridgeTint(ar.sky, dark);
         for (let x = ra - (ra % RIDGE_W); x < rb; x += RIDGE_W) {
           box.push(this.add.image(x, 13 * TILE, 'ridge').setOrigin(0, 1).setScrollFactor(0.3)
@@ -1337,6 +1431,13 @@ class Play extends Phaser.Scene {
           const hill = this.add.image(x + 20, 13 * TILE, 'hill').setOrigin(0, 1).setScrollFactor(0.8).setDepth(DEPTH.SCENERY);
           if (ar.night && !night()) hill.setTint(0x6070a0);
           box.push(hill);
+        }
+        // Bushes nearer still, between the hills.
+        const [ba, bb] = span(0.9);
+        for (let x = ba, n = 0; x < bb; x += 170 + (n % 3) * 40, n++) {
+          const bush = this.add.image(x + 140, 13 * TILE, 'bushes').setOrigin(0, 1).setScrollFactor(0.9).setDepth(DEPTH.SCENERY);
+          if (ar.night && !night()) bush.setTint(0x6070a0);
+          box.push(bush);
         }
       }
       return box;

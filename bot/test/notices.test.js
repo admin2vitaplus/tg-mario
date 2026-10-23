@@ -161,12 +161,14 @@ test("changelog.json is valid, readable for players and free of forbidden words"
 });
 
 test("changelog problems are reported", () => {
-  const ok = { id: "a-1", date: "2026-10-02", title: "T", body: "B", titleEn: "T", bodyEn: "B" };
+  const ok = { id: "a-1", date: "2026-10-02", size: "major", title: "T", body: "B", titleEn: "T", bodyEn: "B" };
   assert.deepEqual(changelogProblems([ok, { ...ok, id: "a-2" }]), []);
   assert.equal(changelogProblems([ok, ok]).length, 1, "same id twice");
   assert.equal(changelogProblems([ok, { ...ok, id: "a-2", date: "2026-10-01" }]).length, 1, "out of order");
   assert.equal(changelogProblems([{ ...ok, titleEn: "" }]).length, 1, "English is required");
   assert.equal(changelogProblems([{ ...ok, id: "Bad id" }]).length, 1);
+  assert.equal(changelogProblems([{ ...ok, size: undefined }]).length, 1, "size is required");
+  assert.equal(changelogProblems([{ ...ok, size: "huge" }]).length, 1);
   assert.deepEqual(changelogProblems([ok, { ...ok, id: "a-3", date: undefined }]), [], "no date: the day it goes live");
 });
 
@@ -179,18 +181,18 @@ test("changelog entries become updates once, with their dates; edits follow, hid
     const manual = notices.add({ kind: "news", title: "Новость" }).notice;
     notices.read(1, manual.id);
     const list = [
-      { id: "old-one", date: "2026-10-01", title: "Старое", body: "", titleEn: "Old", bodyEn: "" },
-      { id: "fresh", title: "Свежее", body: "Текст", titleEn: "Fresh", bodyEn: "Text" },
+      { id: "old-one", date: "2026-10-01", size: "minor", title: "Старое", body: "", titleEn: "Old", bodyEn: "" },
+      { id: "fresh", size: "major", title: "Свежее", body: "Текст", titleEn: "Fresh", bodyEn: "Text" },
     ];
     assert.equal(notices.syncChangelog(list), 2);
     assert.equal(notices.syncChangelog(list), 0, "only once");
     let me = notices.list(1, "en");
     // Без даты — когда сервер увидел запись; список идёт по датам, новое сверху.
-    assert.deepEqual(me.items.map((i) => [i.title, i.kind]), [["Fresh", "update"], ["Новость", "news"], ["Old", "update"]]);
+    assert.deepEqual(me.items.map((i) => [i.title, i.kind]), [["Fresh", "update"], ["Новость", "news"], ["Old", "minor"]]);
     assert.equal(me.items[2].at, Date.UTC(2026, 9, 1, 9));
     assert.equal(me.unread, 2, "new entries are unread even when their date is old");
-    notices.syncChangelog([{ ...list[0], title: "Старое, исправлено" }, list[1]]);
-    assert.equal(notices.list(1).items.at(-1).title, "Старое, исправлено");
+    notices.syncChangelog([{ ...list[0], size: "major", title: "Старое, исправлено" }, list[1]]);
+    assert.deepEqual([notices.list(1).items.at(-1).title, notices.list(1).items.at(-1).kind], ["Старое, исправлено", "update"]);
     notices.hide(me.items[0].id);
     notices.syncChangelog(list);
     me = notices.list(1, "en");
