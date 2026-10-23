@@ -301,6 +301,13 @@ const SMALL_LEGS_WALK = [
   '...BBB....BBB...',
   '..BBB......BBB..',
 ];
+// Passing pose of the walk: one foot planted, the other lifted under the body.
+const SMALL_LEGS_PASS = [
+  '.....PPPPPP.....',
+  '......PPPP......',
+  '.....PPBBB......',
+  '......BBB.......',
+];
 const BIG_BODY = [
   '....JJJJJJJJ....',
   '...JJJJJJJJJJ...',
@@ -340,6 +347,13 @@ const BIG_LEGS_WALK = [
   '..PP........PP..',
   '.BBBB......BBBB.',
   '.BBBB......BBBB.',
+];
+const BIG_LEGS_PASS = [
+  '....PPP.PPP.....',
+  '.....PPPPP......',
+  '.....PPPBBB.....',
+  '.....BBBB.......',
+  '.....BBBB.......',
 ];
 
 const CROUCH = [
@@ -1177,6 +1191,9 @@ function makeHeroTextures(scene) {
   hp('hb1', [...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]);
   hp('hb2', [...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]);
   hp('hbc', CROUCH);
+  hp('hs3', [...HEAD, ...SMALL_BODY, ...SMALL_LEGS_PASS]);
+  hp('hb3', [...HEAD, ...BIG_BODY, ...BIG_LEGS_PASS]);
+  hp('hf3', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS_PASS]));
   hp('hf0', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS]));
   hp('hf1', fire([...HEAD, ...BIG_BODY, ...BIG_LEGS_WALK]));
   hp('hf2', fire([...HEAD, ...BIG_BODY_JUMP, ...BIG_LEGS_WALK]));
@@ -2034,7 +2051,8 @@ class Play extends Phaser.Scene {
     let frame = pre + '0';
     if (this.crouch) frame = pre + 'c';
     else if (!onGround) frame = pre + '2';
-    else if (Math.abs(b.velocity.x) > 5) frame = pre + (Math.floor(time / (run ? 70 : 110)) % 2);
+    // Walk in four beats: stride, pass, feet together, pass.
+    else if (Math.abs(b.velocity.x) > 5) frame = pre + '1303'[Math.floor(time / (run ? 50 : 80)) % 4];
     if (p.texture.key !== frame) p.setTexture(frame);
     p.setAlpha(time < this.invUntil && Math.floor(time / 60) % 2 ? 0.3 : 1);
   }

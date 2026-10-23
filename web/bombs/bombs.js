@@ -577,11 +577,13 @@ function spotEffects(s) {
     fxFire = new Uint8Array(n);
     fxCells = Uint8Array.from(s.cells);
     fxDead.clear();
+    scorch.length = 0;
   }
   let blasts = 0;
   for (let k = 0; k < n; k++) {
     const f = s.fire[k];
     const x = (k % COLS) * TILE + 8, y = Math.floor(k / COLS) * TILE + 8;
+    if (f && f > fxFire[k]) scorch.push({ x, y, big: s.fireKind[k] === 0, t0: Date.now() });
     if (f && f > fxFire[k] && s.fireKind[k] === 0) {
       blasts++;
       Fx.burst(x, y, { n: 14, speed: 90, life: 420, size: 2, colors: ['#fff8d0', '#f8a800', '#e83800'] });
@@ -606,6 +608,32 @@ function spotEffects(s) {
   }
 }
 
+// Soot left on the floor where flames burned; it fades within a few seconds.
+const scorch = [];
+function drawScorch() {
+  const now = Date.now();
+  for (let i = scorch.length - 1; i >= 0; i--) {
+    const m = scorch[i];
+    const k = 1 - (now - m.t0) / 5000;
+    if (k <= 0) { scorch.splice(i, 1); continue; }
+    ctx.globalAlpha = (m.big ? 0.4 : 0.22) * k;
+    ctx.fillStyle = '#000000';
+    const r = m.big ? 6 : 4;
+    for (let dy = -r; dy <= r; dy++) {
+      const w = Math.floor(Math.sqrt(r * r - dy * dy)) - ((dy + m.x) & 1);
+      if (w > 0) ctx.fillRect(m.x - w, m.y + dy, w * 2, 1);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// A soft shadow under someone standing on the floor.
+function footShadow(x, y) {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+  ctx.fillRect(x + 4, y + 14, 8, 2);
+  ctx.fillRect(x + 3, y + 15, 10, 1);
+}
+
 function render(s) {
   const p = s.players[me()] || s.players[0];
   const gr = lookItem('ground');
@@ -618,6 +646,7 @@ function render(s) {
   ctx.save();
   ctx.translate(-camX + sx, sy);
   ctx.drawImage(groundImage(), 0, 0);
+  if (window.Fx) drawScorch();
   const c0 = Math.max(0, Math.floor(camX / TILE)), c1 = Math.min(COLS - 1, c0 + VIEW_COLS);
   const block = blockTile();
   for (let cy = 0; cy < ROWS; cy++) {
@@ -660,6 +689,7 @@ function render(s) {
     const x = Math.round(e.x / S.SUB), y = Math.round(e.y / S.SUB);
     if (e.dead) { if (e.dead & 4) ctx.drawImage(ENEMY_DEAD, x, y); continue; }
     if (e.wait && (s.frame & 4)) continue;
+    footShadow(x, y);
     ctx.drawImage(ENEMY_IMG[e.type][(s.frame >> 3) & 1], x, y);
   }
   for (const pl of s.players) {
@@ -672,6 +702,7 @@ function render(s) {
       ctx.globalAlpha = 1;
       continue;
     }
+    footShadow(x, y);
     if ((pl.shield || pl.mystery) && (s.frame & 4)) ctx.globalAlpha = 0.45;
     ctx.drawImage(heroImg(heroes[pl.pi], pl.dir, pl.anim >> 3), x, y);
     ctx.globalAlpha = 1;
