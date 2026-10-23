@@ -386,8 +386,9 @@ export function createApiServer({
         if (res.playerId === user.id) {
           mine = res;
           won = got;
-          // Испытание дня: одиночная игра, начатая с первого этапа.
-          day = challenge?.record(res.playerId, game, res.score, { fromStart: !start, solo: r.replay.players === 1 }, out) ?? null;
+          // Испытание дня: одиночная игра, начатая с первого этапа, в обычном режиме
+          // («Выживание», «Без промаха» и игры с ботом считают очки по-другому).
+          day = challenge?.record(res.playerId, game, res.score, { fromStart: !start && !mode, solo: r.replay.players === 1 }, out) ?? null;
         }
       }
       economy?.setLang(user.id, user.language_code);
