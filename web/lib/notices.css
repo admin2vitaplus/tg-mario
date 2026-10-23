@@ -50,6 +50,18 @@
   border-radius: 10px;
   background: #111114;
 }
+.nItem.n-update { border-left-color: #7fe8ec; background: linear-gradient(135deg, #0c2a2c 0%, #111114 70%); }
+.n-update .nTitle { font-size: 17px; }
+/* A minor update: one compact line, no card. */
+.nItem.n-minor { margin: 0 0 6px; padding: 6px 10px; border-left: 3px solid #4a7d80; background: transparent; }
+.n-minor .nKind { color: #8fb8ba; font-weight: normal; letter-spacing: 0; text-transform: none; }
+.n-minor .nTitle { margin-top: 2px; font-size: 13px; }
+.n-minor .nHead { flex-wrap: nowrap; }
+.n-minor .nNew { padding: 0 5px; font-size: 10px; }
+.n-minor .nBody { margin-top: 2px; font-size: 12px; color: #aaa; }
+.nSizes { margin: 0 0 10px; }
+.wallet.notices .nSizes button { padding: 7px 4px; }
+.wallet.notices .nSizes button.on { background: #1fa2a8; color: #fff; }
 .nItem.n-news { border-left-color: #f8d020; }
 .nItem.n-personal { border-left-color: #8fdf6f; background: #0f1610; }
 .nItem.unread { border-top-color: rgba(248, 208, 32, 0.45); border-right-color: rgba(248, 208, 32, 0.45); border-bottom-color: rgba(248, 208, 32, 0.45); }

@@ -6,7 +6,9 @@ import { readFileSync } from "node:fs";
 // (syncChangelog). Таблицы — миграции 12 и 13 в db.js. Текст хранится как есть и на странице
 // вставляется только как текст.
 
-export const KINDS = ["update", "news", "personal"];
+// update — крупное обновление, minor — небольшое (в журнале изменений size: major | minor).
+export const KINDS = ["update", "minor", "news", "personal"];
+const KIND_OF_SIZE = { major: "update", minor: "minor" };
 export const LIMITS = { title: 80, body: 2000 };
 // Сколько последних уведомлений получает игрок: старые и так никто не листает.
 export const PLAYER_LIST = 50;
@@ -25,8 +27,8 @@ export function createNotices(store, { now = Date.now } = {}) {
       WHERE hidden_at IS NULL AND (player_id IS NULL OR player_id = ?) ORDER BY created_at DESC, id DESC LIMIT ?`),
     byRef: db.prepare("SELECT * FROM notices WHERE ref = ?"),
     addRef: db.prepare(`INSERT INTO notices (kind, player_id, title, body, title_en, body_en, created_at, ref)
-      VALUES ('update', NULL, ?, ?, ?, ?, ?, ?)`),
-    editRef: db.prepare("UPDATE notices SET title = ?, body = ?, title_en = ?, body_en = ? WHERE ref = ?"),
+      VALUES (?, NULL, ?, ?, ?, ?, ?, ?)`),
+    editRef: db.prepare("UPDATE notices SET kind = ?, title = ?, body = ?, title_en = ?, body_en = ? WHERE ref = ?"),
     unread: db.prepare(`SELECT COUNT(*) AS n FROM notices
       WHERE hidden_at IS NULL AND (player_id IS NULL OR player_id = ?) AND id > ?`),
     seen: db.prepare("SELECT last_id FROM notice_seen WHERE player_id = ?"),
@@ -65,7 +67,7 @@ export function createNotices(store, { now = Date.now } = {}) {
       const id = Number(q.add.run(kind, playerId, title, body, titleEn, bodyEn, now()).lastInsertRowid);
       return { ok: true, notice: q.get.get(id) };
     },
-    // Журнал изменений (readChangelog) → уведомления «Обновление» для всех. Новая запись добавляется
+    // Журнал изменений (readChangelog) → уведомления «Обновление» (крупное или небольшое) для всех. Новая запись добавляется
     // один раз (по id записи) с датой из журнала, а без даты — с моментом, когда её увидел сервер, то есть
     // когда обновление вышло. Исправленный в журнале текст исправляется и у игроков; убранное в панели
     // остаётся убранным. Возвращает, сколько записей добавлено.
@@ -78,14 +80,15 @@ export function createNotices(store, { now = Date.now } = {}) {
           const body = clean(e.body, LIMITS.body);
           const titleEn = clean(e.titleEn, LIMITS.title) || null;
           const bodyEn = clean(e.bodyEn, LIMITS.body) || null;
+          const kind = KIND_OF_SIZE[e.size] || "update";
           const old = q.byRef.get(e.id);
           if (!old) {
             // Записи одного дня идут по порядку журнала: следующая — на секунду позже.
             const at = e.date ? Date.parse(`${e.date}T09:00:00Z`) + i * 1000 : now();
-            q.addRef.run(title, body, titleEn, bodyEn, at, e.id);
+            q.addRef.run(kind, title, body, titleEn, bodyEn, at, e.id);
             added++;
-          } else if (old.title !== title || old.body !== body || old.title_en !== titleEn || old.body_en !== bodyEn) {
-            q.editRef.run(title, body, titleEn, bodyEn, e.id);
+          } else if (old.kind !== kind || old.title !== title || old.body !== body || old.title_en !== titleEn || old.body_en !== bodyEn) {
+            q.editRef.run(kind, title, body, titleEn, bodyEn, e.id);
           }
         });
         db.exec("COMMIT");
@@ -120,7 +123,9 @@ export function createNotices(store, { now = Date.now } = {}) {
   };
 }
 
-// Журнал изменений: [{ id, date?, title, body, titleEn?, bodyEn? }], см. bot/changelog.json.
+// Журнал изменений: [{ id, date?, size, title, body, titleEn, bodyEn }], см. bot/changelog.json.
+// size: major — крупное обновление (новая игра, мир, режим, заметная возможность), minor — небольшое
+// (улучшение, ускорение, исправление); у игроков крупные выделены, небольшие — короткой строкой.
 // Ошибка в файле не останавливает бота: тест (notices.test.js) ловит её раньше, чем она попадёт на сервер.
 export const CHANGELOG_FILE = new URL("./changelog.json", import.meta.url);
 export function readChangelog(file = CHANGELOG_FILE) {
@@ -145,6 +150,7 @@ export function changelogProblems(list) {
       else if (e.date < last) out.push(`${where}: записи идут по датам, новые — в конец`);
       else last = e.date;
     }
+    if (!KIND_OF_SIZE[e?.size]) out.push(`${where}: size — major (крупное) или minor (небольшое)`);
     if (typeof e?.title !== "string" || !e.title.trim() || e.title.length > LIMITS.title) out.push(`${where}: заголовок до ${LIMITS.title} знаков`);
     if (typeof e?.body !== "string" || e.body.length > LIMITS.body) out.push(`${where}: текст до ${LIMITS.body} знаков`);
     if (typeof e?.titleEn !== "string" || !e.titleEn.trim() || e.titleEn.length > LIMITS.title) out.push(`${where}: titleEn до ${LIMITS.title} знаков`);
