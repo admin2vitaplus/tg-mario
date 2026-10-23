@@ -213,5 +213,13 @@
     "body": "Новые находки: пинок (толкай бомбы, они катятся до препятствия) и перчатка (B бросает бомбу через стены). В дуэли через две минуты поле начинает сжиматься стальными блоками, так что матч всегда заканчивается.",
     "titleEn": "Bomb Field: kick, glove and a closing field",
     "bodyEn": "New finds: the kick (push bombs and they roll until something stops them) and the glove (B throws a bomb over walls). In a duel the field starts closing in with steel after two minutes, so every match has an ending."
+  },
+  {
+    "id": "2026-10-23-tanks-survival",
+    "size": "major",
+    "title": "«Танкодром»: режим «Выживание»",
+    "body": "Новый режим в меню: одна карта и волны врагов без конца, каждая больше и злее прошлой. Сколько волн удержите?",
+    "titleEn": "Tank Field: Survival mode",
+    "bodyEn": "A new mode in the menu: one map and endless enemy waves, each bigger and fiercer than the last. How many can you hold?"
   }
 ]

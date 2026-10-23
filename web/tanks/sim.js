@@ -33,6 +33,15 @@ function wave(n) {
   return [plain, 20 - plain - rapid - armored, rapid, armored];
 }
 const FLASH_AT = [3, 10, 17]; // these enemies carry a bonus
+// Rules version: 2 adds the «Выживание» mode. A game is replayed with the rules it was played
+// under; old games come without one and are 1.
+const RULES = 2;
+// Modes: '' the usual stages, 'survival' — one map, endless waves, alone (from rules 2).
+const MODES = ['', 'survival'];
+// Survival: wave n (from 0) brings 10 + n enemies, up to 20, of the kinds of stage n;
+// the difficulty (how many at once, how often they shoot) is that of stage n as well.
+const SURVIVAL_MAP = 0;
+const SURVIVAL_REST = 120;  // frames between two waves
 const PLAYER_SPAWN = [[64, 192], [128, 192]];
 const ENEMY_SPAWN_X = [96, 192, 0];
 const BASE_WALL = [[11, 23], [11, 24], [11, 25], [12, 23], [13, 23], [14, 23], [14, 24], [14, 25]];
@@ -860,8 +869,9 @@ function onIce(s, t) {
 }
 
 // ---------- Game setup ----------
-function newGame(players, seed) {
-  const s = { seed: seed | 0, frame: 0, twoP: players === 2, won: false, players: [], events: [] };
+// opts: { rules, mode } — see RULES and MODES.
+function newGame(players, seed, opts = {}) {
+  const s = { rules: opts.rules || 1, mode: opts.mode || '', wave: 0, rest: 0, seed: seed | 0, frame: 0, twoP: players === 2, won: false, players: [], events: [] };
   for (let i = 0; i < players; i++) {
     s.players.push({ pi: i, lives: 3, level: 0, score: 0, tank: null, respawn: 0, kills: [0, 0, 0, 0] });
   }
@@ -869,8 +879,30 @@ function newGame(players, seed) {
   return s;
 }
 
+const survival = (s) => s.mode === 'survival';
+// The stage whose difficulty applies: in survival it grows with the waves.
+const level = (s) => (survival(s) ? Math.min(STAGES - 1, s.wave) : s.stage);
+
+// The next wave's enemies, shuffled.
+function fillQueue(s, n) {
+  const queue = [];
+  wave(n).forEach((count, type) => {
+    for (let i = 0; i < count; i++) queue.push(type);
+  });
+  for (let i = queue.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd(s) * (i + 1));
+    [queue[i], queue[j]] = [queue[j], queue[i]];
+  }
+  if (survival(s)) queue.length = Math.min(queue.length, 10 + n);
+  s.queue = queue;
+  s.total = queue.length;
+  s.spawned = 0;
+  s.spawnStarts = 0;
+  s.spawnTimer = 0;
+}
+
 function startStage(s, n) {
-  const map = MAPS[Math.min(n, STAGES - 1)];
+  const map = MAPS[survival(s) ? SURVIVAL_MAP : Math.min(n, STAGES - 1)];
   s.stage = n;
   s.mapName = map.name;
   s.cells = parseMap(map.rows);
@@ -883,19 +915,7 @@ function startStage(s, n) {
   s.freeze = 0;
   s.shovel = 0;
   s.nextId = 1;
-  const queue = [];
-  wave(n).forEach((count, type) => {
-    for (let i = 0; i < count; i++) queue.push(type);
-  });
-  for (let i = queue.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd(s) * (i + 1));
-    [queue[i], queue[j]] = [queue[j], queue[i]];
-  }
-  s.queue = queue;
-  s.total = queue.length;
-  s.spawned = 0;
-  s.spawnStarts = 0;
-  s.spawnTimer = 0;
+  fillQueue(s, survival(s) ? 0 : n);
   s.spawnPoint = 0;
   s.phase = 'intro';
   s.phaseT = 0;
@@ -1179,18 +1199,21 @@ function pickDir(s, e) {
 // Difficulty grows with the stage: more enemies at once, shorter pauses between them.
 // The first stages set the pace; from stage 21 and 36 one more enemy may be out at once.
 function fieldCap(s) {
-  const late = (s.stage >= 20 ? 1 : 0) + (s.stage >= 35 ? 1 : 0);
-  return Math.min(s.twoP ? 8 : 6, (s.twoP ? 6 : 4) + Math.floor(s.stage / 2)) + late;
+  const n = level(s);
+  const late = (n >= 20 ? 1 : 0) + (n >= 35 ? 1 : 0);
+  return Math.min(s.twoP ? 8 : 6, (s.twoP ? 6 : 4) + Math.floor(n / 2)) + late;
 }
 
 function spawnDelay(s) {
   if (s.spawnStarts < 3) return 20;
-  return Math.max(s.stage >= 30 ? 24 : 30, 100 - s.stage * 12);
+  const n = level(s);
+  return Math.max(n >= 30 ? 24 : 30, 100 - n * 12);
 }
 
 // Moving enemies shoot more often on later stages.
 function fireOdds(s) {
-  return 1 / Math.max(s.stage >= 40 ? 20 : s.stage >= 25 ? 24 : 28, 56 - s.stage * 5);
+  const n = level(s);
+  return 1 / Math.max(n >= 40 ? 20 : n >= 25 ? 24 : 28, 56 - n * 5);
 }
 
 function updateEnemies(s, spawning) {
@@ -1229,6 +1252,19 @@ function updateEnemies(s, spawning) {
   }
 }
 
+// Survival: a short rest, the base wall is mended, then the next, bigger wave.
+function nextWave(s) {
+  if (!s.rest) {
+    s.rest = SURVIVAL_REST;
+    s.events.push('wave');
+    return;
+  }
+  if (--s.rest > 0) return;
+  s.wave++;
+  if (!s.shovel) setWalls(s, BRICK);
+  fillQueue(s, s.wave);
+}
+
 // ---------- One frame (60 per second) ----------
 function step(s, inputs) {
   s.frame++;
@@ -1255,8 +1291,11 @@ function step(s, inputs) {
       s.phaseT = 0;
       s.events.push('over');
     } else if (!s.queue.length && !s.enemies.length && !s.spawns.length) {
-      s.phase = 'clear';
-      s.phaseT = 0;
+      if (survival(s)) nextWave(s);
+      else {
+        s.phase = 'clear';
+        s.phaseT = 0;
+      }
     }
   } else if (s.phase === 'over') {
     if (++s.phaseT >= 200) s.phase = 'overDone';
@@ -1272,5 +1311,6 @@ root.TankSim = {
   fieldCap, spawnDelay, bonusSpotOk, spawnBonus,
   CELL, N, FIELD, EMPTY, BRICK, STEEL, WATER, FOREST, ICE, BASE, UP, RIGHT, DOWN, LEFT,
   ENEMY, MAPS, STAGES, wave, newGame, startStage, step,
+  RULES, MODES, SURVIVAL_REST,
 };
 })(typeof window !== 'undefined' ? window : globalThis);

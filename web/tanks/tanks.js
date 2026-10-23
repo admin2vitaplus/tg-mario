@@ -923,13 +923,14 @@ function hud(s) {
   const score = s.players.reduce((a, p) => a + p.score, 0);
   const lives = s.players.map((p) => Math.max(0, p.lives)).join(' · ');
   const foes = s.queue.length + s.spawns.length + s.enemies.length;
-  const line = [score, lives, foes, s.stage].join('|');
+  const line = [score, lives, foes, s.stage, s.wave].join('|');
   if (line === lastHud) return;
   lastHud = line;
   $('score').textContent = String(score).padStart(6, '0');
   $('lives').textContent = lives;
   $('foes').textContent = String(foes);
-  $('stage').textContent = String(s.stage + 1);
+  $('stage').textContent = String((s.mode === 'survival' ? s.wave : s.stage) + 1);
+  document.querySelector('[data-t="hud_stage"]').textContent = T(s.mode === 'survival' ? 'hud_wave' : 'hud_stage');
 }
 
 // Map names live in sim.js in Russian; the dictionary has them by map number.
@@ -941,7 +942,8 @@ function mapTitle(name) {
 let bannerText = '';
 function banner(s) {
   let text = '', cls = '';
-  if (s.phase === 'intro') text = T('banner_stage', { n: s.stage + 1, map: mapTitle(s.mapName).toUpperCase() });
+  if (s.phase === 'intro') text = s.mode === 'survival' ? T('banner_survival') : T('banner_stage', { n: s.stage + 1, map: mapTitle(s.mapName).toUpperCase() });
+  else if (s.mode === 'survival' && s.rest > 0 && s.phase === 'play') text = T('banner_wave_done', { n: s.wave + 1 });
   else if (s.won) text = T('won_title');
   else if (s.phase === 'over' || s.phase === 'overDone') { text = T('game_over'); cls = 'over'; }
   if (text === bannerText) return;
@@ -999,7 +1001,7 @@ const canPick = () => !!window.Progress && window.Progress.open('tanks', STAGE_C
 function showPick(btn) { btn.classList.toggle('hidden', !canPick()); }
 function openPick() {
   audio();
-  window.Progress.pick({ game: 'tanks', count: STAGE_COUNT, cols: 5, onPick: (i) => beginLocal(1, i) });
+  window.Progress.pick({ game: 'tanks', count: STAGE_COUNT, cols: 5, onPick: (i) => { variant = ''; beginLocal(1, i); } });
 }
 $('btnPick').addEventListener('click', openPick);
 $('ovPick').addEventListener('click', openPick);
@@ -1014,20 +1016,25 @@ $('ovBtn').addEventListener('click', () => {
   if (act) act();
 });
 
+// The mode of the next game alone: '' the stages, 'survival' — «Выживание» (sim.js).
+let variant = '';
 for (const b of document.querySelectorAll('#menu button[data-players]')) {
-  b.addEventListener('click', () => { audio(); beginLocal(Number(b.dataset.players)); });
+  b.addEventListener('click', () => { audio(); variant = ''; beginLocal(Number(b.dataset.players)); });
 }
+$('btnSurvival').addEventListener('click', () => { audio(); variant = 'survival'; beginLocal(1); });
 
 function resultText(s) {
   const score = s.players.reduce((a, p) => a + p.score, 0);
-  return (s.won ? T('won_text', { n: S.STAGES }) : s.baseAlive ? T('all_killed') : T('base_lost')) + '<br>' + T('stage_line', { n: s.stage + 1 }) + '<br>' + T('score_line', { n: score });
+  const how = s.won ? T('won_text', { n: S.STAGES }) : s.baseAlive ? T('all_killed') : T('base_lost');
+  const reached = s.mode === 'survival' ? T('wave_line', { n: s.wave }) : T('stage_line', { n: s.stage + 1 });
+  return how + '<br>' + reached + '<br>' + T('score_line', { n: score });
 }
 
 // «Поделиться итогом»: the result goes to any Telegram chat with a link to the bot.
 let shareText = '';
 function showShare(s) {
   const score = s.players.reduce((a, p) => a + p.score, 0);
-  shareText = T(s.players.length > 1 ? 'share_duo' : 'share_solo', { n: s.stage + 1, score });
+  shareText = s.mode === 'survival' ? T('share_survival', { n: s.wave, score }) : T(s.players.length > 1 ? 'share_duo' : 'share_solo', { n: s.stage + 1, score });
   $('ovShare').textContent = T('btn_share');
   $('ovShare').classList.remove('hidden');
 }
@@ -1583,7 +1590,8 @@ function recNext() {
 function sendRun(s, quit) {
   if (!rec.seed || mode === 'guest' || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
   recFlush();
-  const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(',') };
+  const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(','), rules: S.RULES };
+  if (rec.mode) body.mode = rec.mode;
   if (rec.start) body.start = rec.start;
   if (mode === 'host' && /^\d{4,8}$/.test(net.code)) body.room = net.code;
   rec.seed = 0;
@@ -1620,8 +1628,9 @@ function begin(players, start) {
   const t = mode !== 'guest' && ticket.next;
   ticket.next = null;
   keepTicket();
-  Object.assign(rec, { seed: t ? t.seed : 0, players, start, out: [], prev: -1, n: 0, frames: 0 });
-  state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1);
+  const v = players === 1 && !start && mode === 'local' ? variant : '';
+  Object.assign(rec, { seed: t ? t.seed : 0, players, start, mode: v, out: [], prev: -1, n: 0, frames: 0 });
+  state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1, { rules: S.RULES, mode: v });
   if (start) S.startStage(state, start); // the same as bot/tanks-replay.js
   fetchTicket();
   track('game_start');
