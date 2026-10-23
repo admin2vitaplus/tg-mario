@@ -359,3 +359,16 @@ test('looks: only the standard item is free, the rest match the server shop', ()
   const prices = new Set(economy.shop.map((it) => it.price));
   assert.ok(prices.size >= 5, 'prices differ');
 });
+
+// ---------- Notifications (lib/notices.js) ----------
+
+test('notifications: both languages, texts from the server go in only as text', () => {
+  const src = read(path.join(WEB, 'lib/notices.js'));
+  const dict = (lang) => Object.keys(eval('(' + new RegExp(lang + ': (\\{[\\s\\S]*?\\n  \\})').exec(src)[1] + ')')).sort();
+  assert.deepEqual(dict('ru'), dict('en'));
+  // The only markup is the button's fixed frame; titles and texts use textContent.
+  assert.deepEqual(src.match(/innerHTML\s*=.*/g), ["innerHTML = '<span class=\"nbLabel\"></span><span class=\"nbSub\"></span><b class=\"nbCount\"></b><i>›</i>';"]);
+  const page = read(path.join(WEB, 'index.html'));
+  assert.ok(page.indexOf('lib/notices.js') > page.indexOf('lib/wallet.js'), 'the button goes under the жетоны banner');
+  assert.match(page, /lib\/notices\.css/);
+});

@@ -282,6 +282,27 @@ export const MIGRATIONS = [
     }
     db.exec("CREATE INDEX IF NOT EXISTS level_results_level ON level_results(player_id, level)");
   },
+  // 12. Уведомления в меню (notices.js): обновления и новости для всех (player_id NULL) и личные игроку.
+  // Убранное из панели не удаляется, а получает hidden_at. notice_seen — последнее прочитанное
+  // уведомление игрока: непрочитанные — те, что новее.
+  `
+    CREATE TABLE IF NOT EXISTS notices (
+      id INTEGER PRIMARY KEY,
+      kind TEXT NOT NULL,
+      player_id INTEGER,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      title_en TEXT,
+      body_en TEXT,
+      created_at INTEGER NOT NULL,
+      hidden_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS notices_player ON notices(player_id, id);
+    CREATE TABLE IF NOT EXISTS notice_seen (
+      player_id INTEGER PRIMARY KEY,
+      last_id INTEGER NOT NULL
+    );
+  `,
 ];
 
 export function migrate(db) {

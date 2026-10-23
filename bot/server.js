@@ -33,6 +33,8 @@ function send(res, status, body, gzip = false) {
 }
 
 export const MAX_BODY = 4096;
+// Уведомление из панели: заголовок и текст на двух языках (кириллица — 2 байта на букву).
+export const MAX_NOTICE_BODY = 24 * 1024;
 
 class HttpError extends Error {
   constructor(status, msg) { super(msg); this.status = status; }
@@ -74,7 +76,7 @@ export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
   store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
-  tanks = null, bombs = null, range = null, createInvoice = null, word = null, admin = null,
+  tanks = null, bombs = null, range = null, createInvoice = null, word = null, admin = null, notices = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -412,6 +414,21 @@ export function createApiServer({
     };
   }
 
+  // Уведомления в меню (notices.js): список с числом непрочитанных и отметка «прочитано до».
+  if (notices) {
+    routes["GET /api/notices"] = (_body, user, url) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const lang = url.searchParams.get("lang") === "en" ? "en" : "ru";
+      return [200, notices.list(user.id, lang)];
+    };
+    routes["POST /api/notices/read"] = (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const upTo = Number(body.upTo);
+      if (!Number.isSafeInteger(upTo) || upTo < 0) return [400, { error: "bad data" }];
+      return [200, notices.read(user.id, upTo)];
+    };
+  }
+
   // Статистика (ТЗ P0-5): { type, game, ref? }. Ответ всегда 204 — игре не нужно ничего с ним делать.
   routes["POST /api/events"] = (body, user) => {
     if (!user) return [401, { error: "unauthorized" }];
@@ -460,7 +477,9 @@ export function createApiServer({
       return send(res, 429, { error: "too many requests" });
     }
     try {
-      const body = req.method === "POST" ? await readJson(req, path === "/api/tanks/run" || path === "/api/bombs/run" || path === "/api/range/run" ? MAX_REPLAY_BODY : MAX_BODY) : null;
+      const limit = path === "/api/tanks/run" || path === "/api/bombs/run" || path === "/api/range/run" ? MAX_REPLAY_BODY
+        : path === "/api/admin/notice" ? MAX_NOTICE_BODY : MAX_BODY;
+      const body = req.method === "POST" ? await readJson(req, limit) : null;
       const user = userFrom(req);
       if (req.method === "POST" && user && !byUser.take(user.id)) {
         res.setHeader("Retry-After", String(byUser.retryAfter(user.id)));

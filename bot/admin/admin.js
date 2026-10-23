@@ -32,6 +32,15 @@
       limit_mem: 'предел 256 МБ', limit_cpu: 'предел 40 %', h: 'ч', m: 'мин', none: 'нет',
       r_achievement: 'достижение', r_record: 'рекорд', r_daily: 'вход за день', r_task: 'задание', r_invite: 'приглашение',
       r_prize: 'приз недели', r_shop: 'покупка', r_annul: 'аннулировано', r_admin: 'вручную',
+      tab_notices: 'Уведомления', n_new: 'Новое уведомление', n_kind: 'Что это', k_update: 'Обновление', k_news: 'Новость',
+      k_personal: 'Личное', n_to: 'Кому', n_all: 'Всем игрокам', n_one: 'Одному игроку', n_player: 'id игрока',
+      n_title: 'Заголовок', n_body: 'Текст', n_en: 'По-английски (для игроков с английским Telegram; можно не заполнять)',
+      n_title_en: 'Title', n_body_en: 'Text', n_tg: 'Отправить и сообщением бота в Telegram', n_send: 'Опубликовать',
+      sure_all: 'Опубликовать уведомление для всех игроков?', sure_one: 'Отправить уведомление игроку {n}?',
+      n_sent: 'Опубликовано.', tg_sent: 'Сообщение в Telegram отправлено.', tg_failed: 'В Telegram не ушло (игрок мог остановить бота), но в игре уведомление есть.',
+      n_list: 'Опубликованные', n_hide: 'Убрать', sure_hide: 'Убрать это уведомление у игроков?', n_hidden: 'убрано',
+      n_read: 'прочитано', n_unread: 'не прочитано', n_everyone: 'всем', n_empty: 'Нужен заголовок или текст.',
+      no_player: 'Игрока с таким id нет.', to_player: '🔔 Уведомление игроку',
     },
     en: {
       title: '◆ Dashboard', login: 'Login', password: 'Password', sign_in: 'Sign in', sign_out: 'Sign out',
@@ -60,6 +69,15 @@
       limit_mem: 'limit 256 MB', limit_cpu: 'limit 40%', h: 'h', m: 'min', none: 'none',
       r_achievement: 'achievement', r_record: 'record', r_daily: 'daily visit', r_task: 'task', r_invite: 'invite',
       r_prize: 'weekly prize', r_shop: 'purchase', r_annul: 'cancelled', r_admin: 'manual',
+      tab_notices: 'Notifications', n_new: 'New notification', n_kind: 'Kind', k_update: 'Update', k_news: 'News',
+      k_personal: 'Personal', n_to: 'To', n_all: 'All players', n_one: 'One player', n_player: 'player id',
+      n_title: 'Title', n_body: 'Text', n_en: 'In English (for players with English Telegram; optional)',
+      n_title_en: 'Title', n_body_en: 'Text', n_tg: 'Also send as a bot message in Telegram', n_send: 'Publish',
+      sure_all: 'Publish the notification to all players?', sure_one: 'Send the notification to player {n}?',
+      n_sent: 'Published.', tg_sent: 'The Telegram message was sent.', tg_failed: 'Telegram did not deliver it (the player may have stopped the bot), but it is in the game.',
+      n_list: 'Published', n_hide: 'Remove', sure_hide: 'Remove this notification for players?', n_hidden: 'removed',
+      n_read: 'read', n_unread: 'not read', n_everyone: 'everyone', n_empty: 'A title or a text is needed.',
+      no_player: 'No player with this id.', to_player: '🔔 Notify the player',
     },
   };
 
@@ -163,7 +181,7 @@
   }
 
   // ---------- Вкладки ----------
-  var TABS = ['overview', 'players', 'economy', 'stars', 'server'];
+  var TABS = ['overview', 'players', 'notices', 'economy', 'stars', 'server'];
   var current = 'overview';
   var overview = null;
   function tabs() {
@@ -176,6 +194,7 @@
     current = tab;
     tabs();
     if (tab === 'players') return players('');
+    if (tab === 'notices') return notices(null);
     if (overview && !force) return render();
     // Пока свежая сводка идёт через туннель, показываем прошлую из этой вкладки (если есть).
     var saved = null;
@@ -185,7 +204,7 @@
       overview = o;
       try { sessionStorage.setItem('admin-overview', JSON.stringify(o)); } catch (e) { /* без хранилища */ }
       out.hidden = false;
-      if (current !== 'players') render();
+      if (current !== 'players' && current !== 'notices') render();
     }).catch(fail);
   }
   function render() {
@@ -354,6 +373,7 @@
             : h('span', { class: 'inline' }, why, h('button', { type: 'button', on: { click: function () { act('flag', { id: p.id, why: why.value }); } } }, T('flag'))),
           h('button', { type: 'button', class: 'danger', on: { click: function () { act('annul', { id: p.id }, T('sure_annul')); } } }, T('annul'))),
         msg),
+      h('button', { type: 'button', on: { click: function () { notices(p.id); } } }, T('to_player')),
       card(T('purchases'), p.purchases.length ? p.purchases.map(function (u) {
         return h('div', { class: 'kv' },
           h('span', { text: when(u.at) + ' · ' + itemName(u.item) }),
@@ -367,6 +387,79 @@
           h('b', { class: r.amount < 0 ? 'neg' : 'pos', text: (r.amount > 0 ? '+' : '') + r.amount }));
       }) : note(T('none'))),
     ];
+  }
+
+  // ---------- Уведомления ----------
+  // Форма: обновление или новость всем, или личное одному игроку (forPlayer — id из карточки игрока).
+  function notices(forPlayer) {
+    if (current !== 'notices') { current = 'notices'; tabs(); }
+    var formKey = key();
+    var kind = h('select', null, h('option', { value: 'update', text: T('k_update') }), h('option', { value: 'news', text: T('k_news') }));
+    var to = h('select', null, h('option', { value: 'all', text: T('n_all') }), h('option', { value: 'one', text: T('n_one') }));
+    var pid = h('input', { type: 'number', inputmode: 'numeric', placeholder: T('n_player'), step: '1' });
+    var title = h('input', { type: 'text', maxlength: '80', placeholder: T('n_title') });
+    var body = h('textarea', { rows: '5', maxlength: '2000', placeholder: T('n_body') });
+    var titleEn = h('input', { type: 'text', maxlength: '80', placeholder: T('n_title_en') });
+    var bodyEn = h('textarea', { rows: '3', maxlength: '2000', placeholder: T('n_body_en') });
+    var tg = h('input', { type: 'checkbox' });
+    var tgRow = h('label', { class: 'check' }, tg, ' ' + T('n_tg'));
+    var msg = h('p', { class: 'msg' });
+    var list = h('div', null, note(T('loading')));
+    if (forPlayer) { to.value = 'one'; pid.value = String(forPlayer); }
+    function sync() {
+      var one = to.value === 'one';
+      pid.hidden = !one;
+      kind.disabled = one;
+      tgRow.hidden = !one;
+    }
+    to.addEventListener('change', sync);
+    sync();
+    var send = h('button', { type: 'button', on: { click: function () {
+      var one = to.value === 'one';
+      var n = Math.trunc(Number(pid.value));
+      msg.className = 'msg';
+      if (!title.value.trim() && !body.value.trim()) { msg.textContent = T('n_empty'); return; }
+      if (one && !(n > 0)) { msg.textContent = T('no_player'); return; }
+      if (!confirm(one ? T('sure_one', { n: n }) : T('sure_all'))) return;
+      send.disabled = true;
+      api('POST', 'notice', {
+        kind: kind.value, player: one ? n : null, title: title.value, body: body.value,
+        titleEn: titleEn.value, bodyEn: bodyEn.value, telegram: one && tg.checked, key: formKey,
+      }).then(function (r) {
+        msg.className = 'msg ok';
+        msg.textContent = T('n_sent') + (r.telegram === 'sent' ? ' ' + T('tg_sent') : r.telegram === 'failed' ? ' ' + T('tg_failed') : '');
+        formKey = key();
+        title.value = body.value = titleEn.value = bodyEn.value = '';
+        load();
+      }).catch(function (err) {
+        if (err instanceof NeedLogin) return fail(err);
+        msg.textContent = err.status === 404 ? T('no_player') : err.message;
+      }).then(function () { send.disabled = false; });
+    } } }, T('n_send'));
+    function load() {
+      api('GET', 'notices').then(function (r) {
+        tg.disabled = !r.telegram;
+        list.replaceChildren.apply(list, r.items.length ? r.items.map(noticeRow) : [note(T('none'))]);
+      }).catch(fail);
+    }
+    function noticeRow(n) {
+      var who = n.playerId ? name({ name: n.name || '?', username: n.username }) + ' · ' + n.playerId + ' · ' + T(n.read ? 'n_read' : 'n_unread') : T('n_everyone');
+      return h('div', { class: 'notice' + (n.hiddenAt ? ' gone' : '') },
+        h('div', { class: 'small' }, when(n.at) + ' · ' + T('k_' + n.kind) + ' · ' + who + (n.hiddenAt ? ' · ' + T('n_hidden') : '')),
+        n.title ? h('b', { text: n.title }) : null,
+        n.body ? h('p', { class: 'body', text: n.body }) : null,
+        n.titleEn || n.bodyEn ? h('p', { class: 'small', text: 'EN: ' + [n.titleEn, n.bodyEn].filter(Boolean).join(' — ') }) : null,
+        n.hiddenAt ? null : h('button', { type: 'button', class: 'mini', on: { click: function () {
+          if (!confirm(T('sure_hide'))) return;
+          api('POST', 'notice/hide', { id: n.id }).then(load).catch(fail);
+        } } }, T('n_hide')));
+    }
+    main.replaceChildren(
+      card(T('n_new'),
+        h('div', { class: 'inline' }, to, kind), pid, title, body,
+        h('p', { class: 'small', text: T('n_en') }), titleEn, bodyEn, tgRow, send, msg),
+      card(T('n_list'), list));
+    load();
   }
 
   // ---------- Старт ----------
@@ -391,6 +484,7 @@
   document.getElementById('reload').addEventListener('click', function () {
     if (!token) return;
     if (current === 'players') players('');
+    else if (current === 'notices') notices(null);
     else show(current, true);
   });
   start();
