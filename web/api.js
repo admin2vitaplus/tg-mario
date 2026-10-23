@@ -42,7 +42,9 @@ let run;
 function newRun() { run = { deaths: 0, levelDeaths: 0, coins: 0, bossFire: false, at: 0, reported: 0, first: true, pending: Promise.resolve() }; }
 newRun();
 // Новая игра с 1-1 или с выбранного уровня (lib/progress.js).
-function begin() { newRun(); run.at = Date.now(); }
+// While a game is on, closing the mini app asks first (lib/back.js).
+const guard = (on) => { if (window.Back && window.Back.guard) window.Back.guard(on); };
+function begin() { newRun(); run.at = Date.now(); guard(true); }
 // Брошенная посередине игра засчитывается, если в неё играли хотя бы 20 секунд.
 const QUIT_MS = 20000;
 
@@ -70,6 +72,7 @@ function levelDone(level, score, timeLeft, world) {
 // Сервер сверяет число уровней с отчётами, которые он принял, поэтому итог ждёт отчёт в пути
 // и называет столько уровней, сколько отчётов дошло: один потерянный отчёт не губит всю игру.
 function runDone(score, levels, completed, keepalive) {
+  guard(false);
   const r = run;
   newRun();
   if (!canSave()) return Promise.resolve(null);
@@ -138,6 +141,7 @@ function openScores() {
 
 // Игрок уходит в меню или закрывает игру посередине: итог того, что сыграно.
 function quit(score, levels) {
+  guard(false);
   if (!run.at || Date.now() - run.at < QUIT_MS) return Promise.resolve(null);
   return runDone(score, levels, false, true);
 }

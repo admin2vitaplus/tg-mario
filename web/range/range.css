@@ -155,12 +155,24 @@ body.touchAim #controls { display: none; }
 @media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
   #app {
     display: grid;
-    grid-template-columns: 1fr minmax(0, 1.7fr) 1fr;
+    /* The field takes the whole height; the score moves to the top of the left column. */
+    grid-template-columns: minmax(150px, 1fr) minmax(0, calc(100vh * 1.15)) minmax(150px, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-    grid-template-areas: "left hud right" "left game right";
+    grid-template-areas: "hud game right" "left game right";
     padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
-  #hud { grid-area: hud; padding: 3px 0; font-size: 10px; line-height: 1.2; }
+  #hud {
+    grid-area: hud;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 42px 0 0 10px;
+    font-size: 10px;
+    line-height: 1.2;
+    text-align: left;
+  }
+  #hud br { display: none; }
+  #hud br + span { margin-left: 6px; }
   #game { grid-area: game; }
   #controls { display: contents; }
   #btnCenter { grid-area: left; place-self: center; }
@@ -169,5 +181,5 @@ body.touchAim #controls { display: none; }
   #overlay h1 { font-size: 22px; margin-bottom: 6px; }
   #overlay p { margin-bottom: 10px; font-size: 13px; }
   #menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .withBack #hud { padding-left: 0; }
+  .withBack #hud, .withFs #hud { padding-left: 10px; padding-right: 0; }
 }

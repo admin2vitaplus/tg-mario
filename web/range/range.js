@@ -33,7 +33,11 @@ if (LANG === 'en') {
 }
 document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = T(el.dataset.t); });
 
-const track = (type, ref) => { try { if (window.GameEvents) window.GameEvents.send(type, GAME, ref); } catch (e) { /* ignore */ } };
+const track = (type, ref) => {
+  // A game on: closing the mini app asks first (../lib/back.js).
+  if (window.Back && /^(game_start|game_finish|match_finished)$/.test(type)) window.Back.guard(type === 'game_start');
+  try { if (window.GameEvents) window.GameEvents.send(type, GAME, ref); } catch (e) { /* ignore */ }
+};
 
 function haptic(kind) {
   try {

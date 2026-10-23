@@ -18,7 +18,7 @@ const config = {
       scores: true,
       // Loaded on this page only when the game is chosen, in this order.
       styles: ['lib/looks.css'],
-      scripts: ['lib/phaser.min.js', 'lib/looks.js', 'lib/back.js', 'lib/progress.js', 'lib/fx.js', 'levels.js', 'worlds.js', 'game.js'],
+      scripts: ['lib/phaser.min.js', 'lib/looks.js', 'lib/progress.js', 'lib/fx.js', 'levels.js', 'worlds.js', 'game.js'],
       // startapp=mario (or ref_<id>-mario from an invite in a chat) opens it straight away.
       start: 'mario',
     },
@@ -30,7 +30,7 @@ const config = {
       url: 'tanks/',
       start: 'tanks',
       // The page's files, fetched ahead by the menu (menu.js prefetch) so the game opens fast.
-      preload: ['tanks/tanks.css', 'tanks/strings.js', 'tanks/sim.js', 'tanks/tanks.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/progress.js'],
+      preload: ['tanks/tanks.css', 'tanks/strings.js', 'tanks/sim.js', 'tanks/tanks.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/fullscreen.js', 'lib/progress.js'],
     },
     {
       id: 'bombs',
@@ -39,7 +39,7 @@ const config = {
       // Its own page like tanks: alone, or an online duel through the same server (/ws/bombs).
       url: 'bombs/',
       start: 'bombs',
-      preload: ['bombs/bombs.css', 'bombs/strings.js', 'bombs/sim.js', 'bombs/bombs.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/progress.js'],
+      preload: ['bombs/bombs.css', 'bombs/strings.js', 'bombs/sim.js', 'bombs/bombs.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/fullscreen.js', 'lib/progress.js'],
     },
     {
       id: 'range',
@@ -48,7 +48,7 @@ const config = {
       // Its own page: the sight follows the phone's tilt (gyroscope), or a finger / mouse.
       url: 'range/',
       start: 'range',
-      preload: ['range/range.css', 'range/strings.js', 'range/sim.js', 'range/aim.js', 'range/range.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/progress.js'],
+      preload: ['range/range.css', 'range/strings.js', 'range/sim.js', 'range/aim.js', 'range/range.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/fullscreen.js', 'lib/progress.js'],
     },
     {
       id: 'word',
