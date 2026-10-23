@@ -759,12 +759,28 @@ function drawBullet(b) {
   ctx.fillRect(x + 1, y + 1, 2, 2);
 }
 
+// A ragged disc: each row's half-width wobbles, so a blast is a cloud rather than a coin.
+function blob(cx, cy, r, col, t) {
+  ctx.fillStyle = col;
+  for (let dy = -r; dy <= r; dy++) {
+    const w = Math.floor(Math.sqrt(r * r - dy * dy)) + (((dy * 5 + t * 3) & 7) < 3 ? -1 : (((dy * 3 + t) & 7) === 0 ? 1 : 0));
+    if (w > 0) ctx.fillRect(Math.round(cx - w), Math.round(cy + dy), w * 2, 1);
+  }
+}
+
 function drawBoom(b) {
   if (b.big) {
     const r = b.t < 14 ? 3 + b.t : 3 + (28 - b.t);
-    circle(b.x, b.y, r, '#d82800');
-    circle(b.x, b.y, Math.max(1, r - 3), '#f89020');
-    circle(b.x, b.y, Math.max(1, r - 6), '#fff8c0');
+    const t = b.t >> 2;
+    blob(b.x, b.y, r, '#d82800', t);
+    blob(b.x, b.y, Math.max(1, r - 3), '#f89020', t + 1);
+    blob(b.x, b.y, Math.max(1, r - 6), '#fff8c0', t + 2);
+    // Dark smoke puffs at the rim while the blast dies down.
+    if (b.t > 14) {
+      for (const [dx, dy] of [[-0.7, -0.6], [0.7, -0.5], [0, -0.9], [-0.5, 0.6], [0.6, 0.6]]) {
+        circle(b.x + dx * r, b.y + dy * r, Math.max(1, (28 - b.t) >> 2), '#3c3c3c');
+      }
+    }
   } else {
     const r = [2, 4, 6, 5, 3, 2][Math.min(5, b.t >> 1)];
     circle(b.x, b.y, r, '#f89020');
@@ -808,6 +824,43 @@ function spotEffects(s) {
   else fxCells = Uint8Array.from(cells);
 }
 
+// Burnt patches left on the ground by big blasts; they fade within a few seconds.
+const scorch = [];
+let scorchStage = -1;
+function drawScorch(s) {
+  if (s.stage !== scorchStage) { scorch.length = 0; scorchStage = s.stage; }
+  const now = Date.now();
+  for (const b of s.booms) {
+    if (b.big && b.t >= 10 && !scorch.some((m) => m.x === b.x && m.y === b.y && now - m.t0 < 1000)) scorch.push({ x: b.x, y: b.y, t0: now });
+  }
+  for (let i = scorch.length - 1; i >= 0; i--) {
+    const m = scorch[i];
+    const k = 1 - (now - m.t0) / 6000;
+    if (k <= 0) { scorch.splice(i, 1); continue; }
+    ctx.globalAlpha = 0.45 * k;
+    blob(m.x, m.y, 7, '#000000', 1);
+    ctx.globalAlpha = 0.3 * k;
+    blob(m.x, m.y, 10, '#201008', 3);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Walls cast a short shadow down and to the right, so they stand on the ground.
+function drawShadows(s) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, FIELD, FIELD);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.beginPath();
+  for (let i = 0; i < s.cells.length; i++) {
+    const c = s.cells[i];
+    if (c === BRICK || c === STEEL) ctx.rect((i % N) * CELL + 2, Math.floor(i / N) * CELL + 2, CELL, CELL);
+  }
+  ctx.fill();
+  ctx.restore();
+}
+
 function render(s) {
   const ground = lookItem('ground');
   ctx.fillStyle = ground.frame;
@@ -817,6 +870,8 @@ function render(s) {
   ctx.drawImage(groundImage(), OX + sx, OY + sy);
   ctx.save();
   ctx.translate(OX + sx, OY + sy);
+  drawScorch(s);
+  drawShadows(s);
   drawCells(s, false);
   ctx.drawImage(s.baseAlive ? BASE_OK : BASE_DEAD, 96, 192);
   for (const sp of s.spawns) drawSpawn(sp);
