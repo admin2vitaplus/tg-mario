@@ -44,6 +44,9 @@ const EN_NAMES = {
   'ВЕЧЕРНИЙ ЛУГ': 'EVENING MEADOW', 'ХОЛМЫ И ПРУЖИНЫ': 'HILLS AND SPRINGS', 'ДЕРЕВЬЯ НА ВЕТРУ': 'WINDY TREES',
   'НОЧНОЙ НАЕЗДНИК': 'NIGHT RIDER', 'ДОЛИНА ТРУБ': 'PIPE VALLEY', 'НОЧНЫЕ ГРИБЫ': 'NIGHT MUSHROOMS',
   'ПОЛЕ МЕТАТЕЛЕЙ': 'THROWERS FIELD', 'ГЛУБОКОЕ МОРЕ': 'DEEP SEA', 'МОСТЫ И РЫБЫ': 'BRIDGES AND FISH',
+  'A — ПРЫЖОК, ДЕРЖИ — ВЫШЕ': 'A — JUMP, HOLD — HIGHER', 'БЕЙ БЛОКИ СНИЗУ': 'HIT BLOCKS FROM BELOW',
+  'ПРЫГАЙ НА ЖУКОВ': 'JUMP ON THE BEETLES', 'B — БЕГ: С РАЗБЕГА ДАЛЬШЕ': 'B — RUN: JUMP FURTHER',
+  '↓ В НЕКОТОРЫЕ ТРУБЫ МОЖНО ЗАЙТИ': '↓ SOME PIPES LEAD SOMEWHERE',
   'ДОЛГАЯ ДОРОГА': 'LONG ROAD', 'ОБРЫВЫ': 'CLIFFS', 'КРЕПОСТНЫЕ СТЕНЫ': 'FORTRESS WALLS', 'ПОСЛЕДНИЙ ЗАМОК': 'LAST CASTLE',
 };
 const nameOf = (ru) => L(ru, EN_NAMES[ru] || ru);
@@ -106,6 +109,11 @@ const touch = { up: false, down: false, left: false, right: false, a: false, b: 
 const WORLD_GRAVITY = 1100;
 // [gravity while A is held and rising, gravity otherwise] for slow, medium and fast take-offs.
 const JUMP_GRAVITY = [[450, 1575], [422, 1350], [562, 2025]];
+// Forgiving jump, ms: a press this long before landing, or this long after leaving a ledge, still jumps.
+const JUMP_BUFFER = 110;
+const COYOTE = 90;
+// Share of the screen the camera shifts forward while the hero runs right.
+const LOOK_AHEAD = 0.12;
 const TURBO_MS = 67; // about 7.5 presses per second, like a turbo button
 
 // Both pads track every finger by pointerId and work out the pressed buttons
@@ -1468,6 +1476,7 @@ class Play extends Phaser.Scene {
     const startArea = Math.max(0, lvl.areas.findIndex((ar) => sx >= ar.x0 && sx < ar.x1));
     this.setArea(startArea);
     const ar0 = lvl.areas[startArea];
+    this.lead = 0;
     cam.scrollX = Phaser.Math.Clamp(this.player.x - VIEW_W * 0.42, ar0.x0 * TILE, ar0.x1 * TILE - VIEW_W);
     this.prevX = this.player.x;
 
@@ -1585,6 +1594,7 @@ class Play extends Phaser.Scene {
       p.setPosition(x, to.y * TILE);
       finish();
     }
+    this.lead = 0;
     cam.scrollX = Phaser.Math.Clamp(x - VIEW_W * 0.42, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
   }
 
@@ -2007,7 +2017,13 @@ class Play extends Phaser.Scene {
         p.y += 2 * TILE - b.top;
       }
     } else {
-      if (jump && !this.prevJump && onGround) {
+      // A forgiving jump: a press shortly before landing still counts (JUMP_BUFFER),
+      // and so does a press just after running off a ledge (COYOTE).
+      if (onGround) this.groundAt = time;
+      if (jump && !this.prevJump) this.jumpAskAt = time;
+      const grounded = onGround || (b.velocity.y >= 0 && time - (this.groundAt || -1e9) < COYOTE);
+      if (grounded && time - (this.jumpAskAt || -1e9) < JUMP_BUFFER) {
+        this.groundAt = this.jumpAskAt = -1e9;
         const speed = Math.abs(b.velocity.x);
         this.jumpKind = speed < 60 ? 0 : speed < 139 ? 1 : 2;
         b.setVelocityY(this.jumpKind === 2 ? -300 : -240);
@@ -2037,9 +2053,12 @@ class Play extends Phaser.Scene {
       }
     }
 
-    // The camera only moves right, like on the console.
+    // The camera only moves right, like on the console, and looks ahead when the hero
+    // runs right: the hero slides back from 42% to 30% of the screen, so more is seen in front.
     const ar = this.lvl.areas[this.area];
-    const want = Phaser.Math.Clamp(p.x - VIEW_W * 0.42, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
+    const lead = Math.max(0, Math.min(1, b.velocity.x / 150)) * LOOK_AHEAD;
+    this.lead = this.lead === undefined ? 0 : this.lead + (lead - this.lead) * Math.min(1, dt * 2);
+    const want = Phaser.Math.Clamp(p.x - VIEW_W * (0.42 - this.lead), ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
     if (want > cam.scrollX) cam.scrollX = want;
     if (p.x - 6 < cam.scrollX) {
       p.x = cam.scrollX + 6;
@@ -2268,6 +2287,7 @@ class Play extends Phaser.Scene {
     const ar = this.lvl.areas[this.area];
     p.body.reset(lp.back * TILE + 8, lp.backY * TILE);
     this.prevX = p.x;
+    this.lead = 0;
     cam.scrollX = Phaser.Math.Clamp(p.x - VIEW_W * 0.42, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
     notes([392, 330, 262], 0.09, 0.12);
   }

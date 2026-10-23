@@ -189,5 +189,12 @@
     "body": "Герой «Прыг-Скока» шагает плавнее, птицы в «Тире» машут крыльями, в «Тире» появились холмы на горизонте. Взрывы в «Танкодроме» и «Бомбодроме» оставляют копоть, у стен и героев есть тени. Обложки игр в меню двигаются.",
     "titleEn": "The games come alive",
     "bodyEn": "The Hop-Skip hero walks more smoothly, Shooting Range birds flap their wings and hills appear on its horizon. Blasts in Tank Field and Bomb Field leave soot, walls and heroes cast shadows. Game covers in the menu move."
+  },
+  {
+    "id": "2026-10-23-pryg-jump",
+    "title": "«Прыг-Скок»: честнее прыжок и обзор",
+    "body": "Камера смотрит вперёд, когда герой бежит, и враги больше не выскакивают внезапно. Прыжок срабатывает, даже если нажать чуть раньше приземления или чуть позже края. На первых уровнях появились подсказки.",
+    "titleEn": "Hop-Skip: fairer jumps, better view",
+    "bodyEn": "The camera looks ahead while the hero runs, so enemies no longer pop up out of nowhere. A jump now works even if pressed just before landing or just past a ledge. The first levels have hints."
   }
 ]
