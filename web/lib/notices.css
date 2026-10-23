@@ -1,0 +1,62 @@
+/* «🔔 Уведомления» (lib/notices.js): the button under the жетоны banner and the list. */
+#noticeBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  min-height: 46px;
+  margin: -4px 0 14px;
+  padding: 8px 34px 8px 14px;
+  border: 1px solid rgba(248, 208, 32, 0.3);
+  border-radius: 14px;
+  background: #16150c;
+  color: #fff;
+  font-family: "Courier New", monospace;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease;
+}
+#noticeBtn:active { transform: scale(0.98); }
+#noticeBtn.fresh { border-color: #f8d020; box-shadow: 0 4px 14px rgba(248, 208, 32, 0.18); }
+#noticeBtn .nbLabel { flex: none; font-size: 14px; font-weight: bold; color: #f8d020; }
+#noticeBtn .nbSub { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: rgba(255, 255, 255, 0.6); text-align: right; }
+#noticeBtn .nbCount {
+  flex: none;
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 11px;
+  background: #e8402a;
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+}
+#noticeBtn .nbCount[hidden] { display: none; }
+#noticeBtn i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 22px; color: #f8d020; }
+
+/* The list: the panel of lib/wallet.css in the menu's yellow. */
+.wallet.notices h1 { color: #f8d020; }
+.wallet.notices .wTabs button { padding: 10px 2px; font-size: 12px; }
+.wallet.notices .wTabs button.on { background: #c8a000; color: #000; }
+.nList { list-style: none; margin: 0; padding: 0; }
+.nItem {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid #7fe8ec;
+  border-radius: 10px;
+  background: #111114;
+}
+.nItem.n-news { border-left-color: #f8d020; }
+.nItem.n-personal { border-left-color: #8fdf6f; background: #0f1610; }
+.nItem.unread { border-top-color: rgba(248, 208, 32, 0.45); border-right-color: rgba(248, 208, 32, 0.45); border-bottom-color: rgba(248, 208, 32, 0.45); }
+.nHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+.nKind { font-weight: bold; letter-spacing: 1px; text-transform: uppercase; color: #7fe8ec; }
+.n-news .nKind { color: #f8d020; }
+.n-personal .nKind { color: #8fdf6f; }
+.nNew { margin-left: auto; padding: 1px 6px; border-radius: 6px; background: #e8402a; color: #fff; font-weight: bold; }
+.nTitle { display: block; margin-top: 6px; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+.nBody { margin: 6px 0 0; font-size: 13px; line-height: 1.4; color: #ddd; white-space: pre-line; overflow-wrap: anywhere; }
