@@ -10,7 +10,7 @@ import { createRangeResults } from "./range-results.js";
 import { createWord } from "./word.js";
 import { createAdmin } from "./admin.js";
 import { createAdminAuth } from "./admin-auth.js";
-import { createNotices } from "./notices.js";
+import { createNotices, readChangelog } from "./notices.js";
 
 // Всё, кроме самого бота Telegram и туннеля: база, HTTP API и комнаты «Танкодрома».
 // Вынесено отдельно, чтобы запуск и остановку можно было проверить тестом без сети и токена.
@@ -64,6 +64,13 @@ export async function startApp({
   const auth = createAdminAuth({ login: (env.ADMIN_LOGIN || "").trim(), passwordHash: (env.ADMIN_PASSWORD_HASH || "").trim() });
   if (!auth.enabled) console.log("Панель /admin выключена: не заданы ADMIN_LOGIN и ADMIN_PASSWORD_HASH.");
   const notices = createNotices(store);
+  // Обновления из журнала изменений (changelog.json) появляются у игроков сами, когда выходит новая версия.
+  try {
+    const added = notices.syncChangelog(readChangelog());
+    if (added) console.log(`Уведомления: из журнала изменений добавлено обновлений: ${added}`);
+  } catch (err) {
+    console.error("Журнал изменений не прочитан:", err.message);
+  }
   const admin = createAdmin({
     store, economy, auth, refundStars, commit, dbFile, notices, message,
     live: () => (tanks ? { rooms: tanks.rooms.size + (bombs?.rooms.size ?? 0), sockets: tanks.wss.clients.size + (bombs?.wss.clients.size ?? 0) } : null),

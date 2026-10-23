@@ -303,6 +303,14 @@ export const MIGRATIONS = [
       last_id INTEGER NOT NULL
     );
   `,
+  // 13. Обновления из журнала изменений bot/changelog.json (notices.js, syncChangelog): ref — id записи
+  // журнала, по нему запись попадает в уведомления один раз.
+  (db) => {
+    if (!db.prepare("PRAGMA table_info(notices)").all().some((c) => c.name === "ref")) {
+      db.exec("ALTER TABLE notices ADD COLUMN ref TEXT");
+    }
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS notices_ref ON notices(ref) WHERE ref IS NOT NULL");
+  },
 ];
 
 export function migrate(db) {
