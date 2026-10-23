@@ -34,7 +34,11 @@ for (const el of document.querySelectorAll('[data-tp]')) el.placeholder = T(el.d
 document.title = T('title');
 
 // Usage statistics for the bot (../lib/events.js); silently off without a server.
-const track = (type, ref) => { try { if (window.GameEvents) window.GameEvents.send(type, 'tanks', ref); } catch (e) { /* ignore */ } };
+const track = (type, ref) => {
+  // A game on: closing the mini app asks first (../lib/back.js).
+  if (window.Back && /^(game_start|game_finish|match_finished)$/.test(type)) window.Back.guard(type === 'game_start');
+  try { if (window.GameEvents) window.GameEvents.send(type, 'tanks', ref); } catch (e) { /* ignore */ }
+};
 
 function haptic(kind) {
   try {
