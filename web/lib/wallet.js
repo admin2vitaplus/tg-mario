@@ -503,9 +503,12 @@ function render(body) {
     const items = info.shop.filter((it) => (!scope || it.game === scope) && gameOn(it.game));
     body.innerHTML = `<p class="wBig">${esc(T('balance', { n: me.balance }))}</p>` +
       note(scope ? T('shop_game') : T('shop_note')) +
-      '<ul class="wShop">' + items.map((it) => {
+      '<ul class="wShop">' + items.map((it, n) => {
         const has = owned.includes(it.id);
-        return `<li><span>${esc(it[lang])}</span>` + (has ? `<i>${esc(T('bought'))}</i>`
+        // On the main screen the items of every game go under its name.
+        const head = !scope && (n === 0 || items[n - 1].game !== it.game)
+          ? `<li class="wShopHead">${esc(T('board_' + it.game))}</li>` : '';
+        return head + `<li><span>${esc(it[lang])}</span>` + (has ? `<i>${esc(T('bought'))}</i>`
           : `<span class="wPay"><button class="wAct" data-act="buy" data-via="tokens" data-id="${esc(it.id)}">◆ ${it.price}</button>` +
             (canStars() ? `<button class="wAct wStars" data-act="buy" data-via="stars" data-id="${esc(it.id)}">⭐ ${it.stars}</button>` : '') +
             '</span>') + '</li>';
