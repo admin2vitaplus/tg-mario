@@ -72,6 +72,12 @@ export function createReplayResults(store, { now = Date.now, members = () => nul
       let credit;
       const st = r.stats || [];
       if (players === 1) credit = [[playerId, r.scores[0], st[0]]];
+      // С ботом вместо друга (mode «bot»): второй игрок — компьютер, игроку засчитывается только своё;
+      // победа над ботом — не победа над другом.
+      else if (mode === "bot") {
+        if (room != null) return { status: 400, error: "bad data" };
+        credit = [[playerId, r.scores[0], { ...(st[0] || {}), duelWin: false }]];
+      }
       else if (room != null) {
         const m = members(room);
         if (!m || m.host !== playerId) return { status: 403, error: "not the host of this room" };

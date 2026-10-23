@@ -30,7 +30,8 @@ const COUNT = S.STAGES.length;
 // start — этап, с которого начата игра (0 — с первого); stages — сколько этапов пройдено от него.
 // → { ok, why?, scores: [p0, p1?], stages, frames, phase, won, quit, stats: [p0, p1?] }
 // quit — игра не закончена (игрок вышел), но в неё играли не меньше MIN_QUIT_FRAMES.
-// rules — версия правил, с которыми сыграна игра (старые игры — 1); режимов у игры нет.
+// rules — версия правил, с которыми сыграна игра (старые игры — 1); mode «bot» — дуэль с ботом
+// вместо друга (правила те же, засчитывается только игрок, tanks-results.js).
 export function replay({ seed, players, log, start = 0, rules = 1, mode = "" }) {
   const bad = (why) => ({ ok: false, why });
   if (!Number.isSafeInteger(seed) || seed <= 0) return bad("bad seed");
@@ -39,7 +40,7 @@ export function replay({ seed, players, log, start = 0, rules = 1, mode = "" }) 
   if (!Number.isSafeInteger(start) || start < 0 || start >= COUNT || (start > 0 && players !== 1)) return bad("bad start");
   const maxCode = players === 1 ? 19 : 399;
   if (!Number.isSafeInteger(rules) || rules < 1 || rules > S.RULES) return bad("bad rules");
-  if (mode) return bad("bad mode");
+  if (mode && (mode !== "bot" || players !== 2 || rules < 2)) return bad("bad mode");
   const s = S.newGame(players, seed, { rules });
   if (start > 0) S.startStage(s, start); // так же делает игра (tanks.js, bombs.js)
   const stats = s.players.map(newStats);

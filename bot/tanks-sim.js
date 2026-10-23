@@ -36,8 +36,9 @@ const FLASH_AT = [3, 10, 17]; // these enemies carry a bonus
 // Rules version: 2 adds the «Выживание» mode. A game is replayed with the rules it was played
 // under; old games come without one and are 1.
 const RULES = 2;
-// Modes: '' the usual stages, 'survival' — one map, endless waves, alone (from rules 2).
-const MODES = ['', 'survival'];
+// Modes: '' the usual stages, 'survival' — one map, endless waves, alone (from rules 2);
+// 'bot' — the second tank is driven by the computer (the rules are the same; the server credits only the player).
+const MODES = ['', 'survival', 'bot'];
 // Survival: wave n (from 0) brings 10 + n enemies, up to 20, of the kinds of stage n;
 // the difficulty (how many at once, how often they shoot) is that of stage n as well.
 const SURVIVAL_MAP = 0;

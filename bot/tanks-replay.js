@@ -55,7 +55,8 @@ export function replay({ seed, players, log, start = 0, rules = 1, mode = "" }) 
   if (!Number.isSafeInteger(start) || start < 0 || start >= COUNT || (start > 0 && players !== 1)) return bad("bad start");
   const maxCode = players === 1 ? 9 : 99;
   if (!Number.isSafeInteger(rules) || rules < 1 || rules > S.RULES) return bad("bad rules");
-  if (!S.MODES.includes(mode) || (mode && rules < 2) || (mode === "survival" && (players !== 1 || start > 0))) return bad("bad mode");
+  if (!S.MODES.includes(mode) || (mode && rules < 2) || (mode === "survival" && (players !== 1 || start > 0))
+    || (mode === "bot" && players !== 2)) return bad("bad mode");
   const s = S.newGame(players, seed, { rules, mode });
   if (start > 0) S.startStage(s, start); // так же делает игра (tanks.js, bombs.js)
   const stats = s.players.map(newStats);

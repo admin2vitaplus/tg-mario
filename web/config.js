@@ -30,7 +30,7 @@ const config = {
       url: 'tanks/',
       start: 'tanks',
       // The page's files, fetched ahead by the menu (menu.js prefetch) so the game opens fast.
-      preload: ['tanks/tanks.css', 'tanks/strings.js', 'tanks/sim.js', 'tanks/tanks.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/progress.js'],
+      preload: ['tanks/tanks.css', 'tanks/strings.js', 'tanks/sim.js', 'tanks/bot.js', 'tanks/tanks.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/progress.js'],
     },
     {
       id: 'bombs',

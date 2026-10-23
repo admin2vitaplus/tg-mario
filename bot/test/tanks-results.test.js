@@ -55,6 +55,23 @@ test("«Выживание» (rules 2) replays with its mode; it is for one play
   assert.equal(replay({ seed: 41, players: 1, log: g.log, rules: 9 }).why, "bad rules");
 });
 
+test("a game with the bot (mode «bot») replays for two and is credited to the player only", () => {
+  const g = play(43, 2, { rules: 2, mode: "bot" });
+  const r = replay({ seed: 43, players: 2, log: g.log, rules: 2, mode: "bot" });
+  assert.equal(r.ok, true, r.why);
+  assert.equal(replay({ seed: 43, players: 1, log: g.log, rules: 2, mode: "bot" }).why, "bad mode");
+  const store = openDb(":memory:");
+  let clock = 1_000_000;
+  const results = createTanksResults(store, { now: () => clock });
+  const { seed } = results.ticket(5);
+  const game = play(seed, 2, { rules: 2, mode: "bot" });
+  clock += game.frames * 20;
+  const out = results.submit(5, { seed, players: 2, log: game.log, rules: 2, mode: "bot" });
+  assert.equal(out.status, 200, out.error);
+  assert.equal(out.results.length, 1);
+  assert.equal(out.results[0].score, game.state.players[0].score, "not the bot's points");
+});
+
 test("replay gives the same score as the game, and a changed record is caught", () => {
   for (const seed of [11, 222, 3333]) {
     const g = play(seed);

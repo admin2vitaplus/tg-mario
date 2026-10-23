@@ -987,6 +987,8 @@ function showOverlay(title, html, button, action, panel) {
 function showMenu() {
   running = false;
   mode = 'local';
+  clearTimeout(botOffer);
+  $('btnBotNow').classList.add('hidden');
   view = null;
   netClose();
   showOverlay(T('title'), T('intro') + '<br>' + T('best', { n: loadBest() }), null, null);
@@ -1260,11 +1262,26 @@ function lostLink(text, wasInGame) {
   else onlineMenu(text);
 }
 
+// No friend in 20 s: offer the computer as the partner instead.
+const BOT_OFFER_MS = 20000;
+let botOffer = 0;
 function roomScreen() {
   showOverlay(T('room'), T('room_code', { code: '<b class="code">' + net.code + '</b>' }), null, null, 'online');
   $('onlineStart').classList.add('hidden');
   $('btnInvite').classList.remove('hidden');
+  clearTimeout(botOffer);
+  botOffer = setTimeout(() => {
+    if (mode === 'host' && !net.started && !$('btnInvite').classList.contains('hidden')) $('btnBotNow').classList.remove('hidden');
+  }, BOT_OFFER_MS);
 }
+function playWithBot() {
+  audio();
+  showMenu();
+  variant = 'bot';
+  beginLocal(2);
+}
+$('btnBotNow').addEventListener('click', playWithBot);
+$('btnBot').addEventListener('click', playWithBot);
 
 function onNet(m) {
   if (m.t === 'room') {
@@ -1274,6 +1291,8 @@ function onNet(m) {
     roomScreen();
   } else if (m.t === 'peer') {
     haptic('success');
+    clearTimeout(botOffer);
+    $('btnBotNow').classList.add('hidden');
     net.guestSkin = '';
     mode = 'host';
     net.started = true;
@@ -1611,11 +1630,12 @@ window.addEventListener('pagehide', () => { sendQuit(); });
 // ---------- Game flow ----------
 let state = null;
 let running = false;
+let botMem = null; // the computer partner's plans (bot.js), in a game with the bot
 
 // start — the stage chosen on «▦ Выбрать уровень» (alone only), 0 — from the first one.
 function begin(players, start) {
   start = players === 1 && start > 0 ? start : 0;
-  keyMap = players === 2 && mode === 'local' ? KEYS_2P : KEYS_1P;
+  keyMap = players === 2 && mode === 'local' && variant !== 'bot' ? KEYS_2P : KEYS_1P;
   skins = [look.tank, mode === 'host' && net.guestSkin ? net.guestSkin : partnerSkin(look.tank)];
   net.remote = { dir: -1, fire: false };
   net.rematch = { me: false, peer: false };
@@ -1628,7 +1648,8 @@ function begin(players, start) {
   const t = mode !== 'guest' && ticket.next;
   ticket.next = null;
   keepTicket();
-  const v = players === 1 && !start && mode === 'local' ? variant : '';
+  const v = !start && mode === 'local' && players === (variant === 'bot' ? 2 : 1) ? variant : '';
+  botMem = window.TankBot ? window.TankBot.newMemory() : null;
   Object.assign(rec, { seed: t ? t.seed : 0, players, start, mode: v, out: [], prev: -1, n: 0, frames: 0 });
   state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1, { rules: S.RULES, mode: v });
   if (start) S.startStage(state, start); // the same as bot/tanks-replay.js
@@ -1700,7 +1721,7 @@ function frame(now) {
     acc += Math.min(dt, 100);
     while (acc >= STEP && running) {
       acc -= STEP;
-      const inputs = [readPad(pads[0]), mode === 'host' ? remotePad() : readPad(pads[1])];
+      const inputs = [readPad(pads[0]), mode === 'host' ? remotePad() : state.mode === 'bot' && botMem ? window.TankBot.think(state, 1, botMem) : readPad(pads[1])];
       recStep(inputs);
       S.step(state, inputs);
       for (const ev of state.events) if (SFX[ev]) SFX[ev]();
