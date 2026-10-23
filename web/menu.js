@@ -30,7 +30,7 @@ if (EN) {
   document.title = 'Yellow Cartridge';
   document.querySelectorAll('[data-en]').forEach((el) => { el.innerHTML = el.dataset.en; });
 }
-const EN_TITLES = { 'pryg-skok': 'HOP-SKIP', tanks: 'TANK FIELD', bombs: 'BOMB FIELD', word: 'WORD OF THE DAY' };
+const EN_TITLES = { 'pryg-skok': 'HOP-SKIP', tanks: 'TANK FIELD', bombs: 'BOMB FIELD', range: 'SHOOTING RANGE', word: 'WORD OF THE DAY' };
 const title = (g) => (EN ? g.titleEn || EN_TITLES[g.id] || g.title : g.title);
 
 let startGame = null; // a game to open right away, from the launch link
@@ -132,6 +132,18 @@ const COVERS = {
     sprite(ctx, ['..ff.', '.kk..', 'kkkk.', 'kkkkk', 'kkkkk', '.kkk.'], 50, 18, { f: '#f8a020', k: '#101018' }, 2);
     sprite(ctx, ['.HHH.', 'HHHHH', '.FFF.', 'BBBBB', '.B.B.'], 6, 16, { H: '#e8e8f0', F: '#f8c890', B: '#f0f0f8' }, 2);
   },
+  range(ctx) {
+    px(ctx, '#58a8f8', 0, 0, COVER_W, 30); px(ctx, '#88c8ff', 0, 0, COVER_W, 6);
+    px(ctx, '#fff', 6, 6, 10, 3); px(ctx, '#fff', 8, 4, 6, 2);
+    px(ctx, '#2a8a2a', 0, 30, COVER_W, 10);
+    for (let x = 0; x < COVER_W; x += 8) { px(ctx, '#1e6a1e', x, 28, 6, 3); px(ctx, '#3aa83a', x + 1, 27, 4, 2); }
+    // A tin bird in flight and the sight on it.
+    sprite(ctx, ['..ww....', '.wwwwk..', 'wwwwwwoo', '.bbbbb..', '..bb.b..'], 14, 12, { w: '#d8dce8', k: '#202028', o: '#f8a020', b: '#8890a8' }, 2);
+    const cx = 44, cy = 16;
+    px(ctx, '#e02020', cx - 7, cy, 5, 1); px(ctx, '#e02020', cx + 3, cy, 5, 1); px(ctx, '#e02020', cx, cy - 7, 1, 5); px(ctx, '#e02020', cx, cy + 3, 1, 5);
+    px(ctx, '#e02020', cx - 4, cy - 4, 9, 1); px(ctx, '#e02020', cx - 4, cy + 4, 9, 1); px(ctx, '#e02020', cx - 4, cy - 4, 1, 9); px(ctx, '#e02020', cx + 4, cy - 4, 1, 9);
+    sprite(ctx, ['.oooo.', 'oyyyyo', '.oooo.'], 50, 30, { o: '#c85018', y: '#f8a040' }, 1);
+  },
   word(ctx) {
     px(ctx, '#111', 0, 0, COVER_W, COVER_H);
     const rows = [['#555', '#c8a000', '#555', '#555', '#2e9e40'], ['#2e9e40', '#555', '#c8a000', '#2e9e40', '#2e9e40'], ['#2e9e40', '#2e9e40', '#2e9e40', '#2e9e40', '#2e9e40']];
@@ -144,9 +156,10 @@ const COVERS = {
   },
 };
 const SUBTITLES = {
-  'pryg-skok': ['Платформер · 4 мира', 'Platformer · 4 worlds'],
+  'pryg-skok': ['Платформер · 5 миров', 'Platformer · 5 worlds'],
   tanks: ['Танки · онлайн вдвоём', 'Tanks · online for two'],
-  bombs: ['Бомбы · 20 этапов и дуэль', 'Bombs · 20 stages and a duel'],
+  bombs: ['Бомбы · 50 этапов и дуэль', 'Bombs · 50 stages and a duel'],
+  range: ['Тир · целься наклоном', 'Targets · aim by tilting'],
   word: ['Слово из 5 букв', 'A five-letter word'],
 };
 

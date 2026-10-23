@@ -8,12 +8,13 @@
   "invite": { "inviter": 50, "newcomer": 30, "gamesNeeded": 3, "perWeek": 10 },
   "suspicious": { "rejectedPerDay": 3 },
   "season": {
-    "pool": 3230,
+    "pool": 4060,
     "notify": true,
     "boards": {
       "mario": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
       "tanks": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
       "bombs": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
+      "range": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
       "word": [150, 90, 60, 40, 30, 20, 10],
       "overall": [100, 70, 50, 40, 30, 20, 10, 10, 5, 5]
     }
@@ -27,6 +28,8 @@
     { "id": "tanks-walls-gold", "game": "tanks", "price": 150, "stars": 15, "ru": "Танкодром: стены «Золото»", "en": "Tank Field: «Gold» walls" },
     { "id": "bombs-hero-ninja", "game": "bombs", "price": 300, "stars": 25, "ru": "Бомбодром: герой «Ниндзя»", "en": "Bomb Field: hero «Ninja»" },
     { "id": "bombs-blocks-candy", "game": "bombs", "price": 150, "stars": 15, "ru": "Бомбодром: блоки «Карамель»", "en": "Bomb Field: «Candy» blocks" },
+    { "id": "range-birds-robot", "game": "range", "price": 300, "stars": 25, "ru": "Тир: мишени «Роботы»", "en": "Shooting Range: «Robot» targets" },
+    { "id": "range-sight-laser", "game": "range", "price": 150, "stars": 15, "ru": "Тир: прицел «Лазер»", "en": "Shooting Range: «Laser» sight" },
     { "id": "word-tiles-sea", "game": "word", "price": 150, "stars": 15, "ru": "Слово дня: плитки «Море»", "en": "Word of the Day: «Sea» tiles" },
     { "id": "word-tiles-candy", "game": "word", "price": 100, "stars": 10, "ru": "Слово дня: плитки «Карамель»", "en": "Word of the Day: «Candy» tiles" }
   ]

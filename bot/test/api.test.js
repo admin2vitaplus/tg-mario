@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { openDb } from "../db.js";
 import { createApiServer } from "../server.js";
+import { LAST_LEVEL, WORLD_TIMES } from "../plausibility.js";
 
 const TOKEN = "123456:TEST";
 
@@ -80,12 +81,12 @@ test("records levels and runs, awards achievements once, ranks players", () =>
     wait(90);
 
     // Новая игра с начала: те же достижения второй раз не выдаются.
-    // Все четыре мира без потерь.
-    const all = Array.from({ length: 16 }, (_, i) => [3000 + i * 3500, i === 8 ? 150 : 100]);
+    // Все миры без потерь.
+    const all = Array.from({ length: LAST_LEVEL + 1 }, (_, i) => [3000 + i * 3500, i === 8 ? 150 : 100]);
     await playLevels(call, wait, alice, all);
 
     r = await call("POST", "/api/mario/run", {
-      user: alice, body: { score: 60000, coins: 55, levels: 16, deaths: 0, completed: true, bossFire: true },
+      user: alice, body: { score: 60000, coins: 55, levels: LAST_LEVEL + 1, deaths: 0, completed: true, bossFire: true },
     });
     assert.equal(r.status, 200);
     assert.equal(r.json.best, 60000);
@@ -120,7 +121,7 @@ test("rejects out-of-range or inconsistent results", () =>
     assert.equal((await call("POST", "/api/mario/run", { user: alice, body: { score: 9e9, coins: 0, levels: 0, deaths: 0 } })).status, 400);
     assert.equal((await call("POST", "/api/mario/run", { user: alice, body: { score: 1, coins: 0, levels: 1, deaths: 0, completed: true } })).status, 422);
     assert.equal((await call("POST", "/api/mario/level", { user: alice, body: { level: 7, score: 1, timeLeft: 1, deaths: 0 } })).status, 400);
-    assert.equal((await call("POST", "/api/mario/level", { user: alice, body: { world: 5, level: 0, score: 1, timeLeft: 1, deaths: 0 } })).status, 400);
+    assert.equal((await call("POST", "/api/mario/level", { user: alice, body: { world: WORLD_TIMES.length + 1, level: 0, score: 1, timeLeft: 1, deaths: 0 } })).status, 400);
     assert.equal((await call("GET", "/api/nope")).status, 404);
   }));
 
@@ -243,7 +244,7 @@ test("progress: passed levels open for a new game, the rest stay closed, all wor
   withServer(async (call, _n, wait) => {
     const level = (body) => call("POST", "/api/mario/level", { user: alice, body: { deaths: 0, ...body } });
     const run = (body) => call("POST", "/api/mario/run", { user: alice, body: { deaths: 0, coins: 0, ...body } });
-    assert.deepEqual((await call("GET", "/api/progress", { user: alice })).json, { mario: [], tanks: [], bombs: [] });
+    assert.deepEqual((await call("GET", "/api/progress", { user: alice })).json, { mario: [], tanks: [], bombs: [], range: [] });
     assert.equal((await call("GET", "/api/progress")).status, 401);
     // С 1-2 сразу — нельзя: 1-1 ещё не пройден.
     assert.equal((await level({ level: 1, score: 3000, timeLeft: 200, start: true })).status, 409);
@@ -268,7 +269,6 @@ test("progress: passed levels open for a new game, the rest stay closed, all wor
   }));
 
 test("level times on the server are the game's own", async () => {
-  const { WORLD_TIMES } = await import("../plausibility.js");
   const { readFileSync } = await import("node:fs");
   const times = (f) => [...readFileSync(new URL(`../../web/${f}`, import.meta.url), "utf8")
     .matchAll(/\btime: (\d+)/g)].map((m) => Number(m[1]));

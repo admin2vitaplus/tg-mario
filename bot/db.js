@@ -249,12 +249,34 @@ export const MIGRATIONS = [
   `
     CREATE INDEX IF NOT EXISTS events_day_game ON events(day, game, type, user_id, detail);
   `,
-  // 10. Выбор пройденных уровней (progress.js). start — игра начата с выбранного уровня:
-  // у отчёта «Прыг-Скока» это первый уровень игры, у «Танкодрома» и «Бомбодрома» — номер
-  // этапа, с которого началась игра (stages — сколько этапов пройдено от него).
+  // 10. «Тир»: билеты и принятые игры, как у «Бомбодрома» (tanks-results.js, range-replay.js).
+  `
+    CREATE TABLE IF NOT EXISTS range_tickets (
+      seed INTEGER PRIMARY KEY,
+      player_id INTEGER NOT NULL,
+      issued_at INTEGER NOT NULL,
+      used_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS range_tickets_player ON range_tickets(player_id, issued_at);
+    CREATE TABLE IF NOT EXISTS range_runs (
+      id INTEGER PRIMARY KEY,
+      player_id INTEGER NOT NULL,
+      seed INTEGER NOT NULL,
+      score INTEGER NOT NULL,
+      stages INTEGER NOT NULL,
+      frames INTEGER NOT NULL,
+      players INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE (player_id, seed)
+    );
+    CREATE INDEX IF NOT EXISTS range_runs_time ON range_runs(created_at);
+  `,
+  // 11. Выбор пройденных уровней (progress.js). start — игра начата с выбранного уровня:
+  // у отчёта «Прыг-Скока» это первый уровень игры, у «Танкодрома», «Бомбодрома» и «Тира» — номер
+  // этапа (раунда), с которого началась игра (stages — сколько этапов пройдено от него).
   // ALTER TABLE не знает IF NOT EXISTS, поэтому столбец добавляется, только если его нет.
   (db) => {
-    for (const table of ["level_results", "tanks_runs", "bombs_runs"]) {
+    for (const table of ["level_results", "tanks_runs", "bombs_runs", "range_runs"]) {
       if (db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === "start")) continue;
       db.exec(`ALTER TABLE ${table} ADD COLUMN start INTEGER NOT NULL DEFAULT 0`);
     }
