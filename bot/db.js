@@ -342,6 +342,29 @@ export const MIGRATIONS = [
       db.exec("ALTER TABLE wallets ADD COLUMN remind INTEGER NOT NULL DEFAULT 1");
     }
   },
+  // 15. «Побей мой счёт» (beat.js): вызов другу на ту же партию (то же зерно и правила) по ссылке
+  // и лучшие счета принявших вызов.
+  `
+    CREATE TABLE IF NOT EXISTS beat_challenges (
+      id TEXT PRIMARY KEY,
+      game TEXT NOT NULL,
+      seed INTEGER NOT NULL,
+      rules INTEGER NOT NULL,
+      mode TEXT NOT NULL,
+      start INTEGER NOT NULL,
+      owner_id INTEGER NOT NULL,
+      owner_score INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE (game, seed)
+    );
+    CREATE TABLE IF NOT EXISTS beat_results (
+      challenge_id TEXT NOT NULL,
+      player_id INTEGER NOT NULL,
+      score INTEGER NOT NULL,
+      at INTEGER NOT NULL,
+      PRIMARY KEY (challenge_id, player_id)
+    );
+  `,
 ];
 
 export function migrate(db) {
