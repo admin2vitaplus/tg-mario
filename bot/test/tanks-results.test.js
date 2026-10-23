@@ -20,8 +20,9 @@ test("the server's copy of the game rules is the game's own file", () => {
 });
 
 // Играет «как человек»: держит направление, стреляет очередями, проходит уровни.
-function play(seed, players = 1, { stopAtClear = false } = {}) {
+function play(seed, players = 1, { stopAtClear = false, start = 0 } = {}) {
   const s = S.newGame(players, seed);
+  if (start) S.startStage(s, start); // игра, начатая с выбранного этапа (как в tanks.js)
   const steps = [];
   let x = seed, dir = 0, hold = 0;
   const rnd = () => (x = (x * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
@@ -117,6 +118,32 @@ test("tickets: own seed only, once, not faster than real time, limited", () => {
   clock.t += 7 * 3600_000;
   assert.ok(results.ticket(1).seed, "old unused tickets expire");
   assert.equal(store.db.prepare("SELECT COUNT(*) AS n FROM tanks_runs").get().n, 1);
+});
+
+// Выбор пройденных уровней: игра с этапа, который игрок уже проходил (или следующего за ним).
+test("a game from a chosen stage: only a passed one (old games count too), replayed from it", () => {
+  const { clock, results, store } = setup();
+  assert.equal(results.passed(1), 0);
+  // Игра до этого изменения: пройдено 3 этапа с первого — открыты этапы 0…3.
+  store.db.prepare(`INSERT INTO tanks_runs (player_id, seed, score, stages, frames, players, created_at)
+    VALUES (1, 5, 900, 3, 3600, 1, ?)`).run(clock.t);
+  assert.equal(results.passed(1), 3);
+  const { seed } = results.ticket(1);
+  const g = play(seed, 1, { start: 3 });
+  clock.t += Math.ceil((g.frames / 60) * 1000);
+  assert.equal(results.submit(1, { seed, players: 1, log: g.log, start: 4 }).status, 409, "stage 5 is not open");
+  assert.equal(results.submit(1, { seed, players: 1, log: g.log, start: 3 }).status, 200);
+  assert.equal(results.passed(1), 3 + g.state.stage - 3 + (g.state.phase === "clearDone" ? 1 : 0));
+  // Из записи с другого этапа выходит другая игра: сервер считает очки сам.
+  const r = replay({ seed, players: 1, log: g.log, start: 3 });
+  assert.equal(r.ok, true, r.why);
+  assert.deepEqual(r.scores, g.state.players.map((p) => p.score));
+  assert.equal(r.stages, g.state.stage - 3);
+  assert.equal(replay({ seed, players: 2, log: g.log, start: 3 }).why, "bad start");
+  assert.equal(replay({ seed, players: 1, log: g.log, start: 10_000 }).why, "bad start");
+  // Вдвоём — только с первого этапа.
+  const two = playTicket(results, clock, 1, 2);
+  assert.equal(results.submit(1, { seed: two.seed, players: 2, log: two.log, start: 1 }).status, 409);
 });
 
 test("online match: the host sends it, both players get their own score", () => {

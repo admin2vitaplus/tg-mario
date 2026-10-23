@@ -26,8 +26,9 @@ export function createReplayResults(store, { now = Date.now, members = () => nul
     addTicket: db.prepare(`INSERT OR IGNORE INTO ${tickets} (seed, player_id, issued_at) VALUES (?, ?, ?)`),
     use: db.prepare(`UPDATE ${tickets} SET used_at = ? WHERE seed = ? AND used_at IS NULL`),
     best: db.prepare(`SELECT COALESCE(MAX(score), 0) AS best FROM ${runs} WHERE player_id = ?`),
-    addRun: db.prepare(`INSERT OR IGNORE INTO ${runs} (player_id, seed, score, stages, frames, players, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`),
+    addRun: db.prepare(`INSERT OR IGNORE INTO ${runs} (player_id, seed, score, stages, frames, players, start, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+    passed: db.prepare(`SELECT COALESCE(MAX(start + stages), 0) AS n FROM ${runs} WHERE player_id = ?`),
     prune: db.prepare(`DELETE FROM ${tickets} WHERE used_at IS NULL AND issued_at < ?`),
     dropOldest: db.prepare(`DELETE FROM ${tickets} WHERE seed = (SELECT seed FROM ${tickets}
       WHERE player_id = ? AND used_at IS NULL ORDER BY issued_at ASC, seed ASC LIMIT 1)`),
@@ -53,14 +54,17 @@ export function createReplayResults(store, { now = Date.now, members = () => nul
       return { error: "busy" };
     },
 
+    // start — этап, с которого начата игра: пройденный игроком или следующий за ним, только для
+    // одного игрока (выбор уровня, web/lib/progress.js). stages — сколько этапов пройдено от него.
     // → { status, error?, why?, replay, results: [{ playerId, score, best, newRecord, stages, stats }] }
-    submit(playerId, { seed, players, log, room }) {
+    submit(playerId, { seed, players, log, room, start = 0 }) {
       const at = now();
       const t = Number.isSafeInteger(seed) ? q.ticket.get(seed) : null;
       if (!t || t.player_id !== playerId) return { status: 403, error: "no ticket" };
       if (t.used_at) return { status: 409, error: "already sent" };
       if (at - t.issued_at > TICKET_TTL_MS) return { status: 410, error: "ticket expired" };
-      const r = replay({ seed, players, log });
+      if (start > 0 && (players !== 1 || start > q.passed.get(playerId).n)) return { status: 409, error: "stage not open" };
+      const r = replay({ seed, players, log, start });
       if (!r.ok) return { status: 422, error: "implausible", why: r.why };
       if (at - t.issued_at < (r.frames / 60) * 1000 * REAL_TIME_SHARE) return { status: 422, error: "implausible", why: "faster than real time" };
 
@@ -80,7 +84,7 @@ export function createReplayResults(store, { now = Date.now, members = () => nul
         if (!q.use.run(at, seed).changes) throw Object.assign(new Error("already sent"), { status: 409 });
         for (const [id, score, stats] of credit) {
           const before = q.best.get(id).best;
-          if (!q.addRun.run(id, seed, score, r.stages, r.frames, players, at).changes) continue;
+          if (!q.addRun.run(id, seed, score, r.stages, r.frames, players, start, at).changes) continue;
           results.push({ playerId: id, score, best: Math.max(before, score), newRecord: score > before, stages: r.stages, stats: stats || {} });
         }
         db.exec("COMMIT");
@@ -93,6 +97,8 @@ export function createReplayResults(store, { now = Date.now, members = () => nul
     },
 
     best: (playerId) => q.best.get(playerId).best,
+    // Сколько этапов подряд с первого игрок прошёл (лучшая игра): открыты этапы 0…passed.
+    passed: (playerId) => q.passed.get(playerId).n,
     // Все принятые игры игрока: сколько и сколько уровней (этапов) в них пройдено.
     totals: (playerId) => q.totals.get(playerId),
   };

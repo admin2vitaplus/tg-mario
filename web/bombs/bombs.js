@@ -712,6 +712,7 @@ function showOverlay(title, html, button, action, panel) {
   btn.textContent = button || '';
   overlayAction = action;
   $('ovShare').classList.add('hidden');
+  $('ovPick').classList.add('hidden');
   $('ovMenu').classList.add('hidden');
   $('overlay').classList.remove('hidden');
 }
@@ -722,8 +723,22 @@ function showMenu() {
   view = null;
   netClose();
   showOverlay(T('title'), T('intro') + '<br>' + T('best', { n: loadBest() }), null, null);
+  showPick($('btnPick'));
   fetchTicket();
 }
+
+// «▦ Выбрать этап» (../lib/progress.js): a cleared stage stays open for good; a game alone can
+// start from it or from the one after it. The server replays the game from that stage too.
+const STAGE_COUNT = S.STAGES.length;
+const canPick = () => !!window.Progress && window.Progress.open('bombs', STAGE_COUNT).length > 1;
+function showPick(btn) { btn.classList.toggle('hidden', !canPick()); }
+function openPick() {
+  audio();
+  window.Progress.pick({ game: 'bombs', count: STAGE_COUNT, cols: 5, onPick: (i) => beginLocal(1, i) });
+}
+$('btnPick').addEventListener('click', openPick);
+$('ovPick').addEventListener('click', openPick);
+if (window.Progress) window.Progress.load().then(() => { if (!$('menu').classList.contains('hidden')) showPick($('btnPick')); });
 
 $('btnLook').addEventListener('click', () => { audio(); openLook(); });
 
@@ -1214,7 +1229,7 @@ function remotePad() {
 const MAX_REC_FRAMES = 60 * 60 * 60;
 const QUIT_FRAMES = 20 * 60; // a game left in the middle counts after 20 s (bot/bombs-replay.js)
 const ticket = { next: null, asking: false, waiters: [] };
-const rec = { seed: 0, players: 1, out: [], prev: -1, n: 0, frames: 0 };
+const rec = { seed: 0, players: 1, start: 0, out: [], prev: -1, n: 0, frames: 0 };
 const canCheck = () => !!(window.Server && window.Server.hasServer && tg && tg.initData);
 // The unused ticket is kept on the phone: opening the game again does not ask for a new one.
 const TICKET_KEY = 'bombs_ticket_' + ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 0);
@@ -1282,6 +1297,7 @@ function sendRun(s, quit) {
   if (!rec.seed || mode === 'guest' || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
   recFlush();
   const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(',') };
+  if (rec.start) body.start = rec.start;
   if (mode === 'host' && /^\d{4,8}$/.test(net.code)) body.room = net.code;
   rec.seed = 0;
   rec.out = [];
@@ -1299,7 +1315,7 @@ window.addEventListener('pagehide', () => { sendQuit(); });
 
 // Alone: the game waits up to 3 s for its ticket.
 let starting = false;
-function beginLocal(players) {
+function beginLocal(players, start) {
   if (starting) return;
   starting = true;
   // The ticket is usually here already; on a slow line the tapped button shows the game is starting.
@@ -1308,7 +1324,7 @@ function beginLocal(players) {
     clearTimeout(slow);
     document.body.classList.remove('ui-starting');
     starting = false;
-    begin(players);
+    begin(players, start);
   });
 }
 
@@ -1316,7 +1332,9 @@ function beginLocal(players) {
 let state = null;
 let running = false;
 
-function begin(players) {
+// start — the stage chosen on «▦ Выбрать этап» (alone only), 0 — from the first one.
+function begin(players, start) {
+  start = players === 1 && start > 0 ? start : 0;
   heroes = [look.hero, mode === 'host' && net.guestHero ? net.guestHero : partnerHero(look.hero)];
   net.remote = { dir: -1, a: false, b: false };
   net.rematch = { me: false, peer: false };
@@ -1329,8 +1347,9 @@ function begin(players) {
   const t = mode !== 'guest' && ticket.next;
   ticket.next = null;
   keepTicket();
-  Object.assign(rec, { seed: t ? t.seed : 0, players, out: [], prev: -1, n: 0, frames: 0 });
+  Object.assign(rec, { seed: t ? t.seed : 0, players, start, out: [], prev: -1, n: 0, frames: 0 });
   state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1);
+  if (start) S.startStage(state, start); // the same as bot/bombs-replay.js
   fetchTicket();
   track('game_start');
   lastHud = '';
@@ -1340,6 +1359,7 @@ function begin(players) {
 }
 
 function afterStep(s) {
+  if ((s.phase === 'clearDone' || s.won) && window.Progress) window.Progress.mark('bombs', s.stage);
   if (s.phase === 'clearDone') {
     running = false;
     const duel = s.players.length > 1;
@@ -1362,6 +1382,7 @@ function afterStep(s) {
     } else {
       showOverlay(s.won ? T('you_won') : T('game_over'), soloResult(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => beginLocal(1));
       showShare(s);
+      showPick($('ovPick'));
     }
   }
   if (mode === 'host' && !running) sendSnapshot(s);

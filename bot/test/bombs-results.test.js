@@ -22,8 +22,9 @@ test("the server's copy of the game rules is the game's own file", () => {
 });
 
 // Играет «как человек»: ходит, ставит бомбы, иногда жмёт «взорвать»; проходит этапы, если повезёт.
-function play(seed, players = 1) {
+function play(seed, players = 1, start = 0) {
   const s = S.newGame(players, seed);
+  if (start) S.startStage(s, start); // игра с выбранного этапа (как в bombs.js)
   const steps = [];
   let x = seed, dir = 0, hold = 0;
   const rnd = () => (x = (x * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
@@ -44,6 +45,19 @@ function play(seed, players = 1) {
   }
   return { log: encode(steps), state: s, frames: steps.filter((v) => v !== "n").length };
 }
+
+test("a game from a chosen stage is replayed from it; stages count from it", () => {
+  const g = play(11, 1, 7);
+  const r = replay({ seed: 11, players: 1, log: g.log, start: 7 });
+  assert.equal(r.ok, true, r.why);
+  assert.deepEqual(r.scores, g.state.players.map((p) => p.score));
+  assert.equal(r.stages, g.state.stage - 7 + (g.state.won ? 1 : 0));
+  // Та же запись с первого этапа — другая игра.
+  const from0 = replay({ seed: 11, players: 1, log: g.log });
+  assert.ok(!from0.ok || from0.scores[0] !== r.scores[0] || from0.frames !== r.frames || from0.stages !== r.stages);
+  assert.equal(replay({ seed: 11, players: 2, log: g.log, start: 7 }).why, "bad start");
+  assert.equal(replay({ seed: 11, players: 1, log: g.log, start: S.STAGES.length }).why, "bad start");
+});
 
 test("replay gives the same scores as the game, and a changed record is caught", () => {
   for (const [seed, players] of [[11, 1], [222, 1], [3333, 2], [44, 2]]) {
