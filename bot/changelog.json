@@ -1,0 +1,186 @@
+[
+  {
+    "id": "2026-10-01-collection",
+    "date": "2026-10-01",
+    "title": "«Жёлтый картридж»: игры в одном месте",
+    "body": "Все игры собраны в одно меню. «Прыг-Скок» и «Танкодром» получили «Внешний вид», удобное управление пальцами и режим, когда телефон лежит боком.",
+    "titleEn": "Yellow Cartridge: all games in one place",
+    "bodyEn": "All games are in one menu now. Hop-Skip and Tank Field got Looks, comfortable touch controls and a layout for a phone held sideways."
+  },
+  {
+    "id": "2026-10-02-tanks-online",
+    "date": "2026-10-02",
+    "title": "«Танкодром»: игра с другом стала удобнее",
+    "body": "Друга можно позвать в комнату одним нажатием. После обрыва связи игра возвращает вас в бой, а в конце можно сыграть реванш. Игра говорит по-русски и по-английски, итогом можно поделиться.",
+    "titleEn": "Tank Field: playing with a friend got easier",
+    "bodyEn": "Invite a friend to your room with one tap. After a lost connection the game takes you back into the fight, and a rematch is one tap away. The game speaks Russian and English, and you can share your result."
+  },
+  {
+    "id": "2026-10-02-tickets",
+    "date": "2026-10-02",
+    "title": "Появились жетоны",
+    "body": "Жетоны даются за игру, задания и достижения. Каждую неделю — таблица лучших с призами. На жетоны можно покупать оформление в магазине.",
+    "titleEn": "Tickets are here",
+    "bodyEn": "Get tickets for playing, tasks and achievements. Every week there is a top table with prizes. Spend tickets on looks in the shop."
+  },
+  {
+    "id": "2026-10-03-worlds-2-4",
+    "date": "2026-10-03",
+    "title": "«Прыг-Скок»: миры 2–4",
+    "body": "Три новых мира по четыре уровня. Игру можно продолжить с начала мира, а не с самого первого уровня.",
+    "titleEn": "Hop-Skip: worlds 2–4",
+    "bodyEn": "Three new worlds of four levels each. You can go on from the start of a world instead of the very first level."
+  },
+  {
+    "id": "2026-10-03-stars",
+    "date": "2026-10-03",
+    "title": "Покупки за звёзды во всех играх",
+    "body": "Всё, что продаётся за жетоны, можно купить и за звёзды Telegram. В «Танкодроме» теперь тоже дают жетоны. У каждой игры свои задания, таблица и магазин — кнопка «◆» в её меню.",
+    "titleEn": "Telegram Stars in every game",
+    "bodyEn": "Everything sold for tickets can also be bought with Telegram Stars. Tank Field gives tickets too now. Each game has its own tasks, table and shop: the «◆» button in its menu."
+  },
+  {
+    "id": "2026-10-06-chats",
+    "date": "2026-10-06",
+    "title": "Игры прямо в чатах",
+    "body": "В любом чате наберите имя бота через @ и выберите игру, чтобы позвать друзей. В группе с ботом работает команда /play.",
+    "titleEn": "Games right in your chats",
+    "bodyEn": "In any chat type @ and the bot's name, then pick a game to invite friends. In a group with the bot, use /play."
+  },
+  {
+    "id": "2026-10-06-lobby",
+    "date": "2026-10-06",
+    "title": "Новое меню",
+    "body": "Игры теперь показаны карточками с картинками, сверху — ваши жетоны. Кнопки во всех играх одинаковые, таблицы открываются быстрее. В «Прыг-Скоке» можно разгоняться в прыжке.",
+    "titleEn": "A new menu",
+    "bodyEn": "Games are shown as picture cards, with your tickets on top. Buttons look the same in every game, and tables open faster. In Hop-Skip you can speed up in a jump."
+  },
+  {
+    "id": "2026-10-07-life",
+    "date": "2026-10-07",
+    "title": "«Прыг-Скок»: ещё одна жизнь",
+    "body": "Когда жизни кончились, можно купить ещё одну и продолжить с того же места. После потери жизни вы появляетесь подальше от врагов.",
+    "titleEn": "Hop-Skip: one more life",
+    "bodyEn": "When your lives run out, buy one more and go on from the same place. After losing a life you come back away from enemies."
+  },
+  {
+    "id": "2026-10-07-bombs",
+    "date": "2026-10-07",
+    "title": "Новая игра: «Бомбодром»",
+    "body": "Ставьте бомбы, расчищайте поле и ищите выход. Можно играть одному или устроить дуэль с другом онлайн.",
+    "titleEn": "New game: Bomb Field",
+    "bodyEn": "Drop bombs, clear the field and find the exit. Play alone or challenge a friend to an online duel."
+  },
+  {
+    "id": "2026-10-07-achievements",
+    "date": "2026-10-07",
+    "title": "Достижения во всех играх",
+    "body": "У каждой игры появились свои достижения, за каждое — жетоны. Задания теперь засчитываются всегда.",
+    "titleEn": "Achievements in every game",
+    "bodyEn": "Every game has its own achievements now, each one gives tickets. Tasks are always counted now."
+  },
+  {
+    "id": "2026-10-08-tasks",
+    "date": "2026-10-08",
+    "title": "Новые задания и быстрые покупки",
+    "body": "Новые задания: сыграть во все игры за день и сыграть 10 игр за неделю. Покупки за жетоны и звёзды проходят сразу, а игры загружаются быстрее.",
+    "titleEn": "New tasks and instant purchases",
+    "bodyEn": "New tasks: play every game in a day and play 10 games in a week. Purchases for tickets and Stars go through at once, and games load faster."
+  },
+  {
+    "id": "2026-10-11-server",
+    "date": "2026-10-11",
+    "title": "Связь с сервером надёжнее",
+    "body": "У сервера игры теперь постоянный адрес: рекорды, жетоны и игра с другом работают стабильнее, игра не зависает при загрузке.",
+    "titleEn": "A steadier connection",
+    "bodyEn": "The game server has a permanent address now: records, tickets and playing with a friend work more reliably, and the game no longer hangs while loading."
+  },
+  {
+    "id": "2026-10-23-bombs-50",
+    "date": "2026-10-23",
+    "title": "«Бомбодром»: 50 этапов",
+    "body": "В одиночной игре теперь 50 этапов вместо 20.",
+    "titleEn": "Bomb Field: 50 stages",
+    "bodyEn": "Single play has 50 stages instead of 20."
+  },
+  {
+    "id": "2026-10-23-range",
+    "date": "2026-10-23",
+    "title": "Новая игра: «Тир»",
+    "body": "Наклоняйте телефон, чтобы целиться, и сбивайте птиц и тарелочки. Можно целиться и пальцем.",
+    "titleEn": "New game: Shooting Range",
+    "bodyEn": "Tilt your phone to aim and shoot down birds and clay discs. You can aim with your finger too."
+  },
+  {
+    "id": "2026-10-23-tanks-50",
+    "date": "2026-10-23",
+    "title": "«Танкодром»: 50 уровней",
+    "body": "В «Танкодроме» теперь 50 уровней.",
+    "titleEn": "Tank Field: 50 levels",
+    "bodyEn": "Tank Field has 50 levels now."
+  },
+  {
+    "id": "2026-10-23-worlds-5-8",
+    "date": "2026-10-23",
+    "title": "«Прыг-Скок»: миры 5–8",
+    "body": "Четыре новых мира по четыре уровня. После уровня 8-4 игра пройдена.",
+    "titleEn": "Hop-Skip: worlds 5–8",
+    "bodyEn": "Four new worlds of four levels each. Clear level 8-4 to finish the game."
+  },
+  {
+    "id": "2026-10-23-looks",
+    "date": "2026-10-23",
+    "title": "Больше достижений, новый «Внешний вид»",
+    "body": "Достижений стало больше. В «Внешнем виде» бесплатно только стандартное оформление, остальное — в магазине. Всё, что у вас уже было, остаётся.",
+    "titleEn": "More achievements, new Looks",
+    "bodyEn": "There are more achievements. In Looks only the standard style is free, the rest is in the shop. Everything you already had stays yours."
+  },
+  {
+    "id": "2026-10-23-level-select",
+    "date": "2026-10-23",
+    "title": "Выбор уровня во всех играх",
+    "body": "Начинайте игру с любого уровня, который уже прошли: кнопка «▦ Выбрать уровень».",
+    "titleEn": "Level select in every game",
+    "bodyEn": "Start from any level you have already cleared: the «▦ Choose a level» button."
+  },
+  {
+    "id": "2026-10-23-big-field",
+    "date": "2026-10-23",
+    "title": "Игровое поле крупнее",
+    "body": "На телефоне поле во всех играх стало крупнее и чётче.",
+    "titleEn": "A bigger playing field",
+    "bodyEn": "On a phone the field is bigger and sharper in every game."
+  },
+  {
+    "id": "2026-10-23-notices",
+    "date": "2026-10-23",
+    "title": "Уведомления",
+    "body": "Здесь будут обновления игр, новости и сообщения лично вам.",
+    "titleEn": "Notifications",
+    "bodyEn": "Game updates, news and messages for you will show up here."
+  },
+  {
+    "id": "2026-10-23-prices",
+    "date": "2026-10-23",
+    "title": "Новые цены в магазине",
+    "body": "Цены за жетоны изменились, цены в звёздах остались прежними.",
+    "titleEn": "New shop prices",
+    "bodyEn": "Prices in tickets have changed; prices in Stars stay the same."
+  },
+  {
+    "id": "2026-10-23-pryg-graphics",
+    "date": "2026-10-23",
+    "title": "«Прыг-Скок» стал красивее",
+    "body": "Объёмные облака, горы на горизонте, пыль из-под ног и мерцающие блоки «!».",
+    "titleEn": "Hop-Skip looks better",
+    "bodyEn": "Fluffier clouds, hills on the horizon, dust under the hero's feet and twinkling «!» blocks."
+  },
+  {
+    "id": "2026-10-23-effects",
+    "date": "2026-10-23",
+    "title": "Эффекты во всех играх",
+    "body": "Искры, осколки, тряска экрана и всплывающие очки: попадания и взрывы стали заметнее.",
+    "titleEn": "Effects in every game",
+    "bodyEn": "Sparks, debris, screen shake and pop-up points: hits and blasts stand out more."
+  }
+]
