@@ -373,5 +373,45 @@
     "body": "Каждый день одна игра на всех: наберите больше очков, начав с первого уровня. За первую игру испытания — жетоны, и с каждым днём подряд их больше. Таблицы дня: все игроки, ваш чат и друзья. Трое лучших за день получают призы. Если серия входов вот-вот прервётся, бот вечером напомнит (отключается кнопкой в сообщении).",
     "titleEn": "Challenge of the day",
     "bodyEn": "One game a day for everyone: score as much as you can starting from the first level. The first challenge game gives tickets, more for every day in a row. Daily tables: everyone, your chat and your friends. The top three of the day get prizes. If your visit streak is about to end, the bot reminds you in the evening (one tap turns it off)."
+  },
+  {
+    "id": "2026-10-23-pryg-jump",
+    "title": "«Прыг-Скок»: честнее прыжок и обзор",
+    "body": "Камера смотрит вперёд, когда герой бежит, и враги больше не выскакивают внезапно. Прыжок срабатывает, даже если нажать чуть раньше приземления или чуть позже края. На первых уровнях появились подсказки.",
+    "titleEn": "Hop-Skip: fairer jumps, better view",
+    "bodyEn": "The camera looks ahead while the hero runs, so enemies no longer pop up out of nowhere. A jump now works even if pressed just before landing or just past a ledge. The first levels have hints.",
+    "size": "minor"
+  },
+  {
+    "id": "2026-10-23-range-modes",
+    "size": "major",
+    "title": "«Тир»: серии, новые мишени и режим «Без промаха»",
+    "body": "Попадания подряд умножают очки до ×4. С третьего раунда вместе с птицами летают часы (мишени замедляются), патрон (лишний выстрел) и бомба, в которую стрелять нельзя. Новый режим «Без промаха»: улетела одна мишень — игра окончена.",
+    "titleEn": "Shooting Range: streaks, new targets and «No misses»",
+    "bodyEn": "Hits in a row multiply the points up to ×4. From round 3 a clock (targets slow down), a cartridge (one more shot) and a bomb you must not hit fly with the birds. New «No misses» mode: one target gets away and the game is over."
+  },
+  {
+    "id": "2026-10-23-bombs-kick",
+    "size": "major",
+    "title": "«Бомбодром»: пинок, перчатка и сжатие поля",
+    "body": "Новые находки: пинок (толкай бомбы, они катятся до препятствия) и перчатка (B бросает бомбу через стены). В дуэли через две минуты поле начинает сжиматься стальными блоками, так что матч всегда заканчивается.",
+    "titleEn": "Bomb Field: kick, glove and a closing field",
+    "bodyEn": "New finds: the kick (push bombs and they roll until something stops them) and the glove (B throws a bomb over walls). In a duel the field starts closing in with steel after two minutes, so every match has an ending."
+  },
+  {
+    "id": "2026-10-23-tanks-survival",
+    "size": "major",
+    "title": "«Танкодром»: режим «Выживание»",
+    "body": "Новый режим в меню: одна карта и волны врагов без конца, каждая больше и злее прошлой. Сколько волн удержите?",
+    "titleEn": "Tank Field: Survival mode",
+    "bodyEn": "A new mode in the menu: one map and endless enemy waves, each bigger and fiercer than the last. How many can you hold?"
+  },
+  {
+    "id": "2026-10-23-bots",
+    "size": "major",
+    "title": "Бот вместо друга",
+    "body": "В «Танкодроме» можно играть вдвоём с ботом-напарником, в «Бомбодроме» — дуэль с ботом. Если друг не пришёл в онлайн-комнату за 20 секунд, игра сама предложит бота.",
+    "titleEn": "A bot instead of a friend",
+    "bodyEn": "In Tank Field you can play together with a bot partner, in Bomb Field duel a bot. If your friend has not joined the online room in 20 seconds, the game offers a bot."
   }
 ]

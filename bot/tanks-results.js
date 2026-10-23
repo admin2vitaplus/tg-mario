@@ -57,20 +57,27 @@ export function createReplayResults(store, { now = Date.now, members = () => nul
     // start — этап, с которого начата игра: пройденный игроком или следующий за ним, только для
     // одного игрока (выбор уровня, web/lib/progress.js). stages — сколько этапов пройдено от него.
     // → { status, error?, why?, replay, results: [{ playerId, score, best, newRecord, stages, stats }] }
-    submit(playerId, { seed, players, log, room, start = 0 }) {
+    // rules и mode — версия правил и режим игры, их проверяет повтор (replay).
+    submit(playerId, { seed, players, log, room, start = 0, rules = 1, mode = "" }) {
       const at = now();
       const t = Number.isSafeInteger(seed) ? q.ticket.get(seed) : null;
       if (!t || t.player_id !== playerId) return { status: 403, error: "no ticket" };
       if (t.used_at) return { status: 409, error: "already sent" };
       if (at - t.issued_at > TICKET_TTL_MS) return { status: 410, error: "ticket expired" };
       if (start > 0 && (players !== 1 || start > q.passed.get(playerId).n)) return { status: 409, error: "stage not open" };
-      const r = replay({ seed, players, log, start });
+      const r = replay({ seed, players, log, start, rules, mode });
       if (!r.ok) return { status: 422, error: "implausible", why: r.why };
       if (at - t.issued_at < (r.frames / 60) * 1000 * REAL_TIME_SHARE) return { status: 422, error: "implausible", why: "faster than real time" };
 
       let credit;
       const st = r.stats || [];
       if (players === 1) credit = [[playerId, r.scores[0], st[0]]];
+      // С ботом вместо друга (mode «bot»): второй игрок — компьютер, игроку засчитывается только своё;
+      // победа над ботом — не победа над другом.
+      else if (mode === "bot") {
+        if (room != null) return { status: 400, error: "bad data" };
+        credit = [[playerId, r.scores[0], { ...(st[0] || {}), duelWin: false }]];
+      }
       else if (room != null) {
         const m = members(room);
         if (!m || m.host !== playerId) return { status: 403, error: "not the host of this room" };

@@ -20,8 +20,8 @@ test("the server's copy of the game rules is the game's own file", () => {
 });
 
 // Играет «как человек»: держит направление, стреляет очередями, проходит уровни.
-function play(seed, players = 1, { stopAtClear = false, start = 0 } = {}) {
-  const s = S.newGame(players, seed);
+function play(seed, players = 1, { stopAtClear = false, start = 0, rules = 1, mode = "" } = {}) {
+  const s = S.newGame(players, seed, { rules, mode });
   if (start) S.startStage(s, start); // игра, начатая с выбранного этапа (как в tanks.js)
   const steps = [];
   let x = seed, dir = 0, hold = 0;
@@ -43,6 +43,34 @@ function play(seed, players = 1, { stopAtClear = false, start = 0 } = {}) {
   }
   return { log: encode(steps), state: s, frames: steps.filter((v) => v !== "n").length };
 }
+
+test("«Выживание» (rules 2) replays with its mode; it is for one player from the first wave", () => {
+  const g = play(41, 1, { rules: 2, mode: "survival" });
+  const r = replay({ seed: 41, players: 1, log: g.log, rules: 2, mode: "survival" });
+  assert.equal(r.ok, true, r.why);
+  assert.deepEqual(r.scores, g.state.players.map((p) => p.score));
+  assert.equal(r.stages, Math.floor(g.state.wave / 2));
+  assert.equal(replay({ seed: 41, players: 1, log: g.log, mode: "survival" }).why, "bad mode", "needs rules 2");
+  assert.equal(replay({ seed: 41, players: 2, log: g.log, rules: 2, mode: "survival" }).why, "bad mode");
+  assert.equal(replay({ seed: 41, players: 1, log: g.log, rules: 9 }).why, "bad rules");
+});
+
+test("a game with the bot (mode «bot») replays for two and is credited to the player only", () => {
+  const g = play(43, 2, { rules: 2, mode: "bot" });
+  const r = replay({ seed: 43, players: 2, log: g.log, rules: 2, mode: "bot" });
+  assert.equal(r.ok, true, r.why);
+  assert.equal(replay({ seed: 43, players: 1, log: g.log, rules: 2, mode: "bot" }).why, "bad mode");
+  const store = openDb(":memory:");
+  let clock = 1_000_000;
+  const results = createTanksResults(store, { now: () => clock });
+  const { seed } = results.ticket(5);
+  const game = play(seed, 2, { rules: 2, mode: "bot" });
+  clock += game.frames * 20;
+  const out = results.submit(5, { seed, players: 2, log: game.log, rules: 2, mode: "bot" });
+  assert.equal(out.status, 200, out.error);
+  assert.equal(out.results.length, 1);
+  assert.equal(out.results[0].score, game.state.players[0].score, "not the bot's points");
+});
 
 test("replay gives the same score as the game, and a changed record is caught", () => {
   for (const seed of [11, 222, 3333]) {

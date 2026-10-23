@@ -37,7 +37,22 @@ const ENEMY = [
   { speed: 6, wall: false, smart: 0.4, turn: 0.3, score: 4000 },   // Шарик
   { speed: 6, wall: true, smart: 0.7, turn: 0.2, score: 8000 },    // Искра
 ];
-const ITEMS = ['bomb', 'fire', 'speed', 'remote', 'wallpass', 'bombpass', 'flamepass', 'mystery'];
+const ITEMS = ['bomb', 'fire', 'speed', 'remote', 'wallpass', 'bombpass', 'flamepass', 'mystery', 'kick', 'glove'];
+
+// Rules version: 2 adds the kick and the glove and, in a duel, the field that closes in.
+// A game is replayed with the rules it was played under; old games come without one and are 1.
+const RULES = 2;
+// Rules 2: these stages (from 0) hide the kick or the glove instead of their usual item;
+// in a duel the stages go kick, glove, the stage's own item, and again.
+const NEW_ITEMS = { 5: 'kick', 13: 'glove', 24: 'kick', 31: 'glove' };
+const DUEL_ITEMS = ['kick', 'glove', ''];
+const SLIDE = 4;            // frames a kicked bomb takes per cell
+const THROW = 3;            // cells a bomb flies from the glove (further if it cannot land there)
+// Duel, rules 2: after SHRINK_AT of play steel blocks fall along the edges, one every
+// SHRINK_EVERY frames, ring by ring, SHRINK_RINGS rings deep. The door's cell is spared.
+const SHRINK_AT = 120 * 60;
+const SHRINK_EVERY = 12;
+const SHRINK_RINGS = 3;
 
 // Stages: how many enemies of each type (by index in ENEMY) and the item hidden under a block.
 const STAGES = [
@@ -99,6 +114,19 @@ const MAX_LIVES = 9;
 
 const NO_INPUT = { dir: -1, a: false, b: false };
 
+// Inner cells ring by ring from the edge, clockwise: where the closing field puts its blocks.
+const SPIRAL = (() => {
+  const out = [];
+  for (let r = 0; r < SHRINK_RINGS; r++) {
+    const x0 = 1 + r, y0 = 1 + r, x1 = COLS - 2 - r, y1 = ROWS - 2 - r;
+    for (let x = x0; x <= x1; x++) out.push([x, y0]);
+    for (let y = y0 + 1; y <= y1; y++) out.push([x1, y]);
+    for (let x = x1 - 1; x >= x0; x--) out.push([x, y1]);
+    for (let y = y1 - 1; y > y0; y--) out.push([x0, y]);
+  }
+  return out;
+})();
+
 // ---------- Helpers ----------
 function rnd(s) {
   s.seed = (s.seed + 0x6D2B79F5) | 0;
@@ -119,12 +147,13 @@ const doorOpen = (s) => s.door && s.cells[idx(s.door[0], s.door[1])] === EMPTY;
 const itemOpen = (s) => s.item && !s.item.taken && s.cells[idx(s.item.x, s.item.y)] === EMPTY;
 
 // ---------- Game setup ----------
-function newGame(players, seed) {
-  const s = { seed: seed | 0, frame: 0, duel: players === 2, players: [], events: [], won: false, winner: -1 };
+// opts: { rules } — see RULES.
+function newGame(players, seed, opts = {}) {
+  const s = { rules: opts.rules || 1, seed: seed | 0, frame: 0, duel: players === 2, players: [], events: [], won: false, winner: -1 };
   for (let i = 0; i < players; i++) {
     s.players.push({
       pi: i, lives: 3, score: 0, wins: 0, out: false,
-      bombs: 1, range: 1, speed: 0, remote: false, wallpass: false, bombpass: false, flamepass: false,
+      bombs: 1, range: 1, speed: 0, remote: false, wallpass: false, bombpass: false, flamepass: false, kick: false, glove: false,
       x: 0, y: 0, dir: DOWN, anim: 0, alive: true, dieT: 0, shield: 0, mystery: 0, kills: 0,
     });
   }
@@ -166,7 +195,8 @@ function startStage(s, n) {
   s.door = soft[d];
   soft.splice(d, 1);
   const it = soft[pick(s, soft.length)];
-  s.item = { x: it[0], y: it[1], type: st.item, taken: false, by: -1 };
+  s.item = { x: it[0], y: it[1], type: itemFor(s, n, st.item), taken: false, by: -1 };
+  s.shrink = 0;
   // Enemies start on free cells away from the players.
   const free = [];
   for (let cy = 1; cy < ROWS - 1; cy++) {
@@ -188,8 +218,26 @@ function startStage(s, n) {
   for (const p of s.players) placePlayer(s, p);
 }
 
+function itemFor(s, n, usual) {
+  if (s.rules < 2) return usual;
+  if (s.duel) return DUEL_ITEMS[n % DUEL_ITEMS.length] || usual;
+  return NEW_ITEMS[n] || usual;
+}
+
 function placePlayer(s, p) {
-  const [sx, sy] = STARTS[p.pi];
+  let [sx, sy] = STARTS[p.pi];
+  // The closing field may have covered the start: then the nearest open floor.
+  if (s.cells[idx(sx, sy)] !== EMPTY) {
+    let best = null;
+    for (let cy = 1; cy < ROWS - 1; cy++) {
+      for (let cx = 1; cx < COLS - 1; cx++) {
+        if (s.cells[idx(cx, cy)] !== EMPTY || bombAt(s, cx, cy)) continue;
+        const d = Math.abs(cx - sx) + Math.abs(cy - sy);
+        if (!best || d < best[2]) best = [cx, cy, d];
+      }
+    }
+    if (best) [sx, sy] = best;
+  }
   p.x = sx * TS;
   p.y = sy * TS;
   p.dir = DOWN;
@@ -210,6 +258,8 @@ function loseRare(p) {
   p.wallpass = false;
   p.bombpass = false;
   p.flamepass = false;
+  p.kick = false;
+  p.glove = false;
   p.mystery = 0;
 }
 
@@ -286,9 +336,16 @@ function updatePlayer(s, p, inp) {
   if (p.shield) p.shield--;
   if (p.mystery) p.mystery--;
   if (s.phase !== 'play') return;
-  if (inp.dir >= 0 && inp.dir <= 3) movePlayer(s, p, inp.dir);
+  if (inp.dir >= 0 && inp.dir <= 3) {
+    movePlayer(s, p, inp.dir);
+    if (p.kick) kickBomb(s, p, inp.dir);
+  }
   if (inp.a) dropBomb(s, p);
-  if (inp.b && p.remote) {
+  // B: the glove throws the bomb underfoot; otherwise it sets off the remote bombs.
+  const [ux, uy] = cellOf(p.x, p.y);
+  const under = p.glove && bombAt(s, ux, uy);
+  if (inp.b && under) throwBomb(s, p, under);
+  else if (inp.b && p.remote) {
     const b = s.bombs.find((x) => x.owner === p.pi);
     if (b) explode(s, b);
   }
@@ -356,6 +413,64 @@ function exitStage(s, p) {
   } else s.phase = 'clear';
 }
 
+// The kick: walking into a bomb sends it sliding until something stops it.
+function kickBomb(s, p, dir) {
+  const [cx, cy] = cellOf(p.x, p.y);
+  const b = bombAt(s, cx + DX[dir], cy + DY[dir]);
+  if (!b || b.slide >= 0) return;
+  if (b.passers & (1 << p.pi)) return;
+  // Only when the hero stands right against it.
+  if (!covers(p.x + DX[dir], p.y + DY[dir], b.x, b.y) || covers(p.x, p.y, b.x, b.y)) return;
+  if (!slideFree(s, b.x + DX[dir], b.y + DY[dir])) return;
+  b.slide = dir;
+  b.slideT = SLIDE;
+  s.events.push('kick');
+}
+
+// A cell a bomb can move onto: open floor with nobody on it.
+function slideFree(s, cx, cy) {
+  if (!inside(cx, cy) || s.cells[idx(cx, cy)] !== EMPTY || bombAt(s, cx, cy)) return false;
+  if (s.players.some((o) => o.alive && covers(o.x, o.y, cx, cy))) return false;
+  return !s.enemies.some((e) => !e.dead && covers(e.x, e.y, cx, cy));
+}
+
+// The glove: the bomb underfoot flies THROW cells ahead, over anything, to the first open floor.
+function throwBomb(s, p, b) {
+  for (let r = THROW; r <= THROW + 3; r++) {
+    const cx = b.x + DX[p.dir] * r, cy = b.y + DY[p.dir] * r;
+    if (!inside(cx, cy)) return;
+    if (s.cells[idx(cx, cy)] !== EMPTY || bombAt(s, cx, cy)) continue;
+    b.x = cx;
+    b.y = cy;
+    b.slide = -1;
+    b.passers = 0;
+    for (const o of s.players) if (o.alive && covers(o.x, o.y, cx, cy)) b.passers |= 1 << o.pi;
+    s.events.push('throw');
+    return;
+  }
+}
+
+// Duel, rules 2: steel blocks close in from the edges.
+function shrinkField(s) {
+  if (s.shrink >= SPIRAL.length) return;
+  if (STAGE_TIME - s.time < SHRINK_AT || (STAGE_TIME - s.time - SHRINK_AT) % SHRINK_EVERY) return;
+  const [cx, cy] = SPIRAL[s.shrink++];
+  if (s.door && s.door[0] === cx && s.door[1] === cy) return;
+  const k = idx(cx, cy);
+  if (s.cells[k] === HARD) return;
+  s.cells[k] = HARD;
+  s.burn[k] = 0;
+  s.fire[k] = 0;
+  s.bombs = s.bombs.filter((b) => b.x !== cx || b.y !== cy);
+  if (s.item && !s.item.taken && s.item.x === cx && s.item.y === cy) { s.item.taken = true; s.item.by = -1; }
+  for (const e of s.enemies) if (!e.dead && covers(e.x, e.y, cx, cy)) e.dead = 1;
+  // Nothing saves a hero from a falling block.
+  for (const p of s.players) {
+    if (p.alive && covers(p.x, p.y, cx, cy)) { p.alive = false; p.dieT = 0; s.events.push('die'); }
+  }
+  s.events.push('shrink');
+}
+
 // ---------- Bombs and flames ----------
 function explode(s, first) {
   const queue = [first];
@@ -400,6 +515,14 @@ function explode(s, first) {
 function updateBombs(s) {
   for (const b of s.bombs) {
     for (const p of s.players) if ((b.passers & (1 << p.pi)) && !(p.alive && covers(p.x, p.y, b.x, b.y))) b.passers &= ~(1 << p.pi);
+  }
+  for (const b of s.bombs) {
+    if (b.slide === undefined || b.slide < 0 || --b.slideT > 0) continue;
+    const nx = b.x + DX[b.slide], ny = b.y + DY[b.slide];
+    if (!slideFree(s, nx, ny)) { b.slide = -1; continue; }
+    b.x = nx;
+    b.y = ny;
+    b.slideT = SLIDE;
   }
   for (const b of s.bombs.slice()) {
     if (b.remote || s.bombs.indexOf(b) < 0) continue;
@@ -528,6 +651,7 @@ function step(s, inputs) {
   }
   updateBombs(s);
   updateEnemies(s);
+  if (s.duel && s.rules >= 2) shrinkField(s);
   hits(s);
   if (s.time > 0 && --s.time === 0 && !s.hurry) hurryUp(s);
 }
@@ -535,6 +659,7 @@ function step(s, inputs) {
 root.BombSim = {
   COLS, ROWS, TILE, SUB, TS, EMPTY, HARD, SOFT, BURN, UP, RIGHT, DOWN, LEFT, DX, DY,
   FUSE, FLAME, DIE, INTRO, STAGE_TIME, ENEMY, ITEMS, STAGES, STARTS, LIFE_STAGES,
+  RULES, NEW_ITEMS, DUEL_ITEMS, SHRINK_AT, SHRINK_EVERY, SPIRAL, SLIDE, THROW,
   newGame, startStage, step, cellOf, explode,
 };
 })(typeof window !== 'undefined' ? window : globalThis);

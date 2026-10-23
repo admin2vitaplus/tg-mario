@@ -41,6 +41,7 @@
         <button id="btn1p" class="ui-btn primary" data-t="menu_1p">1 игрок</button>
         <button id="btnPick" class="ui-btn hidden" data-t="menu_pick">▦ Выбрать этап</button>
         <button id="btnOnline" class="ui-btn" data-t="menu_online">Дуэль онлайн</button>
+        <button id="btnBot" class="ui-btn" data-t="menu_bot">🤖 Дуэль с ботом</button>
         <button id="btnWallet" class="ui-btn teal wGameBtn" data-wallet-game="bombs">◆ Жетоны</button>
         <button id="btnLook" class="ui-btn" data-t="menu_look">🎨 Внешний вид</button>
       </div>
@@ -53,6 +54,7 @@
           </div>
         </div>
         <button id="btnInvite" class="ui-btn primary hidden" data-t="btn_invite">Позвать друга в Telegram</button>
+        <button id="btnBotNow" class="ui-btn hidden" data-t="btn_bot_now">🤖 Друг не пришёл? Дуэль с ботом</button>
         <button id="btnCancel" class="ui-btn ghost" data-t="btn_back">Назад</button>
       </div>
       <div class="ui-stack" id="ovActs">
@@ -77,6 +79,7 @@
   <script defer src="../lib/progress.js"></script>
   <script defer src="strings.js"></script>
   <script defer src="sim.js"></script>
+  <script defer src="bot.js"></script>
   <script defer src="bombs.js"></script>
 </body>
 </html>

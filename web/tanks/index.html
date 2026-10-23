@@ -41,9 +41,11 @@
       <p id="ovText">Защити штаб от вражеских танков.<br>Кирпич пробивается, сталь держит.</p>
       <div id="menu" class="ui-stack">
         <button data-players="1" class="ui-btn primary" data-t="menu_1p">1 игрок</button>
+        <button id="btnSurvival" class="ui-btn" data-t="menu_survival">♾ Выживание</button>
         <button id="btnPick" class="ui-btn hidden" data-t="menu_pick">▦ Выбрать уровень</button>
         <button data-players="2" class="ui-btn desk" data-t="menu_2p">2 игрока за одной клавиатурой</button>
         <button id="btnOnline" class="ui-btn" data-t="menu_online">Онлайн вдвоём</button>
+        <button id="btnBot" class="ui-btn" data-t="menu_bot">🤖 Вдвоём с ботом</button>
         <button id="btnWallet" class="ui-btn teal wGameBtn" data-wallet-game="tanks">◆ Жетоны</button>
         <button id="btnLook" class="ui-btn" data-t="menu_look">🎨 Внешний вид</button>
       </div>
@@ -56,6 +58,7 @@
           </div>
         </div>
         <button id="btnInvite" class="ui-btn primary hidden" data-t="btn_invite">Позвать друга в Telegram</button>
+        <button id="btnBotNow" class="ui-btn hidden" data-t="btn_bot_now">🤖 Друг не пришёл? Играть с ботом</button>
         <button id="btnCancel" class="ui-btn ghost" data-t="btn_back">Назад</button>
       </div>
       <div class="ui-stack" id="ovActs">
@@ -80,6 +83,7 @@
   <script defer src="../lib/fx.js"></script>
   <script defer src="strings.js"></script>
   <script defer src="sim.js"></script>
+  <script defer src="bot.js"></script>
   <script defer src="tanks.js"></script>
 </body>
 </html>

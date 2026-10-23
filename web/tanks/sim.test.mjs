@@ -146,3 +146,32 @@ test('clearing stage 50 wins the game', () => {
   for (let i = 0; i < 300 && lost.phase !== 'overDone'; i++) S.step(lost, []);
   assert.equal(lost.won, false);
 });
+
+// ---------- Rules 2: «Выживание» ----------
+test('survival: waves never end the game, each one bigger, on the same map', () => {
+  const s = S.newGame(1, 7, { rules: 2, mode: 'survival' });
+  while (s.phase === 'intro') S.step(s, []);
+  assert.equal(s.queue.length, 10, 'the first wave is 10');
+  const map = s.mapName;
+  s.players[0].lives = 99;
+  for (let w = 0; w < 3; w++) {
+    // Clear the wave at once.
+    s.queue = []; s.spawns = []; s.enemies = [];
+    S.step(s, []);
+    assert.equal(s.phase, 'play', 'no stage clear in survival');
+    for (let i = 0; i < S.SURVIVAL_REST + 2; i++) S.step(s, []);
+    assert.equal(s.wave, w + 1);
+    assert.equal(s.total, 10 + s.wave);
+    assert.equal(s.mapName, map);
+  }
+});
+
+test('survival: the difficulty follows the wave; rules 1 ignore the mode', () => {
+  const s = S.newGame(1, 7, { rules: 2, mode: 'survival' });
+  const early = S.fieldCap(s);
+  s.wave = 30;
+  assert.ok(S.fieldCap(s) > early);
+  const old = S.newGame(1, 7);
+  assert.equal(old.mode, '');
+  assert.equal(old.total, 20);
+});

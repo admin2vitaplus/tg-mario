@@ -113,6 +113,12 @@ function levelField() {
   column(189, 8);
   L.flagpole(198);
 
+  // Hints for a first game, painted on the sky.
+  L.signs.push({ x: 9, y: 6, text: 'A — ПРЫЖОК, ДЕРЖИ — ВЫШЕ' });
+  L.signs.push({ x: 19, y: 7.2, text: 'БЕЙ БЛОКИ СНИЗУ' });
+  L.signs.push({ x: 33, y: 6, text: 'ПРЫГАЙ НА ЖУКОВ' });
+  L.signs.push({ x: 62, y: 6, text: 'B — БЕГ: С РАЗБЕГА ДАЛЬШЕ' });
+
   L.enemies([22, 40, 51, 53, 97, 99, 107, 114, 116, 124, 126, 128, 130, 174, 176]);
   L.enemies([81, 83], 4);
 
@@ -187,6 +193,7 @@ function levelCave() {
   fill(142, 145, 7, 12, 'H');
   row(142, 6, 'oooo');
   L.plants.push({ x: 80, y: 10 }, { x: 88, y: 9 });
+  L.signs.push({ x: 81, y: 4.5, text: '↓ В НЕКОТОРЫЕ ТРУБЫ МОЖНО ЗАЙТИ' });
 
   // Pit with two lifts and no ceiling above it; the right lift rises high enough
   // to jump onto the ceiling.

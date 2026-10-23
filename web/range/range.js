@@ -110,6 +110,9 @@ const SFX = {
   over: () => notes([523, 440, 349, 262], 0.2, 0.25),
   win: () => notes([523, 659, 784, 1047, 784, 1047, 1319], 0.1, 0.14),
   start: () => notes([392, 523, 659, 784], 0.1, 0.12),
+  bomb: () => { noise(0.5, 0.6, 700); haptic('heavy'); },
+  clock: () => { notes([1568, 1175, 784], 0.07, 0.1); haptic('medium'); },
+  ammo: () => { notes([784, 1047], 0.06, 0.08); haptic('medium'); },
 };
 
 // ---------- Pictures (drawn by code, ASSETS.md) ----------
@@ -166,6 +169,18 @@ const BIRD_LOOKS = [
 ];
 const GOLD = { B: '#f8c020', W: '#fff090', H: '#d89000', K: '#402000', X: '#ffffff', O: '#f84020', D: '#906000' };
 const DISC = fromRows(['...oooooo...', '.oyyyyyyyyo.', 'oyyyyyyyyyyo', '.oddddddddo.', '...oooooo...'], { o: '#a83810', y: '#f89840', d: '#c85820' });
+// Extra targets (rules 2, sim.js): a bomb to leave alone, a clock that slows the others, a cartridge for one more shot.
+const EXTRA_IMG = {
+  bomb: fromRows(['..........yr....', '.........y..r...', '........kk......', '.......kkkk.....', '.....kkkkkkkk...', '....kkhkkkkkkk..',
+    '...kkhhkkkkkkkk.', '...khhkkkkkkkkk.', '...kkkkkkkkkkkk.', '...kkkkkkkkkkkk.', '...kkkkkkkkkkkk.', '....kkkkkkkkkk..',
+    '.....kkkkkkkk...', '.......kkkk.....', '................', '................'], { k: '#202028', h: '#686878', y: '#f8d020', r: '#f84020' }),
+  clock: fromRows(['......rrrr......', '....rrwwwwrr....', '...rwwwwkwwwr...', '..rwwwwwkwwwwr..', '.rwwwwwwkwwwwwr.', '.rwwwwwwkwwwwwr.',
+    'rwwwwwwwkwwwwwwr', 'rwkwwwwwkkkkwkwr', 'rwwwwwwwwwwwwwwr', '.rwwwwwwwwwwwwr.', '.rwwwwwwwwwwwwr.', '..rwwwwwkwwwwr..',
+    '...rwwwwwwwwr...', '....rrwwwwrr....', '......rrrr......', '................'], { r: '#e83018', w: '#ffffff', k: '#202028' }),
+  ammo: fromRows(['......yy........', '.....yyyy.......', '.....yyyy.......', '....rrrrrr......', '....rrrrrr......', '....rrrrrr......',
+    '....rrrrrr......', '....rrrrrr......', '....rrrrrr......', '....rrrrrr......', '....rrrrrr......', '....dddddd......',
+    '....dddddd......', '................', '................', '................'], { y: '#f8d878', r: '#38a838', d: '#c8a020' }),
+};
 const SHARDS = fromRows(['o..y....d..o', '.y...o.y..y.', '..d..y...o..'], { o: '#a83810', y: '#f89840', d: '#c85820' });
 
 const birdCache = new Map();
@@ -486,11 +501,18 @@ function spotEffects(s) {
       Fx.burst(x, y, { n: 10, speed: 70, life: 500, grav: 220, size: 2, colors: ['#f89838', '#c85818', '#fff0c0'] });
     } else {
       const gold = t.kind === 'gold';
-      Fx.burst(x, y, { n: 9, speed: 45, life: 650, grav: 60, size: 2,
-        colors: gold ? ['#f8d020', '#fff8c0', '#c89000'] : ['#ffffff', '#c8c8c8', '#a87848'] });
+      const colors = t.kind === 'bomb' ? ['#f84020', '#f8d020', '#404048'] : t.kind === 'clock' ? ['#ffffff', '#e83018']
+        : t.kind === 'ammo' ? ['#38a838', '#f8d878'] : gold ? ['#f8d020', '#fff8c0', '#c89000'] : ['#ffffff', '#c8c8c8', '#a87848'];
+      Fx.burst(x, y, { n: t.kind === 'bomb' ? 16 : 9, speed: t.kind === 'bomb' ? 80 : 45, life: 650, grav: 60, size: 2, colors });
+      if (t.kind === 'bomb') {
+        Fx.shake(3, 250);
+        Fx.popup(x, y - 10, '-' + S.BOMB_COST * S.mult(s.round), '#f84020');
+        return;
+      }
     }
     // Several targets in one shot share the points.
-    if (gain > 0) Fx.popup(x, y - 10, Math.round(gain / fresh.length), fresh.length > 1 ? '#60f0ff' : '#f8d020');
+    const real = fresh.filter((v) => v.slot >= 0).length;
+    if (gain > 0 && t.slot >= 0) Fx.popup(x, y - 10, Math.round(gain / real), real > 1 ? '#60f0ff' : '#f8d020');
   });
 }
 
@@ -507,6 +529,11 @@ function render(s) {
       else if (t.state === 'hit') ctx.drawImage(SHARDS, x + 2, y + 6 + Math.floor((24 - t.hang) / 4));
       continue;
     }
+    if (EXTRA_IMG[t.kind]) {
+      if (t.state === 'hit' && t.kind === 'bomb') continue; // blown up: only the sparks are left
+      ctx.drawImage(EXTRA_IMG[t.kind], x, y + (t.state === 'fall' ? 0 : ((t.age >> 3) & 1)));
+      continue;
+    }
     const left = t.vx < 0;
     if (t.state === 'hit') ctx.drawImage(birdImg(birds, t.kind, 2, false, false), x, y);
     else if (t.state === 'fall') ctx.drawImage(birdImg(birds, t.kind, 1, left, true), x, y);
@@ -514,6 +541,9 @@ function render(s) {
   }
   ctx.drawImage(bushImage(scene), 0, GROUND - 4);
   if (window.Fx) Fx.draw(ctx);
+  // Hits in a row: the points multiplier in the corner.
+  const combo = s.rules >= 2 ? S.comboOf(s.stats.streak) : 1;
+  if (combo > 1 && window.Fx) Fx.digits(ctx, 'x' + combo, 12, 8, combo >= 4 ? '#f84020' : '#f8d020');
   // Where the last shot went: a quick ring.
   if (flash && s.frame - flash.t < 8) {
     ctx.strokeStyle = 'rgba(255, 255, 255, ' + (1 - (s.frame - flash.t) / 8) + ')';
@@ -540,7 +570,8 @@ function strip(s) {
   ctx.fillStyle = '#202028';
   ctx.fillRect(6, STRIP + 6, 34, 20);
   const shots = s.phase === 'intro' ? SHOTS : s.shots;
-  for (let i = 0; i < SHOTS; i++) if (i < shots) ctx.drawImage(BULLET, 11 + i * 10, STRIP + 12);
+  const gap = shots > SHOTS ? 7 : 10; // a cartridge can give a fourth shot
+  for (let i = 0; i < Math.max(SHOTS, shots); i++) if (i < shots) ctx.drawImage(BULLET, 9 + i * gap, STRIP + 12);
   ctx.fillStyle = '#202028';
   ctx.fillRect(48, STRIP + 6, 202, 20);
   const blink = (s.frame >> 4) & 1;
@@ -642,13 +673,16 @@ function showMenu() {
   fetchTicket();
 }
 
+// The mode of the next game: '' the usual one, 'sudden' — «Без промаха» (sim.js).
+let mode = '';
+
 // «▦ Выбрать раунд» (../lib/progress.js): a cleared round stays open for good; a game can start
 // from it or from the one after it. The server replays the game from that round too.
 const canPick = () => !!window.Progress && window.Progress.open('range', S.ROUNDS).length > 1;
 function showPick(btn) { btn.classList.toggle('hidden', !canPick()); }
 function openPick() {
   audio();
-  window.Progress.pick({ game: 'range', count: S.ROUNDS, cols: 5, onPick: (i) => play(i) });
+  window.Progress.pick({ game: 'range', count: S.ROUNDS, cols: 5, onPick: (i) => { mode = ''; play(i); } });
 }
 $('btnPick').addEventListener('click', openPick);
 $('ovPick').addEventListener('click', openPick);
@@ -667,7 +701,8 @@ $('ovAlt').addEventListener('click', () => {
   altAction = null;
   if (act) act();
 });
-$('btnPlay').addEventListener('click', () => { audio(); play(); });
+$('btnPlay').addEventListener('click', () => { audio(); mode = ''; play(); });
+$('btnSudden').addEventListener('click', () => { audio(); mode = 'sudden'; play(); });
 
 function result(s) {
   return T('round_line', { n: s.round + 1 }) + '<br>' + T('hits_line', { hits: s.stats.hits, shots: s.stats.shots }) + '<br>' + T('score_line', { n: s.score });
@@ -716,7 +751,7 @@ function appLink(label) {
 const MAX_REC_FRAMES = 60 * 60 * 60;
 const QUIT_FRAMES = 20 * 60; // a game left in the middle counts after 20 s (bot/range-replay.js)
 const ticket = { next: null, asking: false, waiters: [] };
-const rec = { seed: 0, start: 0, out: [], since: 0, frames: 0 };
+const rec = { seed: 0, start: 0, mode: '', out: [], since: 0, frames: 0 };
 const canCheck = () => !!(window.Server && window.Server.hasServer && tg && tg.initData);
 // The unused ticket is kept on the phone: opening the game again does not ask for a new one.
 const TICKET_KEY = 'range_ticket_' + ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) || 0);
@@ -770,8 +805,9 @@ function recStep(shot) {
 function sendRun(quit) {
   if (!rec.seed || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
   if (rec.since > 0) rec.out.push('e' + rec.since.toString(36));
-  const body = { seed: rec.seed, players: 1, log: rec.out.join(',') };
+  const body = { seed: rec.seed, players: 1, log: rec.out.join(','), rules: S.RULES };
   if (rec.start) body.start = rec.start;
+  if (rec.mode) body.mode = rec.mode;
   rec.seed = 0;
   rec.out = [];
   return window.Server.request('POST', '/api/range/run', body, { keepalive: quit })
@@ -817,8 +853,8 @@ function begin(start) {
   const t = ticket.next;
   ticket.next = null;
   keepTicket();
-  Object.assign(rec, { seed: t ? t.seed : 0, start, out: [], since: 0, frames: 0 });
-  state = S.newGame(t ? t.seed : (Date.now() & 0x7fffffff) || 1);
+  Object.assign(rec, { seed: t ? t.seed : 0, start, mode, out: [], since: 0, frames: 0 });
+  state = S.newGame(t ? t.seed : (Date.now() & 0x7fffffff) || 1, { rules: S.RULES, mode });
   if (start) S.startRound(state, start); // the same as bot/range-replay.js
   fetchTicket();
   track('game_start');
@@ -837,7 +873,7 @@ function finished(s) {
   sendRun(false);
   track('game_finish');
   shareText = T('share_text', { n: S.cleared(s), score: s.score });
-  showOverlay(s.won ? T('you_won') : T('game_over'), result(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => play());
+  showOverlay(s.won ? T('you_won') : T('game_over'), (s.mode === 'sudden' ? T('sudden_line') + '<br>' : '') + result(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => play());
   $('ovShare').classList.remove('hidden');
   $('ovShare').textContent = T('btn_share');
   $('ovMenu').classList.remove('hidden');
@@ -862,6 +898,7 @@ function frame(now) {
         if (SFX[ev]) SFX[ev]();
         if (ev === 'shot' && shot) flash = { x: shot.x, y: shot.y, t: state.frame };
         if (ev === 'double') doubleUntil = Date.now() + 900;
+        if (ev === 'bomb' || ev === 'clock' || ev === 'ammo') toast(T('toast_' + ev));
       }
       state.events.length = 0;
       // A round with its tally passed is cleared: it stays open on «▦ Выбрать раунд».
