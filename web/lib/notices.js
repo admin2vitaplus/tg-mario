@@ -19,14 +19,16 @@ const STR = {
   ru: {
     title: 'УВЕДОМЛЕНИЯ', button: '🔔 Уведомления', sub_none: 'Новостей пока нет', sub_new: 'Новых: {n}', sub_read: 'Всё прочитано',
     tab_all: 'Все', tab_update: 'Обновления', tab_news: 'Новости', tab_personal: 'Личные',
-    kind_update: 'Обновление', kind_news: 'Новость', kind_personal: 'Лично вам', fresh: 'новое',
+    kind_update: 'Крупное обновление', kind_minor: 'Небольшое обновление', kind_news: 'Новость',
+    size_all: 'Все', size_major: 'Крупные', size_minor: 'Небольшие', kind_personal: 'Лично вам', fresh: 'новое',
     empty: 'Здесь будут обновления игр, новости и сообщения лично вам.', empty_tab: 'В этом разделе пока ничего нет.',
     loading: 'Загрузка…', offline: 'Сервер сейчас недоступен. Показано то, что было загружено раньше.', close: 'Закрыть',
   },
   en: {
     title: 'NOTIFICATIONS', button: '🔔 Notifications', sub_none: 'No news yet', sub_new: 'New: {n}', sub_read: 'All read',
     tab_all: 'All', tab_update: 'Updates', tab_news: 'News', tab_personal: 'Personal',
-    kind_update: 'Update', kind_news: 'News', kind_personal: 'For you', fresh: 'new',
+    kind_update: 'Major update', kind_minor: 'Minor update', kind_news: 'News',
+    size_all: 'All', size_major: 'Major', size_minor: 'Minor', kind_personal: 'For you', fresh: 'new',
     empty: 'Game updates, news and messages for you will show up here.', empty_tab: 'Nothing in this section yet.',
     loading: 'Loading…', offline: 'The server is not reachable right now. Showing what was loaded before.', close: 'Close',
   },
@@ -104,12 +106,17 @@ function refresh() {
 // ---------- The list ----------
 let panel = null;
 let tab = 'all';
+let size = 'all'; // in «Обновления»: all, major (update) or minor
 let shownSeen = 0; // what was read before this opening: newer items stay lit while the list is open
 
 const date = (ms) => {
   try {
     return new Date(ms).toLocaleDateString(lang === 'en' ? 'en-GB' : 'ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
   } catch (e) { return ''; }
+};
+const shortDate = (ms) => {
+  const d = new Date(ms);
+  return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
 };
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -124,13 +131,27 @@ function render() {
   body.replaceChildren();
   if (!state) { body.append(el('p', 'wNote', T('loading'))); return; }
   if (!at && server.online === false) body.append(el('p', 'wNote wWarn', T('offline')));
-  const items = state.items.filter((n) => tab === 'all' || n.kind === tab);
+  // Updates are major (kind update) and minor ones; the updates tab can show one size only.
+  if (tab === 'update') {
+    const sizes = el('div', 'wTabs wPeriod nSizes');
+    for (const z of ['all', 'major', 'minor']) {
+      const b = el('button', z === size ? 'on' : null, T('size_' + z));
+      b.dataset.size = z;
+      sizes.append(b);
+    }
+    body.append(sizes);
+  }
+  const isUpdate = (n) => n.kind === 'update' || n.kind === 'minor';
+  const items = state.items.filter((n) => tab === 'all' || (tab === 'update' ? isUpdate(n) &&
+    (size === 'all' || (size === 'major') === (n.kind === 'update')) : n.kind === tab));
   if (!items.length) { body.append(el('p', 'wNote', T(state.items.length ? 'empty_tab' : 'empty'))); return; }
+  // A major update is a full card; a minor one is a short line.
   const list = el('ul', 'nList');
   for (const n of items) {
     const li = el('li', 'nItem n-' + n.kind + (n.id > shownSeen ? ' unread' : ''));
     const head = el('div', 'nHead');
-    head.append(el('span', 'nKind', T('kind_' + n.kind)), el('span', 'nDate', date(n.at)));
+    // A minor one keeps its head on one line: a short date (23.10).
+    head.append(el('span', 'nKind', T('kind_' + n.kind)), el('span', 'nDate', n.kind === 'minor' ? shortDate(n.at) : date(n.at)));
     if (n.id > shownSeen) head.append(el('span', 'nNew', T('fresh')));
     li.append(head);
     if (n.title) li.append(el('b', 'nTitle', n.title));
@@ -181,11 +202,16 @@ function open() {
   }
   tabs.addEventListener('click', (e) => {
     const b = e.target.closest('button');
-    if (b) { tab = b.dataset.tab; render(); }
+    if (b) { tab = b.dataset.tab; size = 'all'; render(); }
   });
   const shut = el('button', 'wClose', T('close'));
   shut.addEventListener('click', close);
-  panel.append(el('h1', null, '🔔 ' + T('title')), tabs, el('div', 'wBody'), shut);
+  const list = el('div', 'wBody');
+  list.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-size]');
+    if (b) { size = b.dataset.size; render(); }
+  });
+  panel.append(el('h1', null, '🔔 ' + T('title')), tabs, list, shut);
   document.addEventListener('keydown', onKey, true);
   document.body.append(panel);
   render();
