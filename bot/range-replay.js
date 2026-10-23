@@ -29,13 +29,16 @@ export function encode(shots, idle = 0) {
 // stats — для достижений (achievements.js): выстрелы, попадания, лучшая серия попаданий подряд,
 // раунды без промаха, золотые птицы, тарелочки, дуплеты.
 // start — раунд, с которого начата игра (выбор пройденных уровней), stages — сколько раундов пройдено от него.
-export function replay({ seed, players, log, start = 0 }) {
+// rules — версия правил, с которыми сыграна игра (старые игры — 1), mode — режим (S.MODES).
+export function replay({ seed, players, log, start = 0, rules = 1, mode = "" }) {
   const bad = (why) => ({ ok: false, why });
   if (!Number.isSafeInteger(seed) || seed <= 0) return bad("bad seed");
   if (players !== 1) return bad("bad players");
   if (typeof log !== "string" || !log.length || log.length > MAX_LOG) return bad("bad log");
   if (!Number.isSafeInteger(start) || start < 0 || start >= S.ROUNDS) return bad("bad start");
-  const s = S.newGame(seed);
+  if (!Number.isSafeInteger(rules) || rules < 1 || rules > S.RULES) return bad("bad rules");
+  if (!S.MODES.includes(mode) || (mode && rules < 2)) return bad("bad mode");
+  const s = S.newGame(seed, { rules, mode });
   if (start > 0) S.startRound(s, start); // так же делает игра (range.js)
   let frames = 0;
   const run = (n, shot) => {

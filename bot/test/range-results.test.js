@@ -22,8 +22,8 @@ test("the server's copy of the game rules is the game's own file", () => {
 
 // Стреляет «как человек»: ждёт, пока мишень взлетит, целится с ошибкой, иногда мажет.
 // rounds — после стольких раундов бросает игру (выходит в меню).
-function play(seed, { skill = 0.75, rounds = Infinity, react = 30, start = 0 } = {}) {
-  const s = S.newGame(seed);
+function play(seed, { skill = 0.75, rounds = Infinity, react = 30, start = 0, rules = 1, mode = "" } = {}) {
+  const s = S.newGame(seed, { rules, mode });
   if (start) S.startRound(s, start); // игра с выбранного раунда (как в range.js)
   const shots = [];
   let x = seed, wait = 0;
@@ -43,6 +43,20 @@ function play(seed, { skill = 0.75, rounds = Infinity, react = 30, start = 0 } =
   }
   return { log: encode(shots, wait), state: s, frames: s.frame };
 }
+
+test("a game under rules 2 (and «Без промаха») replays with them; unknown rules are refused", () => {
+  for (const [seed, mode] of [[31, ""], [32, ""], [33, "sudden"]]) {
+    const g = play(seed, { rules: 2, mode, rounds: 8 });
+    const r = replay({ seed, players: 1, log: g.log, rules: 2, mode });
+    assert.equal(r.ok, true, r.why);
+    assert.equal(r.scores[0], g.state.score);
+    assert.equal(r.stages, S.cleared(g.state));
+  }
+  const g = play(34, { rules: 2, rounds: 8 });
+  assert.equal(replay({ seed: 34, players: 1, log: g.log, rules: S.RULES + 1 }).why, "bad rules");
+  assert.equal(replay({ seed: 34, players: 1, log: g.log, rules: 2, mode: "god" }).why, "bad mode");
+  assert.equal(replay({ seed: 34, players: 1, log: g.log, mode: "sudden" }).why, "bad mode", "the mode needs rules 2");
+});
 
 test("replay gives the same score as the game, and a changed record is caught", () => {
   for (const seed of [11, 222, 3333]) {

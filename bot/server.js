@@ -354,8 +354,13 @@ export function createApiServer({
       const start = body.start == null ? 0 : Number(body.start);
       if (typeof body.log !== "string" || (room && !/^\d{4,8}$/.test(room))) return [400, { error: "bad data" }];
       if (!Number.isSafeInteger(start) || start < 0) return [400, { error: "bad data" }];
+      // rules — версия правил игры (новые игры присылают свою, старые — без неё, это 1);
+      // mode — режим игры («Без промаха» в «Тире» и т. п.), его проверяет повтор игры.
+      const rules = body.rules == null ? 1 : Number(body.rules);
+      const mode = body.mode == null ? "" : String(body.mode);
+      if (!Number.isSafeInteger(rules) || rules < 1 || rules > 99 || !/^[a-z]{0,16}$/.test(mode)) return [400, { error: "bad data" }];
       store.touchPlayer(user);
-      const r = results.submit(user.id, { seed, players, log: body.log, room, start });
+      const r = results.submit(user.id, { seed, players, log: body.log, room, start, rules, mode });
       if (r.status !== 200) {
         if (r.status === 422) {
           console.warn(`Отклонена игра «${name}»: ${r.why}`);

@@ -19,6 +19,21 @@ const INTRO = 90, AFTER = 40, TALLY = 120, OVER = 150, HIT_HANG = 24;
 const FAST = 10;                // a hit this soon after a target appeared is faster than a person
 const KINDS = ['bird', 'gold', 'disc'];
 const BASE = { bird: 500, gold: 1500, disc: 1000 };
+// Rules version: 2 adds the hit streak multiplier and the extra targets (bomb, clock, cartridge).
+// A game is replayed with the rules it was played under; old games come without one and are 1.
+const RULES = 2;
+// Modes: '' the usual game, 'sudden' — any target that gets away ends the game (from rules 2).
+const MODES = ['', 'sudden'];
+// Extra targets fly with a wave from round EXTRA_FROM (from 0), not on disc rounds; they are
+// not among the ten of the round. Bomb: points off and the streak lost; clock: the others fly
+// slower and longer; cartridge: one more shot.
+const EXTRAS = ['bomb', 'bomb', 'clock', 'ammo'];
+const EXTRA_FROM = 2;
+const EXTRA_CHANCE = 4;         // one wave in this many gets an extra target
+const BOMB_COST = 1000;         // times the round multiplier
+const CLOCK_MORE = 90;          // frames more before the slowed targets fly away
+// Points multiplier for hits in a row: x2 after 3, x3 after 6, x4 after 9.
+const comboOf = (streak) => 1 + Math.min(3, Math.floor(streak / 3));
 // Directions of flight, each of length 5 so speed stays the same whichever is picked.
 const DIRS = [[3, 4], [4, 3], [5, 0], [0, 5]];
 
@@ -43,8 +58,10 @@ const mult = (r) => 1 + Math.floor(r / 5);
 const perfectBonus = (r) => 5000 * (1 + Math.floor(r / 10));
 
 // ---------- Game setup ----------
-function newGame(seed) {
+// opts: { rules, mode } — see RULES and MODES.
+function newGame(seed, opts = {}) {
   const s = {
+    rules: opts.rules || 1, mode: opts.mode || '',
     seed: seed | 0, frame: 0, events: [], phase: 'intro', phaseT: 0, round: 0, score: 0, won: false, lost: false,
     marks: [], wave: 0, shots: 0, cool: 0, targets: [],
     stats: { shots: 0, hits: 0, streak: 0, bestStreak: 0, perfect: 0, gold: 0, discs: 0, doubles: 0, fast: 0 },
@@ -80,6 +97,29 @@ function turn(s, t, up) {
   t.turn = range(s, 40, 100);
 }
 
+function spawnExtra(s) {
+  const kind = EXTRAS[pick(s, EXTRAS.length)];
+  const t = { kind, slot: -1, x: range(s, 24, W - 40) * SUB, y: (GROUND - 8) * SUB, vx: 0, vy: 0, speed: speedOf(s.round), state: 'fly', age: 0, turn: 0, more: 0 };
+  turn(s, t, true);
+  return t;
+}
+
+// An extra target was hit.
+function useExtra(s, t) {
+  if (t.kind === 'bomb') {
+    s.score = Math.max(0, s.score - BOMB_COST * mult(s.round));
+  } else if (t.kind === 'clock') {
+    for (const o of s.targets) {
+      if (o === t || o.state !== 'fly') continue;
+      o.speed = Math.max(4, o.speed >> 1);
+      o.vx = Math.trunc(o.vx / 2);
+      o.vy = Math.trunc(o.vy / 2);
+      o.more = (o.more || 0) + CLOCK_MORE;
+    }
+  } else if (t.kind === 'ammo') s.shots++;
+  s.events.push(t.kind);
+}
+
 function spawnDisc(s, slot) {
   const r = s.round;
   const left = pick(s, 2) === 0;
@@ -97,6 +137,7 @@ function startWave(s) {
     const slot = s.next++;
     s.targets.push(discRound(s.round) ? spawnDisc(s, slot) : spawnBird(s, slot));
   }
+  if (s.rules >= 2 && !discRound(s.round) && s.round >= EXTRA_FROM && pick(s, EXTRA_CHANCE) === 0) s.targets.push(spawnExtra(s));
   s.shots = SHOTS;
   s.cool = 0;
   s.phase = 'fly';
@@ -119,37 +160,47 @@ function shoot(s, shot) {
   s.cool = COOL;
   s.stats.shots++;
   s.events.push('shot');
-  let got = 0;
+  let got = 0, extra = 0, bomb = false;
+  const combo = s.rules >= 2 ? comboOf(s.stats.streak) : 1;
   for (const t of s.targets) {
     if (t.state !== 'fly') continue;
     const [x0, y0, x1, y1] = hitBox(t);
     if (x < x0 || x >= x1 || y < y0 || y >= y1) continue;
-    got++;
     t.state = 'hit';
     t.hang = HIT_HANG;
+    if (t.slot < 0) {
+      extra++;
+      if (t.kind === 'bomb') bomb = true;
+      useExtra(s, t);
+      continue;
+    }
+    got++;
     s.marks[t.slot] = 1;
-    s.score += BASE[t.kind] * mult(s.round);
+    s.score += BASE[t.kind] * mult(s.round) * combo;
     s.stats.hits++;
     if (t.kind === 'gold') s.stats.gold++;
     if (t.kind === 'disc') s.stats.discs++;
     if (t.age < FAST) s.stats.fast++;
   }
   if (got) {
-    s.stats.streak++;
-    s.stats.bestStreak = Math.max(s.stats.bestStreak, s.stats.streak);
+    if (!bomb) {
+      s.stats.streak++;
+      s.stats.bestStreak = Math.max(s.stats.bestStreak, s.stats.streak);
+    }
     if (got > 1) s.stats.doubles++;
     s.events.push(got > 1 ? 'double' : 'hit');
-  } else {
+  } else if (!extra) {
     s.stats.streak = 0;
     s.events.push('miss');
   }
+  if (bomb) s.stats.streak = 0;
   // Out of shots: whatever still flies gets away.
   if (s.shots === 0) for (const t of s.targets) if (t.state === 'fly') flyAway(s, t);
 }
 
 function flyAway(s, t) {
   t.state = 'away';
-  s.marks[t.slot] = 2;
+  if (t.slot >= 0) s.marks[t.slot] = 2;
   if (t.kind !== 'disc') { t.vx = 0; t.vy = -3 * SUB; }
   s.events.push('away');
 }
@@ -190,7 +241,7 @@ function moveTarget(s, t) {
   if (t.y < 8 * SUB) { t.y = 8 * SUB; t.vy = Math.abs(t.vy); }
   if (t.y > (GROUND - BOX) * SUB && t.age > 30) { t.y = (GROUND - BOX) * SUB; t.vy = -Math.abs(t.vy); }
   if (--t.turn <= 0) turn(s, t, t.y > (GROUND - 48) * SUB);
-  if (t.age >= flyOf(s.round)) flyAway(s, t);
+  if (t.age >= flyOf(s.round) + (t.more || 0)) flyAway(s, t);
 }
 
 // ---------- One frame ----------
@@ -204,7 +255,9 @@ function step(s, shot) {
   }
   if (s.phase === 'after') {
     if (++s.phaseT >= AFTER) {
-      if (s.next < PER_ROUND) startWave(s);
+      // «Без промаха»: a target that got away ends the round, and with it the game.
+      if (s.mode === 'sudden' && s.marks.includes(2)) tally(s);
+      else if (s.next < PER_ROUND) startWave(s);
       else tally(s);
     }
     return;
@@ -236,7 +289,7 @@ function tally(s) {
   s.phase = 'tally';
   s.phaseT = 0;
   s.roundHits = hits;
-  s.lost = hits < needOf(s.round);
+  s.lost = hits < needOf(s.round) || (s.mode === 'sudden' && s.marks.includes(2));
   if (hits === PER_ROUND) {
     s.score += perfectBonus(s.round);
     s.stats.perfect++;
@@ -249,6 +302,7 @@ const cleared = (s) => s.round + ((s.phase === 'tally' || s.phase === 'over' || 
 
 root.RangeSim = {
   W, H, GROUND, SUB, BOX, MARGIN, ROUNDS, PER_ROUND, SHOTS, COOL, FAST, KINDS, BASE,
+  RULES, MODES, EXTRAS, BOMB_COST, comboOf,
   discRound, pairs, speedOf, flyOf, needOf, mult, perfectBonus,
   newGame, startRound, step, cleared, hitBox,
 };

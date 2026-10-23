@@ -105,3 +105,102 @@ test('rounds get harder: two at a time, discs, faster, more to hit', () => {
   flying(s);
   assert.deepEqual(s.targets.map((t) => t.kind), ['disc', 'disc']);
 });
+
+// ---------- Rules 2: streak multiplier, extra targets, «Без промаха» ----------
+const shootAt = (s, t) => { while (s.cool > 0) S.step(s, null); S.step(s, centre(t)); };
+
+test('rules 2: hits in a row raise the points multiplier', () => {
+  assert.deepEqual([0, 2, 3, 5, 6, 9, 20].map(S.comboOf), [1, 1, 2, 2, 3, 4, 4]);
+  const s = S.newGame(4, { rules: 2 });
+  s.stats.streak = 3;
+  flying(s);
+  idle(s, 30);
+  const t = s.targets[0];
+  shootAt(s, t);
+  assert.equal(t.state, 'hit');
+  assert.equal(s.score, S.BASE[t.kind] * S.mult(0) * 2);
+  assert.equal(s.stats.streak, 4);
+});
+
+test('rules 1 stay as before: no multiplier, no extra targets', () => {
+  const s = S.newGame(4);
+  s.stats.streak = 9;
+  flying(s);
+  idle(s, 30);
+  shootAt(s, s.targets[0]);
+  assert.equal(s.score, S.BASE[s.targets[0].kind] * S.mult(0));
+  for (let seed = 1; seed < 60; seed++) {
+    const g = S.newGame(seed);
+    S.startRound(g, 5);
+    flying(g);
+    assert.ok(g.targets.every((t) => t.slot >= 0));
+  }
+});
+
+// A wave of round r (from 0) with an extra target, under rules 2.
+function waveWithExtra(r, kind) {
+  for (let seed = 1; seed < 5000; seed++) {
+    const s = S.newGame(seed, { rules: 2 });
+    S.startRound(s, r);
+    flying(s);
+    const e = s.targets.find((t) => t.slot < 0);
+    if (e && (!kind || e.kind === kind)) return { s, e };
+  }
+  throw new Error('no wave with ' + kind);
+}
+
+test('rules 2: extra targets join some waves from round 3, never on disc rounds', () => {
+  let seen = 0;
+  for (let seed = 1; seed < 400; seed++) {
+    for (const r of [0, 1, 3]) {
+      const s = S.newGame(seed, { rules: 2 });
+      S.startRound(s, r);
+      flying(s);
+      assert.ok(s.targets.every((t) => t.slot >= 0), 'round ' + (r + 1));
+    }
+    const s = S.newGame(seed, { rules: 2 });
+    S.startRound(s, 4);
+    flying(s);
+    if (s.targets.some((t) => t.slot < 0)) seen++;
+  }
+  assert.ok(seen > 50 && seen < 150, 'about one wave in four: ' + seen);
+});
+
+test('rules 2: a bomb takes points off and breaks the streak', () => {
+  const { s, e } = waveWithExtra(4, 'bomb');
+  s.score = 50000;
+  s.stats.streak = 5;
+  idle(s, 30);
+  shootAt(s, e);
+  assert.equal(e.state, 'hit');
+  assert.equal(s.score, 50000 - S.BOMB_COST * S.mult(4));
+  assert.equal(s.stats.streak, 0);
+  assert.equal(s.stats.hits, 0, 'not one of the ten');
+  assert.ok(s.marks.every((m) => m !== 1));
+});
+
+test('rules 2: a cartridge gives one more shot, a clock slows the others down', () => {
+  const a = waveWithExtra(4, 'ammo');
+  idle(a.s, 30);
+  shootAt(a.s, a.e);
+  assert.equal(a.s.shots, S.SHOTS, 'the shot is given back');
+  const c = waveWithExtra(4, 'clock');
+  idle(c.s, 30);
+  const speeds = new Map(c.s.targets.map((t) => [t, t.speed]));
+  shootAt(c.s, c.e);
+  const others = c.s.targets.filter((t) => t.slot >= 0 && t.state === 'fly');
+  assert.ok(others.length, 'someone is still flying');
+  for (const t of others) {
+    assert.equal(t.speed, Math.max(4, speeds.get(t) >> 1));
+    assert.ok(t.more > 0);
+  }
+});
+
+test('«Без промаха»: a target that gets away ends the game', () => {
+  const s = flying(S.newGame(4, { rules: 2, mode: 'sudden' }));
+  while (s.phase !== 'tally') S.step(s, null); // nobody shoots: the first target gets away
+  assert.equal(s.next, 1, 'the round stops at once');
+  assert.ok(s.lost);
+  while (s.phase !== 'overDone') S.step(s, null);
+  assert.equal(s.won, false);
+});
