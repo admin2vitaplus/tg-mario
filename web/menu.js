@@ -271,6 +271,16 @@ function choose() {
   });
 }
 
+// Open a game by its config.js id from another part of the menu (the challenge of the day, lib/challenge.js).
+window.Cartridge.play = (id) => {
+  const i = lines.findIndex((g) => g.id === id);
+  if (i < 0) return false;
+  cursor = i;
+  render();
+  choose();
+  return true;
+};
+
 function move(d) {
   cursor = (cursor + d + lines.length) % lines.length;
   render();

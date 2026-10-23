@@ -41,6 +41,20 @@
       n_list: 'Опубликованные', n_hide: 'Убрать', sure_hide: 'Убрать это уведомление у игроков?', n_hidden: 'убрано',
       n_read: 'прочитано', n_unread: 'не прочитано', n_everyone: 'всем', n_empty: 'Нужен заголовок или текст.',
       no_player: 'Игрока с таким id нет.', to_player: '🔔 Уведомление игроку',
+      tab_analytics: 'Аналитика', a_note: 'Только суммы и доли, без имён. Дни активности — по Москве, жетоны и испытание — по UTC. Пересчёт раз в 5 минут.',
+      a_recount: 'Пересчитать', a_activity: 'Активность, 30 дней', a_dau: 'за день (DAU)', a_wau: 'за 7 дней (WAU)', a_mau: 'за 30 дней (MAU)',
+      a_avg: 'в среднем за день (7 дней)', a_sticky: 'Липкость DAU/MAU', a_returning: 'вернувшиеся', a_sticky_hint: 'Доля месячных игроков, которые заходят каждый день. 20 % и выше — хорошо.',
+      a_retention: 'Удержание', a_ret_hint: 'Доля новых игроков, которые были активны ровно через N дней после первого захода.',
+      a_cohorts: 'По неделям прихода', a_week_of: 'неделя', a_by_source: 'По источникам (90 дней)',
+      a_funnel: 'Воронка новичков, 30 дней', f_arrived: 'пришли', f_opened: 'открыли игру', f_started: 'начали игру', f_finished: 'доиграли до конца',
+      f_returned: 'вернулись в другой день', f_days3: 'были активны 3 дня и больше', f_bought: 'купили за жетоны', f_paid: 'заплатили звёздами',
+      a_games: 'По играм', a_g_players: 'игроков', a_g_opens: 'заходов', a_g_per: 'на игрока', a_g_starts: 'начали', a_g_games: 'игр принято', a_g_gpp: 'игр на игрока',
+      a_levels: 'Где бросают', a_levels_hint: 'Сколько игроков прошли каждый уровень (этап) за всё время. Красным — где теряется больше трети.',
+      a_ends: 'Чаще всего игра кончается на этапе', a_stage: 'этап', a_passed: 'прошли', a_lost: 'потеряно',
+      a_buys: 'Покупки, 30 дней', a_tokens: 'За жетоны', a_stars: 'За звёзды', a_buyers: 'покупателей', a_arppu: 'звёзд на платящего',
+      a_payers: 'Платящих за всё время', a_share: 'доля от всех игроков',
+      a_streaks: 'Серии входов сейчас', a_days: 'дн.', a_challenge: 'Испытание дня и напоминания, 14 дней (UTC)',
+      a_ch_players: 'играли', a_ch_prized: 'призы', a_reminded: 'напомнили', a_back: 'пришли после', a_remind_off: 'Отключили напоминания',
     },
     en: {
       title: '◆ Dashboard', login: 'Login', password: 'Password', sign_in: 'Sign in', sign_out: 'Sign out',
@@ -78,6 +92,20 @@
       n_list: 'Published', n_hide: 'Remove', sure_hide: 'Remove this notification for players?', n_hidden: 'removed',
       n_read: 'read', n_unread: 'not read', n_everyone: 'everyone', n_empty: 'A title or a text is needed.',
       no_player: 'No player with this id.', to_player: '🔔 Notify the player',
+      tab_analytics: 'Analytics', a_note: 'Totals and shares only, no names. Activity days are Moscow time, tickets and the challenge use UTC. Recounted every 5 minutes.',
+      a_recount: 'Recount', a_activity: 'Activity, 30 days', a_dau: 'per day (DAU)', a_wau: '7 days (WAU)', a_mau: '30 days (MAU)',
+      a_avg: 'daily average (7 days)', a_sticky: 'Stickiness DAU/MAU', a_returning: 'returning', a_sticky_hint: 'Share of monthly players who come every day. 20% and up is good.',
+      a_retention: 'Retention', a_ret_hint: 'Share of new players active exactly N days after their first visit.',
+      a_cohorts: 'By week of arrival', a_week_of: 'week', a_by_source: 'By source (90 days)',
+      a_funnel: 'New player funnel, 30 days', f_arrived: 'arrived', f_opened: 'opened a game', f_started: 'started a game', f_finished: 'finished a game',
+      f_returned: 'came back another day', f_days3: 'active 3 days or more', f_bought: 'bought for tickets', f_paid: 'paid with Stars',
+      a_games: 'By game', a_g_players: 'players', a_g_opens: 'visits', a_g_per: 'per player', a_g_starts: 'started', a_g_games: 'games accepted', a_g_gpp: 'games per player',
+      a_levels: 'Where players drop', a_levels_hint: 'How many players cleared each level (stage), all time. Red: more than a third lost.',
+      a_ends: 'Games end most often at stage', a_stage: 'stage', a_passed: 'cleared', a_lost: 'lost',
+      a_buys: 'Purchases, 30 days', a_tokens: 'For tickets', a_stars: 'For Stars', a_buyers: 'buyers', a_arppu: 'Stars per payer',
+      a_payers: 'Paying players, all time', a_share: 'share of all players',
+      a_streaks: 'Visit streaks now', a_days: 'd', a_challenge: 'Challenge of the day and reminders, 14 days (UTC)',
+      a_ch_players: 'played', a_ch_prized: 'prizes', a_reminded: 'reminded', a_back: 'came after', a_remind_off: 'Turned reminders off',
     },
   };
 
@@ -181,7 +209,7 @@
   }
 
   // ---------- Вкладки ----------
-  var TABS = ['overview', 'players', 'notices', 'economy', 'stars', 'server'];
+  var TABS = ['overview', 'analytics', 'players', 'notices', 'economy', 'stars', 'server'];
   var current = 'overview';
   var overview = null;
   function tabs() {
@@ -195,6 +223,7 @@
     tabs();
     if (tab === 'players') return players('');
     if (tab === 'notices') return notices(null);
+    if (tab === 'analytics') return analyticsTab(false);
     if (overview && !force) return render();
     // Пока свежая сводка идёт через туннель, показываем прошлую из этой вкладки (если есть).
     var saved = null;
@@ -204,7 +233,7 @@
       overview = o;
       try { sessionStorage.setItem('admin-overview', JSON.stringify(o)); } catch (e) { /* без хранилища */ }
       out.hidden = false;
-      if (current !== 'players' && current !== 'notices') render();
+      if (current !== 'players' && current !== 'notices' && current !== 'analytics') render();
     }).catch(fail);
   }
   function render() {
@@ -299,6 +328,104 @@
       kv(T('load'), s.load.toFixed(2)), kv(T('db'), mb(s.dbSize)),
       kv(T('live'), s.live ? s.live.rooms + ' / ' + s.live.sockets : '—'), kv('Node', s.node))];
   }
+
+  // ---------- Аналитика (bot/analytics.js) ----------
+  var analytics = null;
+  function analyticsTab(fresh) {
+    if (analytics && !fresh) { main.replaceChildren.apply(main, viewAnalytics(analytics)); return; }
+    if (!analytics) main.replaceChildren(note(T('loading')));
+    api('GET', 'analytics' + (fresh ? '?fresh=1' : '')).then(function (a) {
+      analytics = a;
+      if (current === 'analytics') main.replaceChildren.apply(main, viewAnalytics(a));
+    }).catch(fail);
+  }
+  function share(r) { return r == null ? '—' : Math.round(r * 100) + '%'; }
+  function rateCell(x) { return x ? share(x.rate) + ' (' + x.returned + '/' + x.cohort + ')' : '—'; }
+  function fmt(x) { return x == null ? '—' : (Math.round(x * 10) / 10).toLocaleString(locale); }
+  function gname(g) { return DICT[lang]['g_' + g] || g; }
+  // Полоска доли: ширина — значение от максимума.
+  function meter(label, n, max, right, warn) {
+    var bar = h('i');
+    bar.style.width = (max ? Math.max(1, Math.round((n / max) * 100)) : 0) + '%';
+    return h('div', { class: 'meter' + (warn ? ' warn' : '') }, h('span', { text: label }), h('div', { class: 'track' }, bar), h('b', { text: right }));
+  }
+  function levelsCard(game, lv) {
+    if (!lv || !lv.players) return null;
+    var base = lv.players;
+    var rows = [meter(T('a_g_players'), base, base, num(base))];
+    var prev = base;
+    lv.levels.forEach(function (l) {
+      var lost = prev ? (prev - l.passed) / prev : 0;
+      rows.push(meter(l.label, l.passed, base, num(l.passed) + (prev && l.passed < prev ? ' (−' + share(lost) + ')' : ''), lost > 1 / 3 && prev >= 3));
+      prev = l.passed;
+    });
+    // Хвост из нулей не нужен: после последнего пройденного — одна пустая строка.
+    var last = 0;
+    lv.levels.forEach(function (l, i) { if (l.passed) last = i + 1; });
+    rows = rows.slice(0, Math.min(rows.length, last + 2));
+    return h('div', { class: 'lv' }, h('h3', { text: gname(game) }), rows,
+      lv.ends && lv.ends.length ? h('p', { class: 'small', text: T('a_ends') + ': ' + lv.ends.map(function (e) { return e.stage + ' (' + e.n + ')'; }).join(', ') }) : null);
+  }
+  function viewAnalytics(a) {
+    var act = a.activity;
+    var last = act.days[act.days.length - 1];
+    var ret = a.retention;
+    var head = h('tr', null, h('th'), RETENTION.map(function (n) { return h('th', { text: 'D' + n }); }));
+    var maxF = a.funnel[0].n;
+    var games = a.games.month.concat([]);
+    return [
+      card(null, note(T('a_note') + ' · ' + when(a.at)), h('button', { type: 'button', class: 'mini', on: { click: function () { analyticsTab(true); } } }, T('a_recount'))),
+      card(T('a_activity'),
+        h('div', { class: 'tiles' }, tile(T('a_dau'), last.dau), tile(T('a_avg'), act.avgDau), tile(T('a_wau'), act.wau), tile(T('a_mau'), act.mau)),
+        h('div', { class: 'legend' }, h('span', { class: 'a', text: T('a_returning') }), h('span', { class: 'b', text: T('new_players') })),
+        bars(act.days, 'returning', 'a'), bars(act.days, 'newPlayers', 'b'),
+        h('div', { class: 'axis' }, h('span', { text: dayLabel(act.days[0].day) }), h('span', { text: dayLabel(last.day) })),
+        kv(T('a_sticky'), share(act.stickiness)), h('p', { class: 'small', text: T('a_sticky_hint') })),
+      card(T('a_retention'), h('p', { class: 'small', text: T('a_ret_hint') }),
+        RETENTION.map(function (n) { return kv('D' + n, rateCell(ret.overall['d' + n])); }),
+        h('h3', { text: T('a_cohorts') }),
+        h('div', { class: 'scroll' }, h('table', null, head, ret.cohorts.map(function (c) {
+          return h('tr', null, h('td', { text: dayLabel(c.from) + ' · ' + c.players }),
+            RETENTION.map(function (n) { var x = c['d' + n]; return h('td', { text: x ? share(x.rate) : '' }); }));
+        }))),
+        h('h3', { text: T('a_by_source') }),
+        ret.bySource.length ? ret.bySource.map(function (s) {
+          return kv((DICT[lang]['src_' + s.source] || s.source) + ' · ' + num(s.players), 'D1 ' + share(s.d1) + ' · D7 ' + share(s.d7));
+        }) : note(T('none'))),
+      card(T('a_funnel'), a.funnel.map(function (f, i) {
+        var prev = i ? a.funnel[i - 1].n : f.n;
+        return meter(T('f_' + f.step), f.n, maxF, num(f.n) + (i ? ' · ' + share(maxF ? f.n / maxF : null) : ''), i > 0 && prev >= 3 && f.n < prev * 0.5);
+      })),
+      card(T('a_games') + ' · ' + T('month'), games.map(function (g) {
+        return h('div', { class: 'game' }, h('b', { text: gname(g.game) + ' · ' + num(g.players) + ' ' + T('a_g_players') }),
+          h('small', { text: [T('a_g_opens') + ' ' + num(g.opens) + ' (' + fmt(g.opensPerPlayer) + ' ' + T('a_g_per') + ')',
+            T('a_g_starts') + ' ' + num(g.starts), T('a_g_games') + ' ' + num(g.games) + ' (' + fmt(g.gamesPerGamer) + ' ' + T('a_g_gpp') + ')'].join(' · ') }));
+      }), h('h3', { text: T('week') }), a.games.week.map(function (g) {
+        return kv(gname(g.game), num(g.players) + ' · ' + num(g.opens) + ' / ' + num(g.games));
+      })),
+      card(T('a_levels'), h('p', { class: 'small', text: T('a_levels_hint') }),
+        ['mario', 'tanks', 'bombs', 'range'].map(function (g) { return levelsCard(g, a.levels[g]); })),
+      card(T('a_buys'),
+        h('h3', { text: T('a_tokens') + ' · ' + num(a.purchases.tokensTotal.n) + ' · ◆ ' + num(a.purchases.tokensTotal.spent) + ' · ' + num(a.purchases.tokensTotal.buyers) + ' ' + T('a_buyers') }),
+        a.purchases.tokens.length ? a.purchases.tokens.map(function (i) { return kv((i.name || itemName(i.item)) + ' × ' + i.n, '◆ ' + num(i.spent)); }) : note(T('none')),
+        h('h3', { text: T('a_stars') + ' · ' + num(a.purchases.starsTotal.n) + ' · ' + num(a.purchases.starsTotal.sum) + ' ⭐ · ' + num(a.purchases.starsTotal.buyers) + ' ' + T('a_buyers') }),
+        a.purchases.stars.length ? a.purchases.stars.map(function (i) { return kv((i.name || itemName(i.item)) + ' × ' + i.n, num(i.sum) + ' ⭐'); }) : note(T('none')),
+        kv(T('a_arppu'), fmt(a.purchases.arppu)),
+        kv(T('a_payers'), num(a.purchases.payersAll) + ' · ' + share(a.purchases.payingShare) + ' ' + T('a_share'))),
+      card(T('a_streaks'), a.streaks.map(function (s) {
+        return kv(s.from + (s.to == null ? '+' : s.to === s.from ? '' : '–' + s.to) + ' ' + T('a_days'), num(s.n));
+      })),
+      card(T('a_challenge'),
+        h('div', { class: 'scroll' }, h('table', null,
+          h('tr', null, h('th'), h('th', { text: T('a_ch_players') }), h('th', { text: T('a_reminded') }), h('th', { text: T('a_back') })),
+          a.challenge.days.map(function (d) {
+            return h('tr', null, h('td', { text: dayLabel(d.day) + ' ' + (d.game ? gname(d.game) : '') + (d.prized ? ' 🏆' : '') }),
+              h('td', { text: num(d.players) }), h('td', { text: num(d.reminded) }), h('td', { text: num(d.back) }));
+          }))),
+        kv(T('a_remind_off'), num(a.challenge.remindOff))),
+    ];
+  }
+  var RETENTION = [1, 3, 7, 14, 30];
 
   // ---------- Игроки ----------
   function playerRow(p, right, sub) {

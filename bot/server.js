@@ -76,7 +76,7 @@ export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
   store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
-  tanks = null, bombs = null, range = null, createInvoice = null, word = null, admin = null, notices = null,
+  tanks = null, bombs = null, range = null, createInvoice = null, word = null, admin = null, notices = null, challenge = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -219,8 +219,10 @@ export function createApiServer({
       const newRecord = e.score > before;
       economy?.setLang(user.id, user.language_code);
       economy?.run(user.id, { newRecord, game: "mario", levels: e.levels }, grants);
+      // Испытание дня (challenge.js): засчитывается игра, начатая с 1-1.
+      const day = challenge?.record(user.id, "mario", e.score, { fromStart: fromFirstLevel(seq) }, grants);
       tracker?.event(user.id, "game_finish", "mario");
-      return [200, { ...meBody(user.id), newRecord, newAchievements: won, ...walletBody(user.id, grants) }];
+      return [200, { ...meBody(user.id), newRecord, newAchievements: won, ...walletBody(user.id, grants), ...(day ? { challenge: day } : {}) }];
     },
   };
 
@@ -266,6 +268,8 @@ export function createApiServer({
       store.touchPlayer(user);
       economy.setLang(user.id, user.language_code);
       const grants = economy.checkin(user.id);
+      // Открытие сборника — тоже активность за день (статистика), даже если игрок ни во что не сыграл.
+      tracker?.visit(user.id, user.startParam);
       economy.inviteCheck(user.id, grants);
       payEarned(user.id, grants);
       // Вместе с начислением — всё, что показывает панель жетонов: странице не нужен второй запрос /me.
@@ -366,6 +370,7 @@ export function createApiServer({
       const grants = [];
       let mine = null;
       let won = [];
+      let day = null;
       for (const res of r.results) {
         const out = res.playerId === user.id ? grants : [];
         economy?.run(res.playerId, { newRecord: res.newRecord, game, levels: res.stages }, out);
@@ -373,11 +378,16 @@ export function createApiServer({
         const e = { type: "run", ...res.stats, ...r.replay, won: r.replay.won && !start, score: res.score, stages: res.stages };
         const got = newAchievements(res.playerId, e, out, game, results.totals(res.playerId));
         tracker?.event(res.playerId, "game_finish", game);
-        if (res.playerId === user.id) { mine = res; won = got; }
+        if (res.playerId === user.id) {
+          mine = res;
+          won = got;
+          // Испытание дня: одиночная игра, начатая с первого этапа.
+          day = challenge?.record(res.playerId, game, res.score, { fromStart: !start, solo: r.replay.players === 1 }, out) ?? null;
+        }
       }
       economy?.setLang(user.id, user.language_code);
       return [200, { score: mine?.score ?? 0, best: mine?.best ?? results.best(user.id), newRecord: !!mine?.newRecord,
-        newAchievements: won, ...walletBody(user.id, grants) }];
+        newAchievements: won, ...walletBody(user.id, grants), ...(day ? { challenge: day } : {}) }];
     };
   }
 
@@ -411,6 +421,15 @@ export function createApiServer({
       store.touchPlayer(user);
       const weekFrom = economy ? seasonStart(seasonOf(now())) : now() - 7 * 86_400_000;
       return [200, word.chat(user.id, user.chat, weekFrom)];
+    };
+  }
+
+  // Испытание дня (challenge.js): игра дня, награда, серия и таблицы (все, этот чат, друзья).
+  if (challenge) {
+    routes["GET /api/challenge"] = (_body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      store.touchPlayer(user);
+      return [200, challenge.state(user.id, { chat: user.chat })];
     };
   }
 

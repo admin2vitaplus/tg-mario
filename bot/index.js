@@ -37,6 +37,13 @@ const app = await startApp({
   refundStars: (userId, chargeId) => bot.api.refundStarPayment(userId, chargeId),
   // Личное уведомление из панели, если владелец отметил «и сообщением в Telegram».
   message: (userId, text) => bot.api.sendMessage(userId, text),
+  // Напоминание о серии дней (challenge.js): кнопка игры и кнопка «не напоминать»; пауза — лимиты Telegram.
+  remind: async (userId, text, { playText, offText }) => {
+    await bot.api.sendMessage(userId, text, {
+      reply_markup: new InlineKeyboard().webApp(playText, gameUrl).row().text(`🔕 ${offText}`, "remind:off"),
+    });
+    await new Promise((ok) => setTimeout(ok, 50));
+  },
 });
 const { store, tracker } = app;
 // Telegram id владельца (администраторов) через запятую. Только им доступны служебные команды
@@ -236,6 +243,17 @@ bot.command("admin", (ctx, next) => {
   return ctx.reply(`Панель: статистика, игроки, жетоны и покупки. Вход по логину и паролю.\n${url}`, {
     reply_markup: new InlineKeyboard().url("📊 Открыть панель", url),
   });
+});
+
+// Напоминания о серии дней: отключить кнопкой под сообщением, включить снова — /remind.
+bot.callbackQuery("remind:off", async (ctx) => {
+  app.challenge.setRemind(ctx.from.id, false);
+  await ctx.answerCallbackQuery();
+  return ctx.reply("Напоминания больше не придут. Включить снова — /remind");
+});
+bot.command("remind", (ctx) => {
+  app.challenge.setRemind(ctx.from.id, true);
+  return ctx.reply("Напоминания включены: если серия дней вот-вот прервётся, я напишу вечером.");
 });
 
 // Жетоны: итоги недели и команды администратора (/wallet, /flag, /unflag, /annul).

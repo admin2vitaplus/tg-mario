@@ -365,5 +365,13 @@
     "body": "У героя появился тёмный контур, его видно на любом фоне. За холмами теперь у каждого мира свои дали: снежные горы, море с островами или стены крепости, а у земли растут кусты.",
     "titleEn": "Hop-Skip: a clearer hero and new views",
     "bodyEn": "The hero has a dark outline now, so you see him on any background. Behind the hills each world has its own view: snowy peaks, the sea with islands or fortress walls, and bushes grow by the ground."
+  },
+  {
+    "id": "2026-10-23-challenge",
+    "size": "major",
+    "title": "Испытание дня",
+    "body": "Каждый день одна игра на всех: наберите больше очков, начав с первого уровня. За первую игру испытания — жетоны, и с каждым днём подряд их больше. Таблицы дня: все игроки, ваш чат и друзья. Трое лучших за день получают призы. Если серия входов вот-вот прервётся, бот вечером напомнит (отключается кнопкой в сообщении).",
+    "titleEn": "Challenge of the day",
+    "bodyEn": "One game a day for everyone: score as much as you can starting from the first level. The first challenge game gives tickets, more for every day in a row. Daily tables: everyone, your chat and your friends. The top three of the day get prizes. If your visit streak is about to end, the bot reminds you in the evening (one tap turns it off)."
   }
 ]

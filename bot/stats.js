@@ -12,6 +12,7 @@ export const CLIENT_EVENTS = new Set([
 const INVITE_SOURCES = new Set(["ref", "room"]);
 const INVITE_TTL_MS = DAY_MS;
 const MATCH_DEDUP_MS = 60_000;
+const MSK_MS = 3 * 3_600_000;
 
 // Метка источника из ?start= бота или startapp= Mini App:
 // src_<метка> — реклама/площадка, ref_<id> — личное приглашение, room_<код> (и старое tanks_<код>) — комната
@@ -46,6 +47,14 @@ export function createTracker(store, now = Date.now) {
         }
       }
       return { isNew, source, ref };
+    },
+
+    // Игрок открыл сборник (вход за день, server.js): откуда пришёл и событие app_open раз в день по Москве.
+    // Так в активных за день попадают и те, кто заглянул в меню, но не начал игру.
+    visit(userId, payload) {
+      const at = now();
+      this.arrive(userId, payload);
+      if (!store.lastEvent(userId, "app_open", dayOf(at) * DAY_MS - MSK_MS)) store.addEvent({ userId, type: "app_open" }, at);
     },
 
     // Событие от игры (или от сервера). Невалидные тихо отбрасываются: это статистика, не игра.

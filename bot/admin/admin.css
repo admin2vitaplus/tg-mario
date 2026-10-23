@@ -72,3 +72,12 @@ select { width: auto; flex: 1; }
 .notice.gone { opacity: .5; }
 .notice .body { margin: 4px 0; white-space: pre-line; overflow-wrap: anywhere; }
 .notice .mini { margin-top: 4px; }
+.meter { display: grid; grid-template-columns: minmax(70px, 34%) 1fr auto; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+.meter span { color: var(--muted); overflow-wrap: anywhere; }
+.meter .track { height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
+.meter .track i { display: block; height: 100%; background: var(--accent2); border-radius: 5px; }
+.meter.warn .track i { background: var(--neg); }
+.meter.warn b { color: var(--neg); }
+.meter b { font-weight: 600; white-space: nowrap; text-align: right; }
+.lv { margin-top: 8px; }
+.scroll { overflow-x: auto; }
