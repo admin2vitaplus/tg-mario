@@ -696,13 +696,9 @@ function drawTiles(scene, key, colors) {
     for (const x of xs) r(1, x, y, 1, 3, b[2]);
   }
 
-  // bonus block with "!"
-  r(2, 0, 0, 16, 16, '#6b3a00');
-  r(2, 0, 0, 15, 15, '#f8c838');
-  r(2, 1, 1, 13, 13, '#e8a020');
-  for (const [x, y] of [[2, 2], [12, 2], [2, 12], [12, 12]]) r(2, x, y, 1, 1, '#6b3a00');
-  r(2, 7, 3, 2, 6, '#6b3a00');
-  r(2, 7, 11, 2, 2, '#6b3a00');
+  // bonus block with "!"; its face glows in turns (see glowBonus)
+  drawBonus(ctx, 0);
+  bonusCanvases.set(key, c);
 
   // used block
   r(3, 0, 0, 16, 16, '#4a2808');
@@ -800,17 +796,111 @@ function drawTiles(scene, key, colors) {
   for (let i = 0; i < count; i++) c.add(i, 0, i * TILE, 0, TILE, TILE);
 }
 
+// Bonus blocks glow like on the console: the face goes bright, bright, bright, dim, dark, dim.
+const BONUS_GLOW = [0, 0, 0, 1, 2, 1];
+const BONUS_FACE = [['#f8c838', '#e8a020'], ['#f0b430', '#d8901c'], ['#e0a028', '#c47c14']];
+const bonusCanvases = new Map();
+
+function drawBonus(ctx, shade) {
+  const [rim, face] = BONUS_FACE[shade];
+  const x0 = T.BONUS * TILE;
+  const r = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x0 + x, y, w, h); };
+  r(0, 0, 16, 16, '#6b3a00');
+  r(0, 0, 15, 15, rim);
+  r(1, 1, 13, 13, face);
+  for (const [x, y] of [[2, 2], [12, 2], [2, 12], [12, 12]]) r(x, y, 1, 1, '#6b3a00');
+  r(7, 3, 2, 6, '#6b3a00');
+  r(7, 11, 2, 2, '#6b3a00');
+  // A small glint in the corner while the block is bright.
+  if (shade === 0) r(3, 3, 2, 1, '#fff0b0');
+}
+
+let bonusStep = -1;
+function glowBonus(time) {
+  const step = Math.floor(time / 140) % BONUS_GLOW.length;
+  if (step === bonusStep) return;
+  const shade = BONUS_GLOW[step];
+  if (bonusStep >= 0 && BONUS_GLOW[bonusStep] === shade) { bonusStep = step; return; }
+  bonusStep = step;
+  for (const c of bonusCanvases.values()) {
+    if (!c.getContext) continue;
+    drawBonus(c.getContext(), shade);
+    c.refresh();
+  }
+}
+
+// Pixel-exact shapes for the scenery: no blurred edges when the picture is scaled up.
+function pxDisc(ctx, cx, cy, rad, col) {
+  ctx.fillStyle = col;
+  for (let y = -rad; y <= rad; y++) {
+    const half = Math.floor(Math.sqrt(rad * rad - y * y) + 0.3);
+    ctx.fillRect(cx - half, cy + y, half * 2 + 1, 1);
+  }
+}
+
+// Far hills along the horizon, painted in grey and tinted by the sky of each area.
+const RIDGE_W = 128;
+const RIDGE_H = 48;
+function ridgeHeight(x) {
+  const a = (2 * Math.PI * x) / RIDGE_W;
+  return Math.round(20 + 10 * Math.sin(a + 0.6) + 6 * Math.sin(2 * a + 1.3) + 2 * Math.sin(4 * a));
+}
+
+function ridgeTint(sky, dark) {
+  if (dark) return 0x26345c;
+  const c = Phaser.Display.Color.HexStringToColor(sky);
+  const mix = (v, w) => Math.round(v * 0.55 + w * 0.45);
+  return (mix(c.red, 0x5a) << 16) | (mix(c.green, 0xb0) << 8) | mix(c.blue, 0x78);
+}
+
 function drawScenery(scene) {
+  // Far ridge: light top edge, body, and a dithered lower half that fades into the haze.
+  let rc = canvasTex(scene, 'ridge', RIDGE_W, RIDGE_H);
+  let rctx = rc.getContext();
+  for (let x = 0; x < RIDGE_W; x++) {
+    const top = RIDGE_H - ridgeHeight(x);
+    rctx.fillStyle = '#ffffff';
+    rctx.fillRect(x, top, 1, 2);
+    rctx.fillStyle = '#e4e4e4';
+    rctx.fillRect(x, top + 2, 1, RIDGE_H - top - 2);
+    rctx.fillStyle = '#cccccc';
+    for (let y = top + 6; y < RIDGE_H; y++) {
+      const deep = (y - top) / (RIDGE_H - top);
+      if ((x + y) % 2 === 0 && deep > 0.35 && ((x * 7 + y * 3) % 5 < deep * 6)) rctx.fillRect(x, y, 1, 1);
+    }
+  }
+  rc.refresh();
+
+  // Clouds: puffs with a soft blue shade underneath and a bright rim on top.
   let c = canvasTex(scene, 'cloud', 40, 20);
   let ctx = c.getContext();
+  const puffs = [[10, 12, 7], [20, 8, 9], [30, 12, 7]];
+  for (const [x, y, rad] of puffs) pxDisc(ctx, x, y + 1, rad, '#a8c0f8');
+  ctx.fillRect(3, 13, 34, 7);
+  for (const [x, y, rad] of puffs) pxDisc(ctx, x, y, rad, '#ffffff');
   ctx.fillStyle = '#ffffff';
-  for (const [x, y, rad] of [[10, 12, 7], [20, 8, 9], [30, 12, 7]]) {
-    ctx.beginPath();
-    ctx.arc(x, y, rad, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.fillRect(4, 12, 32, 7);
+  ctx.fillRect(3, 12, 34, 5);
+  ctx.fillStyle = '#d8e4ff';
+  ctx.fillRect(5, 16, 30, 1);
+  for (const x of [8, 18, 28]) ctx.fillRect(x, 15, 4, 1);
   c.refresh();
+  c = canvasTex(scene, 'cloudSmall', 24, 14);
+  ctx = c.getContext();
+  for (const [x, y, rad] of [[7, 8, 5], [15, 6, 6]]) pxDisc(ctx, x, y + 1, rad, '#a8c0f8');
+  for (const [x, y, rad] of [[7, 8, 5], [15, 6, 6]]) pxDisc(ctx, x, y, rad, '#ffffff');
+  ctx.fillStyle = '#d8e4ff';
+  ctx.fillRect(4, 12, 15, 1);
+  c.refresh();
+
+  // Dust kicked up by the hero: three frames of a puff that grows and thins out.
+  c = canvasTex(scene, 'dust', 24, 8);
+  ctx = c.getContext();
+  pxDisc(ctx, 4, 4, 2, '#ffffff');
+  pxDisc(ctx, 12, 4, 3, '#ffffff');
+  ctx.clearRect(11, 3, 2, 2);
+  for (const [x, y] of [[17, 1], [21, 2], [18, 5], [22, 6], [20, 3]]) ctx.fillRect(x, y, 1 + (x % 2), 1);
+  c.refresh();
+  for (let i = 0; i < 3; i++) c.add(i, 0, i * 8, 0, 8, 8);
 
   const back = lookOf('back');
   c = canvasTex(scene, 'hill', back.w, back.h);
@@ -919,6 +1009,14 @@ const BACKS = [
   { id: 'hills', name: 'Холмы', stars: 0, w: 80, h: 36, paint(ctx, n) {
     hump(ctx, 0, 80, 34, 36, n ? '#0a3a20' : '#107010');
     hump(ctx, 3, 74, 32, 37, n ? '#185a30' : '#30a030');
+    // Light on the left slope and a few darker tufts, all on whole pixels.
+    ctx.fillStyle = n ? '#22703c' : '#58c048';
+    for (const [x, y, w] of [[30, 6, 8], [24, 8, 4], [20, 11, 3], [17, 14, 2], [15, 17, 2]]) ctx.fillRect(x, y, w, 1);
+    ctx.fillStyle = n ? '#0f4424' : '#188818';
+    for (const [x, y] of [[44, 14], [56, 20], [36, 24], [62, 28], [24, 28], [48, 30]]) {
+      ctx.fillRect(x, y, 3, 2);
+      ctx.fillRect(x + 1, y - 1, 1, 1);
+    }
   } },
   { id: 'mountains', name: 'Горы', stars: 0, shop: 'pryg-back-mountains', tokens: 1000, legacy: true, w: 160, h: 80, paint(ctx, n) {
     const peak = (x, w, h, col, snow) => {
@@ -1190,10 +1288,22 @@ class Play extends Phaser.Scene {
       if (ar.scenery !== 'none') {
         if (dark) box.push(this.add.image(0, 0, 'stars').setOrigin(0).setScrollFactor(0).setDepth(DEPTH.SCENERY - 1));
         const [a, b] = span(0.5);
-        for (let x = a; x < b; x += 190) {
+        for (let x = a, n = 0; x < b; x += 190, n++) {
           const cloud = this.add.image(x + 60, 40 + (x % 3) * 12, 'cloud').setOrigin(0).setScrollFactor(0.5).setDepth(DEPTH.SCENERY);
           if (dark) cloud.setTint(0x5a6488);
           box.push(cloud);
+          // Smaller clouds drift further away, between the big ones.
+          const far = this.add.image(x + 150, 22 + (n % 3) * 18, 'cloudSmall').setOrigin(0).setScrollFactor(0.35)
+            .setDepth(DEPTH.SCENERY - 1).setAlpha(0.85);
+          if (dark) far.setTint(0x46507a);
+          box.push(far);
+        }
+        // Far ridge on the horizon, slowest of all, in the colors of this area's sky.
+        const [ra, rb] = span(0.3);
+        const tint = ridgeTint(ar.sky, dark);
+        for (let x = ra - (ra % RIDGE_W); x < rb; x += RIDGE_W) {
+          box.push(this.add.image(x, 13 * TILE, 'ridge').setOrigin(0, 1).setScrollFactor(0.3)
+            .setDepth(DEPTH.SCENERY - 1).setTint(tint));
         }
       }
       if (ar.scenery === 'field') {
@@ -1362,6 +1472,18 @@ class Play extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(ar.night || (ar.sky === DAY_SKY && night()) ? NIGHT_SKY : ar.sky);
     this.inWater = !!ar.water;
     this.scenery.forEach((box, j) => box.forEach((img) => img.setVisible(i === j)));
+  }
+
+  // A small puff of dust at the hero's feet that drifts aside and fades.
+  puff(x, y, dir) {
+    const d = this.add.sprite(x, y, 'dust', 0).setOrigin(0.5, 1).setDepth(DEPTH.HERO - 1);
+    const ar = this.lvl.areas[this.area];
+    if (ar && (ar.night || night())) d.setTint(0x9098b8);
+    this.tweens.add({
+      targets: d, x: x + dir * 7, y: y - 3, alpha: 0.2, duration: 260,
+      onUpdate: (tw) => d.setFrame(Math.min(2, Math.floor(tw.progress * 3))),
+      onComplete: () => d.destroy(),
+    });
   }
 
   layerAt(tx) {
@@ -1726,6 +1848,7 @@ class Play extends Phaser.Scene {
   update(time, delta) {
     this.paintBehind();
     if (!started) return;
+    glowBonus(time);
     const p = this.player;
     const b = p.body;
     const cam = this.cameras.main;
@@ -1824,6 +1947,18 @@ class Play extends Phaser.Scene {
     else acc = run ? 200 : 134;
     const vx = b.velocity.x;
     b.setVelocityX(vx < target ? Math.min(vx + acc * dt, target) : Math.max(vx - acc * dt, target));
+    // Dust from under the feet: a hard landing, and a skid when the hero turns at speed.
+    if (onGround && !this.inWater) {
+      if (!this.wasOnGround && this.fallV > 150) {
+        this.puff(b.center.x - 5, b.bottom, -1);
+        this.puff(b.center.x + 5, b.bottom, 1);
+      } else if (target !== 0 && vx !== 0 && Math.sign(target) !== Math.sign(vx) && Math.abs(vx) > 60 && time > (this.dustAt || 0)) {
+        this.dustAt = time + 80;
+        this.puff(b.center.x - Math.sign(target) * 4, b.bottom, -Math.sign(target));
+      }
+    }
+    this.wasOnGround = onGround;
+    this.fallV = b.velocity.y;
     if (target !== 0) p.setFlipX(target < 0);
 
     // Jump: higher when running, shorter when the button is released early.
@@ -1847,6 +1982,7 @@ class Play extends Phaser.Scene {
         this.jumpKind = speed < 60 ? 0 : speed < 139 ? 1 : 2;
         b.setVelocityY(this.jumpKind === 2 ? -300 : -240);
         SFX.jump();
+        if (speed > 60) this.puff(b.center.x - Math.sign(b.velocity.x) * 4, b.bottom, -Math.sign(b.velocity.x));
       }
       const [holdG, fallG] = JUMP_GRAVITY[this.jumpKind || 0];
       const g = b.velocity.y < 0 && jump ? holdG : fallG;
