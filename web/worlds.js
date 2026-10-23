@@ -1,4 +1,4 @@
-// «Прыг-Скок» worlds 2-7: four levels each, in the same order as world 1
+// «Прыг-Скок» worlds 2-8: four levels each, in the same order as world 1
 // (field, a special level, a high level, a castle). Loaded after levels.js and before game.js;
 // also loaded by tests/levels.test.mjs, so it uses no browser or Phaser APIs.
 // Extra chars (see game.js): v water surface, y water, s fish, p springboard, t bolt thrower, n spiky.
@@ -1401,6 +1401,240 @@ function level74() {
   return L.done(Object.assign(castleEnd(L, 196), { start: [3, 8] }));
 }
 
+// ---------- World 8 (the last) ----------
+
+// 8-1: the long road: many pits, packs of beetles and spikies, little time.
+function level81() {
+  const L = grid(240);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 222, 'tiles', SKY, 'field');
+  L.area(224, 240, 'tilesCave', BLACK);
+  L.floor('#', 0, 221);
+  for (const [a, b] of [[24, 26], [40, 42], [58, 61], [76, 78], [92, 95], [112, 114], [130, 133], [150, 152], [166, 169]]) L.gap(a, b);
+
+  row(14, 9, '?M?');
+  pipe(20, 2);
+  row(30, 9, 'BBBB');
+  row(31, 5, 'oo');
+  stairsUp(36, 3);
+  column(39, 3);
+  row(46, 9, 'B?B');
+  pipe(52, 3);
+  L.plants.push({ x: 52, y: 10 });
+  stairsUp(54, 4);
+  column(57, 4);
+  row(64, 9, 'BkBhB');
+  row(68, 5, 'oooo');
+  stairsDown(79, 3);
+  pipe(86, 2);
+  stairsUp(88, 4);
+  column(91, 4);
+  row(100, 9, 'BBMBB');
+  pipe(106, 4);
+  L.plants.push({ x: 106, y: 9 });
+  stairsUp(108, 4);
+  column(111, 4);
+  row(118, 8, 'oooooo');
+  pipe(124, 2);
+  stairsUp(126, 4);
+  column(129, 4);
+  row(138, 9, '?B?B?');
+  stairsUp(146, 4);
+  column(149, 4);
+  row(156, 9, 'BBB');
+  pipe(160, 3);
+  L.plants.push({ x: 160, y: 10 });
+  stairsUp(162, 4);
+  column(165, 4);
+  row(174, 9, 'B?B');
+  pipe(190, 2);
+  stairsUp(200, 8);
+  column(208, 8);
+  L.flagpole(217);
+
+  L.enemies([18, 28, 32, 34, 44, 50, 62, 66, 70, 72, 84, 98, 102, 116, 120, 136, 140, 142, 154, 172, 178, 180, 184, 194]);
+  for (const x of [48, 82, 122, 158, 182]) put(x, 12, 'n');
+  coinRoom(L, 224);
+  L.pipes.push({ type: 'down', x: 124, y: 11, to: { area: 1, x: 226, y: 3 } });
+  L.pipes.push({ type: 'side', x: 236, y: 11, to: { area: 0, pipeX: 190, pipeY: 11 } });
+
+  return L.done({ goal: 'pole', goalX: 217, checkpoint: { x: 116, start: [117, 13] } });
+}
+
+// 8-2: cliffs under the cloud rider: steps over pits, springboards, a thrower on a tower.
+function level82() {
+  const L = grid(226);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 226, 'tiles', SKY, 'field');
+  L.floor('#', 0, 225);
+  for (const [a, b] of [[30, 33], [52, 55], [78, 81], [104, 107], [132, 135], [156, 159]]) L.gap(a, b);
+
+  row(14, 9, 'B?B');
+  stairsUp(24, 4);
+  fill(28, 29, 9, 12, 'H');
+  fill(34, 35, 9, 12, 'H');
+  row(38, 9, 'BMB');
+  put(44, 12, 'p');
+  row(42, 3, 'oooooo');
+  stairsUp(46, 4);
+  fill(50, 51, 9, 12, 'H');
+  fill(56, 57, 9, 12, 'H');
+  column(64, 4);
+  column(65, 4);
+  put(64, 8, 't');
+  row(70, 9, '?B?');
+  stairsUp(73, 4);
+  fill(77, 77, 9, 12, 'H');
+  fill(82, 83, 9, 12, 'H');
+  row(88, 8, 'oooo');
+  pipe(94, 3);
+  L.plants.push({ x: 94, y: 10 });
+  stairsUp(100, 4);
+  fill(108, 109, 9, 12, 'H');
+  row(114, 9, 'BhB');
+  put(120, 12, 'p');
+  row(118, 2, 'oooooo');
+  stairsUp(126, 4);
+  fill(130, 131, 9, 12, 'H');
+  fill(136, 137, 9, 12, 'H');
+  row(142, 9, 'B?B?B');
+  stairsUp(150, 4);
+  fill(154, 155, 9, 12, 'H');
+  fill(160, 161, 9, 12, 'H');
+  row(166, 8, 'oooo');
+  stairsUp(186, 8);
+  column(194, 8);
+  L.flagpole(203);
+
+  L.enemies([20, 22, 40, 60, 68, 86, 90, 98, 112, 116, 124, 140, 146, 170, 174, 178]);
+  return L.done({ goal: 'pole', goalX: 203, rider: { x0: 10, x1: 180 }, checkpoint: { x: 110, start: [112, 13] } });
+}
+
+// 8-3: fortress walls: wide towers with bolt throwers on top and between them.
+function level83() {
+  const L = grid(226);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 226, 'tiles', SKY, 'field');
+  L.floor('#', 0, 225);
+  L.gap(70, 72);
+  L.gap(146, 149);
+
+  row(14, 9, '?M?');
+  pipe(22, 2);
+  fill(28, 35, 9, 12, 'H');
+  put(31, 8, 't');
+  row(29, 5, 'oooooo');
+  put(40, 12, 't');
+  fill(46, 51, 9, 12, 'H');
+  put(48, 8, 't');
+  row(56, 9, 'B?B');
+  fill(60, 67, 9, 12, 'H');
+  put(64, 8, 't');
+  stairsUp(74, 4);
+  fill(78, 85, 9, 12, 'H');
+  put(82, 8, 't');
+  row(79, 5, 'B?B?B');
+  put(90, 12, 't');
+  pipe(96, 3);
+  L.plants.push({ x: 96, y: 10 });
+  fill(102, 109, 9, 12, 'H');
+  put(105, 8, 't');
+  row(114, 9, 'BhB');
+  fill(120, 127, 9, 12, 'H');
+  put(124, 8, 't');
+  put(132, 12, 't');
+  fill(136, 143, 9, 12, 'H');
+  put(140, 8, 't');
+  row(137, 5, 'oooooo');
+  stairsUp(150, 4);
+  fill(154, 161, 9, 12, 'H');
+  put(158, 8, 't');
+  pipe(168, 2);
+  stairsUp(186, 8);
+  column(194, 8);
+  L.flagpole(203);
+
+  L.enemies([18, 26, 38, 44, 54, 58, 88, 92, 112, 116, 130, 134, 166, 172, 176]);
+  return L.done({ goal: 'pole', goalX: 203, checkpoint: { x: 112, start: [114, 13] } });
+}
+
+// 8-4: the last castle: lava, fire bars, two forks of the maze and the beetle on the bridge.
+function level84() {
+  const L = grid(256);
+  const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
+  L.area(0, 256, 'tilesCastle', BLACK);
+  L.floor();
+  fill(0, 201, 0, 2, 'H');
+  fill(0, 5, 8, 12, 'H');
+  fill(6, 12, 9, 12, 'H');
+  put(10, 9, 'r');
+  L.gap(13, 20, true);
+  put(15, 13, 'f');
+  put(19, 13, 'f');
+  L.lifts.push({ x: 14, y: 10, w: 3, axis: 'y', dist: 3, period: 3, phase: 0 });
+  fill(21, 26, 9, 12, 'H');
+  put(23, 9, 'r');
+  row(28, 9, '?M?');
+
+  // Fork 1 (x 36-66): the way on is the bottom corridor.
+  stairsUp(31, 4);
+  fill(36, 64, 7, 7, 'H');
+  row(40, 10, 'oooooo');
+  put(48, 7, 'r');
+  put(56, 12, 'r');
+  fill(65, 66, 3, 12, 'H');
+  fill(65, 66, 5, 6, '.');
+  fill(65, 66, 11, 12, '.');
+  L.loops.push({ x: 67, rows: [8, 14], back: 30, backY: 13 });
+
+  fill(71, 73, 11, 12, 'H');
+  put(72, 11, 'r');
+  L.gap(76, 84, true);
+  L.lifts.push({ x: 77, y: 9, w: 3, axis: 'x', dist: 3, period: 3, phase: 0 });
+  put(80, 13, 'f');
+  fill(85, 88, 10, 12, 'H');
+  put(87, 10, 'r');
+  fill(94, 99, 9, 12, 'H');
+  row(94, 8, 'oooooo');
+
+  // Fork 2 (x 101-130): the top way.
+  fill(101, 128, 7, 7, 'H');
+  row(104, 6, 'ooooo');
+  put(112, 7, 'r');
+  put(122, 12, 'r');
+  fill(129, 130, 3, 12, 'H');
+  fill(129, 130, 5, 6, '.');
+  fill(129, 130, 11, 12, '.');
+  L.loops.push({ x: 131, rows: [0, 6], back: 93, backY: 13 });
+
+  fill(135, 140, 9, 12, 'H');
+  put(138, 9, 'r');
+  L.gap(142, 160, true);
+  L.lifts.push({ x: 143, y: 9, w: 3, axis: 'x', dist: 4, period: 3.5, phase: 0 });
+  L.lifts.push({ x: 151, y: 7, w: 3, axis: 'y', dist: 4, period: 3, phase: 0.5 });
+  fill(156, 157, 10, 14, 'H');
+  put(156, 10, 'r');
+  put(146, 13, 'f');
+  put(154, 13, 'f');
+  put(159, 13, 'f');
+  fill(161, 165, 9, 12, 'H');
+  put(165, 9, 'r');
+  row(170, 9, '?B?');
+  fill(176, 177, 10, 12, 'H');
+  put(176, 10, 'r');
+  L.gap(180, 190, true);
+  L.lifts.push({ x: 181, y: 9, w: 3, axis: 'x', dist: 5, period: 4, phase: 0 });
+  put(184, 13, 'f');
+  put(189, 13, 'f');
+  fill(191, 201, 3, 4, 'H');
+  fill(191, 195, 10, 12, 'H');
+  put(194, 10, 'r');
+
+  L.enemies([11], 8);
+  L.enemies([42, 52, 60, 90, 108, 118, 126, 168, 172, 198]);
+  return L.done(Object.assign(castleEnd(L, 202), { start: [3, 8] }));
+}
+
 WORLDS.push(
   [
     { name: 'ЛУГ', build: level21, time: 400 },
@@ -1437,6 +1671,12 @@ WORLDS.push(
     { name: 'ГЛУБОКОЕ МОРЕ', build: level72, time: 400 },
     { name: 'МОСТЫ И РЫБЫ', build: level73, time: 300 },
     { name: 'ЗАМОК-ЛАБИРИНТ', build: level74, time: 400 },
+  ],
+  [
+    { name: 'ДОЛГАЯ ДОРОГА', build: level81, time: 300 },
+    { name: 'ОБРЫВЫ', build: level82, time: 400 },
+    { name: 'КРЕПОСТНЫЕ СТЕНЫ', build: level83, time: 300 },
+    { name: 'ПОСЛЕДНИЙ ЗАМОК', build: level84, time: 400 },
   ],
 );
 })();
