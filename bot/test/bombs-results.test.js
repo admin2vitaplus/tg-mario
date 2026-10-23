@@ -57,6 +57,9 @@ test("games under rules 2 (kick, glove, closing field) replay with them; unknown
   const g = play(25, 2, 0, 2);
   assert.equal(replay({ seed: 25, players: 2, log: g.log, rules: S.RULES + 1 }).why, "bad rules");
   assert.equal(replay({ seed: 25, players: 2, log: g.log, rules: 2, mode: "x" }).why, "bad mode");
+  // Дуэль с ботом: те же правила, режим bot только для двоих по правилам 2.
+  assert.equal(replay({ seed: 25, players: 2, log: g.log, rules: 2, mode: "bot" }).ok, true);
+  assert.equal(replay({ seed: 25, players: 2, log: g.log, rules: 1, mode: "bot" }).why, "bad mode");
 });
 
 test("a game from a chosen stage is replayed from it; stages count from it", () => {

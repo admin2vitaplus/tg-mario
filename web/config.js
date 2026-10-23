@@ -39,7 +39,7 @@ const config = {
       // Its own page like tanks: alone, or an online duel through the same server (/ws/bombs).
       url: 'bombs/',
       start: 'bombs',
-      preload: ['bombs/bombs.css', 'bombs/strings.js', 'bombs/sim.js', 'bombs/bombs.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/progress.js'],
+      preload: ['bombs/bombs.css', 'bombs/strings.js', 'bombs/sim.js', 'bombs/bot.js', 'bombs/bombs.js', 'lib/looks.css', 'lib/looks.js', 'lib/events.js', 'lib/back.js', 'lib/progress.js'],
     },
     {
       id: 'range',
