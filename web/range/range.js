@@ -145,7 +145,12 @@ const BIRD_ROWS = [
   ['................', 'W..............W', 'WW....HHHH....WW', '.WW..HXHHXH..WW.', '..WWBHHHHHHBWW..', '...BBBHOOHBBB...',
     '....BBBBBBBB....', '....BBBBBBBB....', '.....BBBBBB.....', '......D..D......', '................', '................',
     '................', '................', '................', '................'],
+  // Wings level, between up and down: the flap goes up, level, down, level.
+  ['................', '................', '................', '............HH..', '...........HKHH.', '.WWWWWBBBBBHHHOO',
+    '..WWWBBBBBBBHH..', '...BBBBBBBBBB...', '..BB.BBBBBBB....', '.......DD.D.....', '................', '................',
+    '................', '................', '................', '................'],
 ];
+const FLAP = [0, 3, 1, 3];
 const BIRD_LOOKS = [
   { id: 'tin', pal: { B: '#a8b0c8', W: '#e0e4ee', H: '#8890a8', K: '#202028', X: '#ffffff', O: '#f8a020', D: '#505868' } },
   { id: 'wood', shop: 'range-birds-wood', tokens: 600, legacy: true, pal: { B: '#a8682c', W: '#d8a060', H: '#7a4818', K: '#201008', X: '#ffffff', O: '#f8d040', D: '#4a2810' } },
@@ -484,7 +489,7 @@ function render(s) {
     const left = t.vx < 0;
     if (t.state === 'hit') ctx.drawImage(birdImg(birds, t.kind, 2, false, false), x, y);
     else if (t.state === 'fall') ctx.drawImage(birdImg(birds, t.kind, 1, left, true), x, y);
-    else ctx.drawImage(birdImg(birds, t.kind, (t.age >> 3) & 1, left, false), x, y);
+    else ctx.drawImage(birdImg(birds, t.kind, FLAP[(t.age >> 2) & 3], left, false), x, y);
   }
   ctx.drawImage(bushImage(scene), 0, GROUND - 4);
   if (window.Fx) Fx.draw(ctx);
