@@ -844,6 +844,7 @@ let bannerText = '';
 function banner(s) {
   let text = '', cls = '';
   if (s.phase === 'intro') text = T('banner_stage', { n: s.stage + 1, map: mapTitle(s.mapName).toUpperCase() });
+  else if (s.won) text = T('won_title');
   else if (s.phase === 'over' || s.phase === 'overDone') { text = T('game_over'); cls = 'over'; }
   if (text === bannerText) return;
   bannerText = text;
@@ -906,7 +907,7 @@ for (const b of document.querySelectorAll('#menu button[data-players]')) {
 
 function resultText(s) {
   const score = s.players.reduce((a, p) => a + p.score, 0);
-  return (s.baseAlive ? T('all_killed') : T('base_lost')) + '<br>' + T('stage_line', { n: s.stage + 1 }) + '<br>' + T('score_line', { n: score });
+  return (s.won ? T('won_text', { n: S.STAGES }) : s.baseAlive ? T('all_killed') : T('base_lost')) + '<br>' + T('stage_line', { n: s.stage + 1 }) + '<br>' + T('score_line', { n: score });
 }
 
 // «Поделиться итогом»: the result goes to any Telegram chat with a link to the bot.
@@ -1235,7 +1236,7 @@ function rematchScreen() {
   }
   const score = s.players.reduce((a, p) => a + p.score, 0);
   const note = net.rematch.me ? T('rematch_wait') : net.rematch.peer ? T('rematch_peer') : '';
-  showOverlay(T('game_over'), resultText(s) + (note ? '<br><br>' + note : ''),
+  showOverlay(T(s.won ? 'won_title' : 'game_over'), resultText(s) + (note ? '<br><br>' + note : ''),
     net.rematch.me ? T('btn_exit') : T('btn_rematch'), net.rematch.me ? showMenu : pressRematch);
   showShare(s);
 }
@@ -1318,7 +1319,7 @@ const unpackTank = (a) => ({
 function sendSnapshot(s) {
   const key = String.fromCharCode.apply(null, s.cells);
   const m = {
-    t: 's', f: s.frame, ph: s.phase, pt: s.phaseT, st: s.stage, mn: s.mapName, ba: s.baseAlive ? 1 : 0,
+    t: 's', f: s.frame, ph: s.phase, pt: s.phaseT, st: s.stage, mn: s.mapName, ba: s.baseAlive ? 1 : 0, wo: s.won ? 1 : 0,
     q: s.queue.length, fr: s.freeze, sh: s.shovel,
     pl: s.players.map((p) => [p.lives, p.level, p.score, p.kills, p.tank ? packTank(p.tank) : 0]),
     en: s.enemies.map(packTank),
@@ -1338,7 +1339,7 @@ function applySnapshot(m) {
   if (!view) view = { cells: new Uint8Array(N * N) };
   const v = view;
   Object.assign(v, {
-    frame: m.f, phase: m.ph, phaseT: m.pt, stage: m.st, mapName: m.mn, baseAlive: !!m.ba,
+    frame: m.f, phase: m.ph, phaseT: m.pt, stage: m.st, mapName: m.mn, baseAlive: !!m.ba, won: !!m.wo,
     queue: { length: m.q }, freeze: m.fr, shovel: m.sh,
     players: m.pl.map((a) => ({ lives: a[0], level: a[1], score: a[2], kills: a[3], tank: a[4] ? unpackTank(a[4]) : null })),
     enemies: m.en.map(unpackTank),
@@ -1397,7 +1398,7 @@ function remotePad() {
 // Log: steps joined by «,»; a step is the buttons' code in base36, «codexN»
 // when repeated N times (N in base36 too); «n» is the move to the next stage.
 // Code: (direction + 1) × 2 + fire; for two players code1 × 10 + code2.
-const MAX_REC_FRAMES = 60 * 60 * 60; // the server takes up to an hour of play
+const MAX_REC_FRAMES = 3 * 60 * 60 * 60; // the server takes up to three hours of play (all 50 stages)
 const QUIT_FRAMES = 20 * 60; // a game left in the middle counts after 20 s (bot/tanks-replay.js)
 const ticket = { next: null, asking: false, waiters: [] };
 const rec = { seed: 0, players: 1, out: [], prev: -1, n: 0, frames: 0 };
@@ -1549,7 +1550,7 @@ function afterStep(s) {
       track('match_finished', net.code);
       rematchScreen();
     } else {
-      showOverlay(T('game_over'), resultText(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => beginLocal(s.players.length));
+      showOverlay(T(s.won ? 'won_title' : 'game_over'), resultText(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => beginLocal(s.players.length));
       showShare(s);
     }
   }

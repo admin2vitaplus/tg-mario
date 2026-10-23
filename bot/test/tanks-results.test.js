@@ -191,7 +191,7 @@ test("HTTP: a checked tanks game closes the game's tasks and a record; a forged 
     r = await call("POST", "/api/tanks/run", { seed: t2, players: 1, log: forged });
     assert.equal(r.status, 422);
     assert.equal(economy.me(5).history.length, r0.json.wallet.grants.length);
-    assert.equal((await call("POST", "/api/tanks/run", { seed: t2, players: 1, log: "x".repeat(600_000) })).status, 413);
+    assert.equal((await call("POST", "/api/tanks/run", { seed: t2, players: 1, log: "x".repeat(1_600_000) })).status, 413);
   }));
 
 test("Stars: invoice only for items not owned; payment once per charge; refund takes it back", () =>

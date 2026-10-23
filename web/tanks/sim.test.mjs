@@ -85,3 +85,64 @@ test('random play never breaks the rules', () => {
     }
   }
 });
+
+test('50 stages, each with its own map', () => {
+  assert.equal(S.STAGES, 50);
+  assert.equal(new Set(S.MAPS.map((m) => m.rows.join(''))).size, 50, 'maps repeat');
+  assert.equal(new Set(S.MAPS.map((m) => m.name)).size, 50, 'names repeat');
+  for (const m of S.MAPS) {
+    assert.equal(m.rows.length, 13, m.name);
+    for (const r of m.rows) assert.match(r, /^[.#@~%-]{13}$/, m.name);
+  }
+});
+
+test('on every map tanks can get from each spawn to the base (bricks can be shot)', () => {
+  for (let stage = 0; stage < S.STAGES; stage++) {
+    const s = playing(1, 1, stage);
+    // A 16px tank on 8px cells: a tile is open when none of its four cells is steel or water.
+    const open = (tx, ty) => {
+      for (let k = 0; k < 4; k++) {
+        const c = s.cells[(ty * 2 + (k >> 1)) * N + tx * 2 + (k & 1)];
+        if (c === STEEL || c === WATER) return false;
+      }
+      return true;
+    };
+    const seen = new Set(['6,10']);
+    const q = [[6, 10]];
+    while (q.length) {
+      const [x, y] = q.shift();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx > 12 || ny > 12 || seen.has(nx + ',' + ny) || !open(nx, ny)) continue;
+        seen.add(nx + ',' + ny);
+        q.push([nx, ny]);
+      }
+    }
+    for (const p of ['0,0', '6,0', '12,0', '4,12', '8,12']) assert.ok(seen.has(p), `stage ${stage + 1}: ${p} is cut off`);
+  }
+});
+
+test('every stage has 20 enemies, and the early ones stay as they were', () => {
+  for (let n = 0; n < S.STAGES; n++) {
+    const w = S.wave(n);
+    assert.equal(w.reduce((a, b) => a + b), 20, `stage ${n + 1}`);
+    assert.ok(w.every((x) => x >= 0), `stage ${n + 1}`);
+  }
+  assert.deepEqual(S.wave(0), [18, 2, 0, 0]);
+  assert.deepEqual(S.wave(5), [2, 6, 6, 6]);
+  assert.ok(S.wave(49)[3] > S.wave(10)[3], 'more armour at the end');
+});
+
+test('clearing stage 50 wins the game', () => {
+  const s = playing(1, 5, 49);
+  s.queue = [];
+  s.spawns = [];
+  s.enemies = [];
+  for (let i = 0; i < 200 && s.phase !== 'overDone'; i++) S.step(s, []);
+  assert.equal(s.phase, 'overDone');
+  assert.equal(s.won, true);
+  const lost = playing(1, 5, 10);
+  lost.baseAlive = false;
+  for (let i = 0; i < 300 && lost.phase !== 'overDone'; i++) S.step(lost, []);
+  assert.equal(lost.won, false);
+});
