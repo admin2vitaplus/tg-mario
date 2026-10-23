@@ -226,3 +226,43 @@ test('the last stage cleared wins the game', () => {
   idle(s, 200);
   assert.equal(s.phase, 'overDone');
 });
+
+test('50 stages, each with all its enemies, its item and a door, alone and in a duel', () => {
+  assert.equal(S.STAGES.length, 50);
+  for (let n = 0; n < S.STAGES.length; n++) {
+    const st = S.STAGES[n];
+    assert.ok(S.ITEMS.includes(st.item), 'stage ' + (n + 1));
+    assert.ok(st.foes.length <= S.ENEMY.length);
+    for (const players of [1, 2]) {
+      for (const seed of [3, 41]) {
+        const s = playing(players, seed, n);
+        assert.equal(s.enemies.length, st.foes.reduce((a, b) => a + b), 'stage ' + (n + 1));
+        assert.ok(s.enemies.length <= 14, 'room left for the ones from the door (16 at most)');
+        assert.equal(at(s, ...s.door), SOFT);
+        for (const [x, y] of S.STARTS.slice(0, players)) assert.equal(at(s, x, y), EMPTY);
+      }
+    }
+  }
+});
+
+function clearStage(s) {
+  bare(s);
+  s.door = [3, 1];
+  s.players[0].x = 3 * TS; s.players[0].y = TS;
+  S.step(s, []);
+}
+
+test('clearing stage 20, 30 or 40 alone gives a life; other stages and duels do not', () => {
+  for (const n of [1, 10, 20, 30, 40, 50]) {
+    const s = playing(1, 5, n - 1);
+    clearStage(s);
+    assert.equal(s.players[0].lives, S.LIFE_STAGES.includes(n) ? 4 : 3, 'stage ' + n);
+  }
+  const d = playing(2, 5, 19);
+  clearStage(d);
+  assert.equal(d.players[0].lives, 3);
+  const full = playing(1, 5, 39);
+  full.players[0].lives = 9;
+  clearStage(full);
+  assert.equal(full.players[0].lives, 9, 'no more than nine');
+});

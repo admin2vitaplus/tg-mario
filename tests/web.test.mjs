@@ -165,7 +165,7 @@ test('old links to a switched-off game land on the menu', () => {
   }
 });
 
-for (const id of ['pryg-skok', 'tanks', 'bombs', 'word']) {
+for (const id of ['pryg-skok', 'tanks', 'bombs', 'range', 'word']) {
   test(`switching off ${id} removes it from the menu and breaks nothing`, () => {
     const cfg = loadConfig();
     const title = cfg.game(id).title;
@@ -187,6 +187,7 @@ test('no separate records button: tables live in the tickets panels', () => {
   assert.match(read(path.join(WEB, 'tanks/index.html')), /data-wallet-game="tanks"/);
   assert.match(read(path.join(WEB, 'word/index.html')), /data-wallet-game="word"/);
   assert.match(read(path.join(WEB, 'bombs/index.html')), /data-wallet-game="bombs"/);
+  assert.match(read(path.join(WEB, 'range/index.html')), /data-wallet-game="range"/);
   assert.match(read(path.join(WEB, 'api.js')), /walletGame = 'mario'/);
 });
 
@@ -341,10 +342,13 @@ test('every game with жетоны is known to config.js by the id the wallet us
 // for жетоны and stars at the server's price, and former free items carry legacy on both sides.
 test('looks: only the standard item is free, the rest match the server shop', () => {
   const economy = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'bot', 'economy.json'), 'utf8'));
-  const games = { mario: ['game.js', 5], tanks: ['tanks/tanks.js', 5], bombs: ['bombs/bombs.js', 3] };
-  for (const [game, [file, groups]] of Object.entries(games)) {
+  const item = /\{ id: '[\w-]+',[^\n]*?stars: 0\b[^\n]*/g;
+  // «Тир» has no stars field on its items: its looks are the lines with a sight, birds or place.
+  const rangeItem = /^ {2}\{ id: '[\w-]+', (?:shop: [^\n]*?)?(?:draw|pal|sky):[^\n]*/gm;
+  const games = { mario: ['game.js', 5, item], tanks: ['tanks/tanks.js', 5, item], bombs: ['bombs/bombs.js', 3, item], range: ['range/range.js', 3, rangeItem] };
+  for (const [game, [file, groups, re]] of Object.entries(games)) {
     const js = fs.readFileSync(path.join(WEB, file), 'utf8');
-    const items = [...js.matchAll(/\{ id: '[\w-]+',[^\n]*?stars: 0\b[^\n]*/g)].map((m) => m[0]);
+    const items = [...js.matchAll(re)].map((m) => m[0]);
     assert.equal(items.filter((l) => !l.includes('shop:')).length, groups, `${game}: free items`);
     const shop = economy.shop.filter((it) => it.game === game);
     assert.equal(items.length - groups, shop.length, `${game}: every paid look is in economy.json`);

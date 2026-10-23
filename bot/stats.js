@@ -3,7 +3,7 @@ import { DAY_MS, dayOf, dayLabel } from "./days.js";
 // Статистика по ТЗ, P0-5: события игроков, источники, K-фактор и удержание.
 // Хранится только Telegram id и то, что нужно для подсчёта; имена и тексты сюда не попадают.
 
-export const GAMES = ["mario", "tanks", "bombs", "word"];
+export const GAMES = ["mario", "tanks", "bombs", "range", "word"];
 // События, которые присылает сама игра. Остальные (первое появление, переход по приглашению,
 // вход по приглашению, конец игры в «Прыг-Скок») сервер записывает сам.
 export const CLIENT_EVENTS = new Set([
@@ -143,7 +143,7 @@ export function collectStats(db, at = Date.now()) {
 }
 
 const SOURCE_NAMES = { direct: "сами", ref: "по ссылке друга", room: "в комнату" };
-const GAME_NAMES = { mario: "Прыг-Скок", tanks: "Танкодром", bombs: "Бомбодром", word: "Слово дня" };
+const GAME_NAMES = { mario: "Прыг-Скок", tanks: "Танкодром", bombs: "Бомбодром", range: "Тир", word: "Слово дня" };
 const pct = (r) => (r.rate == null ? "—" : `${Math.round(r.rate * 100)}% (${r.returned} из ${r.cohort})`);
 const kText = (k) => (k.k == null ? `— (новых по приглашениям ${k.invited}, пригласивших 0)`
   : `${k.k.toFixed(2)} (${k.invited} новых ÷ ${k.inviters} пригласивших)`);

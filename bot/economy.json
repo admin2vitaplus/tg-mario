@@ -8,12 +8,13 @@
   "invite": { "inviter": 50, "newcomer": 30, "gamesNeeded": 3, "perWeek": 10 },
   "suspicious": { "rejectedPerDay": 3 },
   "season": {
-    "pool": 3230,
+    "pool": 4060,
     "notify": true,
     "boards": {
       "mario": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
       "tanks": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
       "bombs": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
+      "range": [300, 180, 110, 70, 50, 40, 30, 20, 20, 10],
       "word": [150, 90, 60, 40, 30, 20, 10],
       "overall": [100, 70, 50, 40, 30, 20, 10, 10, 5, 5]
     }
@@ -105,6 +106,20 @@
     { "id": "bombs-ground-night", "game": "bombs", "price": 500, "stars": 35, "ru": "Бомбодром: поле «Ночь»", "en": "Bomb Field: field «Night»", "legacy": true },
     { "id": "bombs-ground-swamp", "game": "bombs", "price": 350, "stars": 25, "ru": "Бомбодром: поле «Болото»", "en": "Bomb Field: field «Swamp»" },
     { "id": "bombs-ground-lava", "game": "bombs", "price": 1000, "stars": 70, "ru": "Бомбодром: поле «Лава»", "en": "Bomb Field: field «Lava»" },
+    { "id": "range-sight-ring", "game": "range", "price": 200, "stars": 15, "ru": "Тир: прицел «Кольцо»", "en": "Shooting Range: sight «Ring»", "legacy": true },
+    { "id": "range-sight-frame", "game": "range", "price": 350, "stars": 25, "ru": "Тир: прицел «Рамка»", "en": "Shooting Range: sight «Frame»", "legacy": true },
+    { "id": "range-sight-laser", "game": "range", "price": 750, "stars": 50, "ru": "Тир: прицел «Лазер»", "en": "Shooting Range: sight «Laser»" },
+    { "id": "range-sight-diamond", "game": "range", "price": 500, "stars": 35, "ru": "Тир: прицел «Ромб»", "en": "Shooting Range: sight «Diamond»" },
+    { "id": "range-birds-wood", "game": "range", "price": 200, "stars": 15, "ru": "Тир: мишени «Деревянные»", "en": "Shooting Range: targets «Wooden»", "legacy": true },
+    { "id": "range-birds-paper", "game": "range", "price": 350, "stars": 25, "ru": "Тир: мишени «Бумажные»", "en": "Shooting Range: targets «Paper»", "legacy": true },
+    { "id": "range-birds-robot", "game": "range", "price": 1000, "stars": 70, "ru": "Тир: мишени «Роботы»", "en": "Shooting Range: targets «Robots»" },
+    { "id": "range-birds-candy", "game": "range", "price": 500, "stars": 35, "ru": "Тир: мишени «Карамельные»", "en": "Shooting Range: targets «Candy»" },
+    { "id": "range-birds-neon", "game": "range", "price": 2500, "stars": 150, "ru": "Тир: мишени «Неоновые»", "en": "Shooting Range: targets «Neon»" },
+    { "id": "range-scene-sunset", "game": "range", "price": 350, "stars": 25, "ru": "Тир: место «Закат»", "en": "Shooting Range: place «Sunset»", "legacy": true },
+    { "id": "range-scene-night", "game": "range", "price": 500, "stars": 35, "ru": "Тир: место «Ночь»", "en": "Shooting Range: place «Night»", "legacy": true },
+    { "id": "range-scene-winter", "game": "range", "price": 500, "stars": 35, "ru": "Тир: место «Зима»", "en": "Shooting Range: place «Winter»", "legacy": true },
+    { "id": "range-scene-autumn", "game": "range", "price": 500, "stars": 35, "ru": "Тир: место «Осень»", "en": "Shooting Range: place «Autumn»" },
+    { "id": "range-scene-desert", "game": "range", "price": 750, "stars": 50, "ru": "Тир: место «Пустыня»", "en": "Shooting Range: place «Desert»" },
     { "id": "word-tiles-sea", "game": "word", "price": 150, "stars": 15, "ru": "Слово дня: плитки «Море»", "en": "Word of the Day: «Sea» tiles" },
     { "id": "word-tiles-candy", "game": "word", "price": 100, "stars": 10, "ru": "Слово дня: плитки «Карамель»", "en": "Word of the Day: «Candy» tiles" }
   ]

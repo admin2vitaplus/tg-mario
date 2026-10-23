@@ -352,6 +352,6 @@ const LEVELS = [
   { name: 'ЗАМОК', build: levelCastle, time: 300 },
 ];
 
-// World 1; worlds.js adds worlds 2-4.
+// World 1; worlds.js adds the later worlds.
 window.PrygLevels = { LEVELS, WORLDS: [LEVELS], grid };
 })();

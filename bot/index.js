@@ -193,7 +193,7 @@ bot.command("me", (ctx) => {
   if (!player) return ctx.reply("Ты ещё не играл. Нажми «Играть»!", { reply_markup: playKeyboard() });
   const earned = new Set(store.earned(player.id).map((a) => a.code));
   const rank = store.rank(player);
-  const names = { mario: "Прыг-Скок", tanks: "Танкодром", bombs: "Бомбодром" };
+  const names = { mario: "Прыг-Скок", tanks: "Танкодром", bombs: "Бомбодром", range: "Тир" };
   const lines = Object.entries(BY_GAME).map(([game, list]) => `${names[game]}:\n` +
     list.map((a) => `${earned.has(a.code) ? a.icon : "🔒"} ${a.title} — ${a.text}`).join("\n"));
   return ctx.reply(

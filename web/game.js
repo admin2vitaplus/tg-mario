@@ -40,6 +40,7 @@ const EN_NAMES = {
   'НОЧНОЙ ЛУГ': 'NIGHT MEADOW', 'НОЧНАЯ ДОРОГА': 'NIGHT ROAD', 'НОЧНЫЕ ДЕРЕВЬЯ': 'NIGHT TREES',
   'ОБЛАЧНЫЙ ЛУГ': 'CLOUD MEADOW', 'ГЛУБОКОЕ ПОДЗЕМЕЛЬЕ': 'DEEP UNDERGROUND', 'ГРИБЫ': 'MUSHROOMS',
   'ЗАМОК-ЛАБИРИНТ': 'MAZE CASTLE', 'ЗОНА ПЕРЕХОДА': 'WARP ZONE',
+  'ВЕЧЕРНИЙ ЛУГ': 'EVENING MEADOW', 'ХОЛМЫ И ПРУЖИНЫ': 'HILLS AND SPRINGS', 'ДЕРЕВЬЯ НА ВЕТРУ': 'WINDY TREES',
 };
 const nameOf = (ru) => L(ru, EN_NAMES[ru] || ru);
 
@@ -846,7 +847,7 @@ const TILE_OF = {
   'v': T.WATER_TOP, 'y': T.WATER,
 };
 
-// Level maps live in levels.js and worlds.js (loaded before this file): four worlds of four levels.
+// Level maps live in levels.js and worlds.js (loaded before this file): worlds of four levels each.
 const WORLD_MAPS = window.PrygLevels.WORLDS;
 const WORLDS = WORLD_MAPS.length;
 

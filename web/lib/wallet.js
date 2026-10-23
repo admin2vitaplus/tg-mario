@@ -13,7 +13,7 @@
 //   Wallet.buyLife(offer, level) -> Promise<boolean>, true when the life is paid
 //   Wallet.grants(res.wallet) -> shows «+10» toasts after a game result
 //   Wallet.open(tab, {game})  -> the collection's own panel (tabs: tasks, top, shop, history) or,
-//                                with game 'mario' | 'tanks' | 'bombs' | 'word', that game's (tasks, top, shop)
+//                                with game 'mario' | 'tanks' | 'bombs' | 'range' | 'word', that game's (tasks, top, shop)
 //   Wallet.button(el, game)   -> turns a button into «◆ balance», opening the game's panel
 //
 // The collection's tasks (a visit a day, friends) and each game's own tasks (play, clear
@@ -32,7 +32,7 @@ const STR = {
   ru: {
     title: 'ЖЕТОНЫ',
     tab_tasks: 'Задания', tab_top: 'Топ-100', tab_table: 'Таблица', tab_history: 'История', tab_shop: 'Магазин',
-    game_mario: 'Прыг-Скок', game_tanks: 'Танкодром', game_bombs: 'Бомбодром', game_word: 'Слово дня',
+    game_mario: 'Прыг-Скок', game_tanks: 'Танкодром', game_bombs: 'Бомбодром', game_range: 'Тир', game_word: 'Слово дня',
     sec_day: 'Каждый день · обновятся через {left} (00:00 UTC)',
     sec_week: 'Каждую неделю · новая неделя через {left}',
     sec_once: 'Достижения · один раз', achieved: 'Достижение',
@@ -41,7 +41,7 @@ const STR = {
     t_invite: 'Позвать друга: {count} из {max} за неделю',
     t_invite_note: 'Друг сыграет {games} {games_w} — тебе {inviter} {inviter_w}, ему {newcomer}.',
     t_play: 'Сыграть игру', t_level: 'Пройти уровень', t_record: 'Побить свой рекорд',
-    t_level_word: 'Отгадать слово', t_record_word: 'Побить свой рекорд серии (от 2 дней)', t_level_bombs: 'Пройти этап',
+    t_level_word: 'Отгадать слово', t_record_word: 'Побить свой рекорд серии (от 2 дней)', t_level_bombs: 'Пройти этап', t_level_range: 'Пройти раунд',
     t_play_note: 'Засчитывается в конце игры или при выходе в меню, если играли от 20 секунд.',
     t_record_note: 'Набрать больше очков, чем твой лучший результат в этой игре. Первая игра тоже считается.',
     t_other: 'Свои задания у каждой игры: откройте игру и нажмите «◆» в её меню.',
@@ -75,7 +75,7 @@ const STR = {
     no_history: 'Операций пока нет. Сыграй — и здесь появятся первые жетоны.',
     r_achievement: 'Достижение', r_record: 'Личный рекорд', r_daily: 'Вход за день', r_task: 'Задание',
     r_invite: 'Приглашение', r_prize: 'Приз недели', r_shop: 'Покупка', r_annul: 'Отменено администратором', r_admin: 'От администратора',
-    prize_place: '{place} место ({board})', board_mario: 'Прыг-Скок', board_tanks: 'Танкодром', board_bombs: 'Бомбодром', board_word: 'Слово дня', board_overall: 'общий зачёт',
+    prize_place: '{place} место ({board})', board_mario: 'Прыг-Скок', board_tanks: 'Танкодром', board_bombs: 'Бомбодром', board_range: 'Тир', board_word: 'Слово дня', board_overall: 'общий зачёт',
     shop_note: 'Купленное включается в «Внешнем виде» игры.',
     buy: 'Купить', bought: 'Куплено',
     confirm: 'Купить «{name}» за {n} {w}?',
@@ -95,7 +95,7 @@ const STR = {
   en: {
     title: 'TICKETS',
     tab_tasks: 'Tasks', tab_top: 'Top 100', tab_table: 'Table', tab_history: 'History', tab_shop: 'Shop',
-    game_mario: 'Hop-Skip', game_tanks: 'Tank Field', game_bombs: 'Bomb Field', game_word: 'Word of the Day',
+    game_mario: 'Hop-Skip', game_tanks: 'Tank Field', game_bombs: 'Bomb Field', game_range: 'Shooting Range', game_word: 'Word of the Day',
     sec_day: 'Every day · new ones in {left} (00:00 UTC)',
     sec_week: 'Every week · new week in {left}',
     sec_once: 'Achievements · once', achieved: 'Achievement',
@@ -104,7 +104,7 @@ const STR = {
     t_invite: 'Invite a friend: {count} of {max} this week',
     t_invite_note: 'Your friend plays {games} {games_w} — {inviter} {inviter_w} for you, {newcomer} for them.',
     t_play: 'Play a game', t_level: 'Clear a level', t_record: 'Beat your best',
-    t_level_word: 'Guess the word', t_record_word: 'Beat your best streak (2 days or more)', t_level_bombs: 'Clear a stage',
+    t_level_word: 'Guess the word', t_record_word: 'Beat your best streak (2 days or more)', t_level_bombs: 'Clear a stage', t_level_range: 'Clear a round',
     t_play_note: 'Counts when the game ends, or when you leave for the menu after 20 seconds of play.',
     t_record_note: 'Score more than your best in this game. Your first game counts too.',
     t_other: 'Each game has its own tasks: open the game and tap «◆» in its menu.',
@@ -138,7 +138,7 @@ const STR = {
     no_history: 'Nothing here yet. Play a game to get your first tickets.',
     r_achievement: 'Achievement', r_record: 'Personal best', r_daily: 'Visit of the day', r_task: 'Task',
     r_invite: 'Invite', r_prize: 'Weekly prize', r_shop: 'Purchase', r_annul: 'Cancelled by admin', r_admin: 'From the admin',
-    prize_place: 'place {place} ({board})', board_mario: 'Hop-Skip', board_tanks: 'Tank Field', board_bombs: 'Bomb Field', board_word: 'Word of the Day', board_overall: 'overall',
+    prize_place: 'place {place} ({board})', board_mario: 'Hop-Skip', board_tanks: 'Tank Field', board_bombs: 'Bomb Field', board_range: 'Shooting Range', board_word: 'Word of the Day', board_overall: 'overall',
     shop_note: 'What you buy is switched on in the game\'s Looks.',
     buy: 'Buy', bought: 'Bought',
     confirm: 'Buy «{name}» for {n} {w}?',
@@ -386,7 +386,7 @@ const gameOn = (g) => !g || !window.CARTRIDGE || !window.CARTRIDGE.isEnabled || 
 
 let panel = null;
 let current = 'tasks';
-let scope = null;      // null — the collection; 'mario' | 'tanks' | 'bombs' | 'word' — that game
+let scope = null;      // null — the collection; 'mario' | 'tanks' | 'bombs' | 'range' | 'word' — that game
 let period = 'week';   // tables: 'week' | 'all'
 
 function tabsOf(game) { return game ? ['tasks', 'table', 'shop'] : ['tasks', 'top', 'shop', 'history']; }
@@ -556,7 +556,7 @@ function open(tab, opts) {
   if (!enabled) return;
   checkinIfNewDay();
   close();
-  scope = opts && ['mario', 'tanks', 'bombs', 'word'].includes(opts.game) && gameOn(opts.game) ? opts.game : null;
+  scope = opts && ['mario', 'tanks', 'bombs', 'range', 'word'].includes(opts.game) && gameOn(opts.game) ? opts.game : null;
   period = 'week';
   const tabs = tabsOf(scope);
   if (tab === 'how' || !tabs.includes(tab)) tab = 'tasks';
