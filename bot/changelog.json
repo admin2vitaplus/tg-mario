@@ -413,5 +413,13 @@
     "body": "В «Танкодроме» можно играть вдвоём с ботом-напарником, в «Бомбодроме» — дуэль с ботом. Если друг не пришёл в онлайн-комнату за 20 секунд, игра сама предложит бота.",
     "titleEn": "A bot instead of a friend",
     "bodyEn": "In Tank Field you can play together with a bot partner, in Bomb Field duel a bot. If your friend has not joined the online room in 20 seconds, the game offers a bot."
+  },
+  {
+    "id": "2026-10-24-pryg-vines",
+    "size": "major",
+    "title": "«Прыг-Скок»: лозы до облаков, зоны перехода и пушки",
+    "body": "Из некоторых кирпичей вырастает лоза: залезьте по ней в облака, там золото и облачная лодка. Так можно в 2-1, 3-1, 5-2 и 6-2, а в 4-2 лоза ведёт к трубам в миры 6, 7 и 8 (по потолку — в мир 5). В 5-1, 7-1, 8-2 и 8-3 стреляют пушки: на пулю можно прыгнуть. На ступеньки лестниц герой теперь встаёт, а не соскальзывает с края.",
+    "titleEn": "Hop-Skip: a vine to the clouds, warp pipes and cannons",
+    "bodyEn": "Some bricks grow a vine: climb it to the clouds for gold and a cloud boat. Try it in 2-1, 3-1, 5-2 and 6-2; in 4-2 the vine leads to pipes to worlds 6, 7 and 8 (over the ceiling, to world 5). Cannons fire in 5-1, 7-1, 8-2 and 8-3: you can stomp the bullets. The hero now lands on stair steps instead of sliding off their edge."
   }
 ]
