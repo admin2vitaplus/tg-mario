@@ -260,7 +260,10 @@ html, body {
   #overlay p { margin-bottom: 10px; font-size: 13px; }
   #overlay .hint { display: none; }
   #overlay button:not(.ui-btn) { padding: 8px 22px; font-size: 15px; }
-  #menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* Three columns, wide enough for every label on one line, so the buttons and
+     «← Все игры» fit the short screen. */
+  #menu { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(720px, 100%); }
+  #menu .ui-btn { padding: 6px 8px; font-size: 13px; }
 }
 
 
