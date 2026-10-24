@@ -17,13 +17,14 @@ const byId = Object.fromEntries(all.map((l) => [l.id, l.lvl]));
 const built = WORLDS[0].map((_, i) => all[i].lvl);
 
 const EMPTY = new Set(['.', 'o', 'e', 's', 't', 'n', 'v', 'y']);
-const SOLID = new Set(['#', 'B', '?', 'M', 'L', 'C', 'H', '[', ']', '{', '}', '(', '-', ')', '_', 'q', 'w', 'z', 'x', 'r', 'p']);
+const SOLID = new Set(['#', 'B', '?', 'M', 'L', 'C', 'H', '[', ']', '{', '}', '(', '-', ')', '_', 'q', 'w', 'z', 'x', 'r', 'p', 'V', 'c']);
 const at = (lvl, x, y) => lvl.grid[y]?.[x];
 const areaOf = (lvl, x) => lvl.areas.findIndex((a) => x >= a.x0 && x < a.x1);
 
 // Rough reachability on the tile grid for a small hero (one tile tall): walking, falling,
 // jumps up to 4 tiles high (6 wide when 2 high or less), lifts along their whole track, springboards,
-// pipes and swimming in water areas. Returns the set of reachable body cells "x,y".
+// pipes, vines up to the clouds, falling off the clouds and swimming in water areas.
+// Returns the set of reachable body cells "x,y".
 function reach(lvl, from) {
   const solid = (x, y) => SOLID.has(at(lvl, x, y));
   const free = (x, y) => x >= 0 && x < lvl.W && y >= 0 && y < lvl.H && !solid(x, y) && !'~=f'.includes(at(lvl, x, y));
@@ -41,7 +42,10 @@ function reach(lvl, from) {
   });
   const land = (x, y) => {
     while (y < lvl.H && free(x, y) && !stand(x, y)) y++;
-    return y < lvl.H && stand(x, y) ? [x, y] : null;
+    if (y < lvl.H && stand(x, y)) return [x, y];
+    // Off the bonus clouds the hero drops back onto the main course from the top.
+    const drop = y >= lvl.H ? (lvl.areas[areaOf(lvl, x)] || {}).drop : undefined;
+    return drop !== undefined ? land(drop, 0) : null;
   };
   const seen = new Set();
   const queue = [];
@@ -75,6 +79,13 @@ function reach(lvl, from) {
       }
     }
     for (const dx of [-1, 1]) if (free(x + dx, y)) push(land(x + dx, y), x, y);
+    // A vine brick hit from below (head up to 4 tiles above the feet) grows a vine to the clouds.
+    for (const v of lvl.vines || []) {
+      if (v.x !== x || v.y >= y || y - v.y > 5) continue;
+      let open = true;
+      for (let yy = v.y + 1; yy < y; yy++) if (!free(x, yy)) open = false;
+      if (open) push([v.to.x + 1, v.to.y - 1], x, y);
+    }
     for (const p of lvl.pipes) {
       const on = p.type === 'down' ? (y === p.y - 1 && (x === p.x || x === p.x + 1)) : (y === p.y + 1 && x === p.x - 1);
       if (!on || p.to.world) continue;
@@ -198,6 +209,27 @@ test('worlds 2-4 bring their own features', () => {
       assert.ok(lp.back < lp.x, id);
       assert.ok(!SOLID.has(at(lvl, lp.back, lp.backY - 1)), `${id}: maze sends the hero back to open space`);
       assert.ok(SOLID.has(at(lvl, lp.back, lp.backY)), `${id}: and onto solid ground`);
+    }
+  }
+});
+
+test('vines grow to bonus clouds that drop the hero back onto the course', () => {
+  const withVines = all.filter(({ lvl }) => lvl.vines.length);
+  assert.deepEqual([...withVines.map(({ id }) => id)], ['2-1', '3-1', '4-2', '5-2', '6-2']);
+  for (const { id, lvl } of withVines) {
+    const cells = reach(lvl, lvl.start || [3, 13]);
+    for (const v of lvl.vines) {
+      assert.equal(at(lvl, v.x, v.y), 'V', `${id}: vine brick at ${v.x}`);
+      for (let y = 0; y < v.y; y++) assert.ok(!SOLID.has(at(lvl, v.x, y)), `${id}: room for the vine at ${v.x},${y}`);
+      const ar = lvl.areas[v.to.area];
+      assert.ok(ar && v.to.area !== 0, `${id}: the vine leads to its own area`);
+      assert.equal(areaOf(lvl, v.to.x), v.to.area, id);
+      assert.ok(SOLID.has(at(lvl, v.to.x + 1, v.to.y)), `${id}: a cloud to step onto`);
+      assert.ok(cells.has(`${v.to.x + 1},${v.to.y - 1}`), `${id}: the vine at ${v.x} can be reached and climbed`);
+      if (ar.drop !== undefined) {
+        assert.equal(areaOf(lvl, ar.drop), 0, `${id}: the clouds drop onto the main course`);
+        assert.ok(finished(lvl, reach(lvl, [v.to.x + 1, v.to.y])), `${id}: the goal can still be reached after the clouds`);
+      }
     }
   }
 });

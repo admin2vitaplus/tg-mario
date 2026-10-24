@@ -45,7 +45,7 @@ function coinRoom(L, x0) {
 // 2-1: a meadow with groups of beetles, plant pipes, a springboard to high coins
 // and a pipe down to a coin room.
 function level21() {
-  const L = grid(226);
+  const L = grid(290);
   const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
   L.area(0, 208, 'tiles', SKY, 'field');
   L.area(210, 226, 'tilesCave', BLACK);
@@ -72,6 +72,8 @@ function level21() {
   row(76, 8, 'oooo');
   row(82, 9, '?B?B?');
   put(86, 5, 'h');
+  // The vine in the bricks climbs to the bonus clouds; their far end drops back near the pipes.
+  L.vine(85, 9, L.clouds(228, 290, 110));
   row(90, 9, 'BB');
   row(103, 9, 'BBB');
   row(103, 5, 'BBBBBB');
@@ -269,7 +271,7 @@ function level24() {
 
 // 3-1: night meadow; bolt throwers guard the brick towers.
 function level31() {
-  const L = grid(226);
+  const L = grid(290);
   const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
   L.area(0, 208, 'tiles', SKY, 'field');
   L.areas[0].night = true;
@@ -291,7 +293,9 @@ function level31() {
   put(62, 8, 't');
   put(62, 4, 'o');
   put(63, 4, 'o');
-  row(72, 9, '?');
+  // The vine climbs to night clouds; their far end drops back before the stairs.
+  L.vine(72, 9, L.clouds(228, 290, 100));
+  L.areas[2].night = true;
   row(76, 9, 'BhB');
   pipe(84, 4);
   L.plants.push({ x: 84, y: 9 });
@@ -523,9 +527,10 @@ function level41() {
 }
 
 // 4-2: a deep cave: low ceilings, lifts over pits, plant pipes, a hidden life
-// and a side pipe out to the flag.
+// and a side pipe out to the flag. A vine through the ceiling leads to the warp zone
+// to worlds 6-8; a lift up through a hole lets the hero run over the ceiling to world 5.
 function level42() {
-  const L = grid(232);
+  const L = grid(262);
   const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
   L.area(0, 196, 'tilesCave', BLACK);
   L.area(198, 232, 'tiles', SKY, 'field');
@@ -549,7 +554,8 @@ function level42() {
   row(54, 6, 'oooooo');
   pipe(62, 4);
   L.plants.push({ x: 62, y: 9 });
-  row(68, 9, 'B?B');
+  row(68, 9, 'B?');
+  put(70, 1, '.');
   L.lifts.push({ x: 77, y: 9, w: 3, axis: 'x', dist: 6, period: 4, phase: 0 });
   row(80, 6, 'ooo');
   fill(87, 92, 9, 12, 'H');
@@ -560,7 +566,8 @@ function level42() {
   pipe(118, 3);
   L.plants.push({ x: 118, y: 10 });
   column(124, 2);
-  L.lifts.push({ x: 130, y: 8, w: 3, axis: 'y', dist: 4, period: 3, phase: 0 });
+  fill(129, 134, 1, 1, '.');
+  L.lifts.push({ x: 130, y: 3, w: 3, axis: 'y', dist: 9, period: 6, phase: 0 });
   stairsUp(136, 4);
   fill(140, 143, 9, 12, 'H');
   row(146, 9, 'BBCBB');
@@ -569,14 +576,33 @@ function level42() {
   pipe(164, 2);
   row(170, 9, 'B?B');
   L.sidePipe(180, 11, 2);
-  fill(184, 195, 1, 12, 'H');
+  fill(184, 185, 1, 12, 'H');
   L.pipes.push({ type: 'side', x: 180, y: 11, to: { area: 1, pipeX: 200, pipeY: 11 } });
+  // Over the ceiling, past the exit: a warp pipe to world 5.
+  fill(195, 195, 1, 12, 'H');
+  pipe(189, 3);
+  L.pipes.push({ type: 'down', x: 189, y: 10, to: { world: 5 } });
+  L.signs.push({ x: 190, y: 4.5, text: 'ЗОНА ПЕРЕХОДА' });
+  L.signs.push({ x: 190, y: 8.5, text: '5' });
 
   L.floor('#', 198, 231);
   pipe(200, 2);
   stairsUp(206, 8);
   column(214, 8);
   L.flagpole(222);
+
+  // Warp zone up the vine: pipes to worlds 6, 7 and 8.
+  L.area(234, 262, 'tiles', SKY, 'sky');
+  L.floor('#', 234, 261);
+  fill(236, 239, 9, 9, 'c');
+  fill(260, 261, 1, 12, 'H');
+  L.signs.push({ x: 249, y: 4.5, text: 'ЗОНА ПЕРЕХОДА' });
+  [[243, 6], [248, 7], [253, 8]].forEach(([x, world]) => {
+    pipe(x, 3);
+    L.signs.push({ x: x + 1, y: 8.5, text: String(world) });
+    L.pipes.push({ type: 'down', x, y: 10, to: { world } });
+  });
+  L.vine(70, 9, { area: 2, x: 235, y: 9 });
 
   L.enemies([14, 16, 30, 32, 46, 52, 66, 72, 96, 100, 114, 122, 146, 150, 168, 172, 176]);
   return L.done({ goal: 'pole', goalX: 222, checkpoint: { x: 93, start: [95, 13] } });
@@ -755,7 +781,7 @@ function level51() {
 // 5-2: hills of hard blocks with springboards up to a high brick road;
 // a pipe on the road leads down into a flooded coin cellar.
 function level52() {
-  const L = grid(232);
+  const L = grid(296);
   const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
   L.area(0, 212, 'tiles', DUSK, 'field');
   L.area(214, 232, 'tilesSea', SEA);
@@ -787,7 +813,9 @@ function level52() {
   row(84, 5, '{}');
   row(92, 5, '?B?');
   fill(101, 104, 6, 12, 'H');
-  row(110, 9, 'BBkBB');
+  row(110, 9, 'BBkB');
+  // The vine climbs to the evening clouds; they drop the hero back over the hard blocks.
+  L.vine(114, 9, L.clouds(234, 296, 132, DUSK));
   put(116, 12, 'p');
   row(114, 3, 'oooooo');
   stairsUp(124, 4);
@@ -990,7 +1018,7 @@ function level61() {
 // 6-2: a valley of pipes: plants in almost every one, one pipe down to a cellar
 // with coins and another down to a sea grotto.
 function level62() {
-  const L = grid(254);
+  const L = grid(318);
   const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
   L.area(0, 212, 'tiles', SKY, 'field');
   L.area(214, 230, 'tilesCave', BLACK);
@@ -1014,7 +1042,9 @@ function level62() {
   row(56, 9, 'oooo');
   pipe(60, 2);
   L.plants.push({ x: 60, y: 11 });
-  row(70, 9, 'BBBBB');
+  row(70, 9, 'BBBB');
+  // The vine climbs to the clouds; they drop the hero back before the tall pipe.
+  L.vine(74, 9, L.clouds(256, 318, 96));
   row(71, 5, '?k?');
   pipe(78, 4);
   L.plants.push({ x: 78, y: 9 });

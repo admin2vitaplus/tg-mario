@@ -5,7 +5,8 @@
 // H hard block, [ ] pipe lip, { } pipe body, o coin, e enemy, | pole, T pole top,
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
 // ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
-// h hidden block with an extra life, k hidden block with a coin (invisible until hit from below).
+// h hidden block with an extra life, k hidden block with a coin (invisible until hit from below),
+// V brick with a vine, c cloud block.
 (function () {
 'use strict';
 
@@ -28,6 +29,10 @@ function grid(W) {
     signs: [],
     // Castle maze: crossing x with the feet outside rows sends the hero back to (back, backY).
     loops: [],
+    // Bricks with a vine: hit from below, it grows to the top of the screen; climbing out
+    // of the top leads to `to` (an area, the vine's column there and the cloud row it reaches).
+    vines: [],
+    vine(x, y, to) { put(x, y, 'V'); L.vines.push({ x, y, to }); },
     pipe(x, h) {
       const top = 13 - h;
       put(x, top, '['); put(x + 1, top, ']');
@@ -62,8 +67,23 @@ function grid(W) {
       put(x, 12, 'H');
     },
     area(x0, x1, tiles, sky, scenery = 'none') { L.areas.push({ x0, x1, tiles, sky, scenery }); },
+    // Bonus clouds above the course, x0..x1: the vine comes up at x0 + 1 next to a cloud ledge,
+    // a cloud lift carries the hero under rows of coins, and falling off the far end (or anywhere) drops
+    // the hero back onto the main course at tile x `drop`. Returns the vine target.
+    clouds(x0, x1, drop, sky = '#6b8cff') {
+      L.areas.push({ x0, x1, tiles: 'tiles', sky, scenery: 'sky', drop });
+      fill(x0 + 2, x0 + 7, 12, 12, 'c');
+      const lift = x1 - x0 - 20;
+      L.lifts.push({ x: x0 + 8, y: 12, w: 3, axis: 'x', dist: lift, carry: 4 });
+      for (let x = x0 + 4; x < x1 - 8; x++) {
+        if (x % 2 === 0) put(x, 8, 'o');
+        if (x > x0 + 10 && x % 2 === 1) put(x, 6, 'o');
+      }
+      fill(x1 - 9, x1 - 6, 12, 12, 'c');
+      return { area: L.areas.length - 1, x: x0 + 1, y: 12 };
+    },
     done(extra) {
-      return Object.assign({ grid: g, W, H, areas: L.areas, pipes: L.pipes, lifts: L.lifts, plants: L.plants, signs: L.signs, loops: L.loops }, extra);
+      return Object.assign({ grid: g, W, H, areas: L.areas, pipes: L.pipes, lifts: L.lifts, plants: L.plants, signs: L.signs, loops: L.loops, vines: L.vines }, extra);
     },
   };
   return L;
