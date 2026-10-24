@@ -820,6 +820,7 @@ function showOverlay(title, html, button, action, panel) {
   btn.textContent = button || '';
   overlayAction = action;
   $('ovShare').classList.add('hidden');
+  $('ovBeat').classList.add('hidden');
   $('ovPick').classList.add('hidden');
   $('ovMenu').classList.add('hidden');
   $('overlay').classList.remove('hidden');
@@ -844,7 +845,7 @@ const canPick = () => !!window.Progress && window.Progress.open('bombs', STAGE_C
 function showPick(btn) { btn.classList.toggle('hidden', !canPick()); }
 function openPick() {
   audio();
-  window.Progress.pick({ game: 'bombs', count: STAGE_COUNT, cols: 5, onPick: (i) => beginLocal(1, i) });
+  window.Progress.pick({ game: 'bombs', count: STAGE_COUNT, cols: 5, onPick: (i) => { beatView = null; beginLocal(1, i); } });
 }
 $('btnPick').addEventListener('click', openPick);
 $('ovPick').addEventListener('click', openPick);
@@ -859,7 +860,7 @@ $('ovBtn').addEventListener('click', () => {
   if (act) act();
 });
 
-$('btn1p').addEventListener('click', () => { audio(); withBot = false; beginLocal(1); });
+$('btn1p').addEventListener('click', () => { audio(); withBot = false; beatView = null; beginLocal(1); });
 
 function soloResult(s) {
   const p = s.players[0];
@@ -1095,6 +1096,7 @@ function playWithBot() {
   audio();
   showMenu();
   withBot = true;
+  beatView = null;
   beginLocal(2);
 }
 $('btnBotNow').addEventListener('click', playWithBot);
@@ -1423,23 +1425,72 @@ function recNext() {
 }
 
 // quit — the player leaves in the middle: the game so far is sent if it lasted QUIT_FRAMES.
+// → Promise of the game as the server accepted it ({ seed, log, rules, mode, start }), or null;
+// a game by a challenge («Побей мой счёт», lib/beat.js) goes to the challenge instead, only finished.
 function sendRun(s, quit) {
-  if (!rec.seed || mode === 'guest' || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
+  if (!rec.seed || mode === 'guest' || (quit && rec.frames < QUIT_FRAMES) || (quit && rec.beat)) return Promise.resolve(null);
   recFlush();
-  const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(','), rules: S.RULES };
+  const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(','), rules: rec.rules || S.RULES };
   if (rec.mode) body.mode = rec.mode;
   if (rec.start) body.start = rec.start;
   if (mode === 'host' && /^\d{4,8}$/.test(net.code)) body.room = net.code;
+  const beatId = rec.beat;
   rec.seed = 0;
   rec.out = [];
+  if (beatId) {
+    return window.Beat.send(beatId, body.log)
+      .then((view) => { beatView = view; showBeatResult(view); return null; })
+      .catch(() => null);
+  }
   return window.Server.request('POST', '/api/bombs/run', body, { keepalive: quit })
     .then((r) => {
-      if (!window.Wallet || !r) return;
-      window.Wallet.grants(r.wallet);
-      if (window.Wallet.achieved) window.Wallet.achieved(r.newAchievements);
+      if (window.Wallet && r) {
+        window.Wallet.grants(r.wallet);
+        if (window.Wallet.achieved) window.Wallet.achieved(r.newAchievements);
+      }
+      return body;
+    })
+    .catch(() => null);
+}
+// ---------- «Побей мой счёт» (lib/beat.js) ----------
+const beatT = (key, vars) => window.Beat.T(key, vars); // its lines, in both languages
+let beatView = null; // the challenge being played, from this page's link
+let lastRun = Promise.resolve(null); // the last finished game alone, once the server took it
+const canBeat = () => !!(window.Beat && window.Beat.enabled());
+$('ovBeat').addEventListener('click', () => {
+  audio();
+  const btn = $('ovBeat');
+  btn.disabled = true;
+  lastRun.then((run) => (run ? window.Beat.create('bombs', run) : Promise.reject(new Error('no game'))))
+    .then((view) => window.Beat.share('bombs', view, appLink('beat_bombs_' + view.id)))
+    .catch(() => { btn.textContent = beatT('error'); })
+    .then(() => { btn.disabled = false; });
+});
+// The friend's result under the game's own result, when the server has checked it.
+function showBeatResult(view) {
+  if ($('overlay').classList.contains('hidden')) return;
+  $('ovText').innerHTML += '<br><br>' + window.Beat.result(view);
+}
+// After the game alone: the result goes to the server, and a checked game can become a challenge.
+function finishRun(s) {
+  const checked = !!rec.seed && !rec.beat && mode === 'local' && s.players.length === 1;
+  const sent = sendRun(s);
+  if (checked && canBeat()) {
+    lastRun = sent;
+    $('ovBeat').textContent = beatT('btn');
+    $('ovBeat').classList.remove('hidden');
+  }
+}
+if (window.Beat && window.Beat.id) {
+  window.Beat.load(window.Beat.id)
+    .then((view) => {
+      if (view.game !== 'bombs' || mode !== 'local') return;
+      beatView = view;
+      showOverlay(beatT('title'), window.Beat.invite(view), beatT('btn_accept'), () => beginLocal(1));
     })
     .catch(() => {});
 }
+
 // The game in progress, when the page is left or closed.
 const sendQuit = () => (state ? sendRun(state, true) : Promise.resolve());
 window.addEventListener('pagehide', () => { sendQuit(); });
@@ -1475,14 +1526,18 @@ function begin(players, start) {
   clearPads();
   // A game left unfinished is sent before the new one starts.
   if (state) sendRun(state, true);
-  const t = mode !== 'guest' && ticket.next;
-  ticket.next = null;
-  keepTicket();
+  // A challenge («Побей мой счёт»): its own game, no ticket (it gives no жетоны).
+  const b = beatView && mode === 'local' && players === 1 ? beatView : null;
+  const t = !b && mode !== 'guest' && ticket.next;
+  if (!b) { ticket.next = null; keepTicket(); }
+  if (b) start = b.start;
+  const rules = b ? b.rules : S.RULES;
+  const seed = b ? b.seed : t ? t.seed : 0;
   const vsBot = withBot && mode === 'local' && players === 2;
-  Object.assign(rec, { seed: t ? t.seed : 0, players, start, mode: vsBot ? 'bot' : '', out: [], prev: -1, n: 0, frames: 0 });
+  Object.assign(rec, { seed, players, start, mode: vsBot ? 'bot' : '', rules, beat: b ? b.id : '', out: [], prev: -1, n: 0, frames: 0 });
   shrinkTold = false;
   botMem = vsBot && window.BombBot ? window.BombBot.newMemory() : null;
-  state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1, { rules: S.RULES });
+  state = S.newGame(players, seed || (Date.now() & 0x7fffffff) || 1, { rules });
   if (vsBot) state.mode = 'bot';
   if (start) S.startStage(state, start); // the same as bot/bombs-replay.js
   fetchTicket();
@@ -1509,9 +1564,9 @@ function afterStep(s) {
   } else if (s.phase === 'overDone') {
     running = false;
     const best = saveBest(s.players[0].score);
-    sendRun(s);
     if (mode === 'local') track('game_finish');
     if (mode === 'host') {
+      sendRun(s);
       track('match_finished', net.code);
       rematchScreen();
     } else {
@@ -1520,6 +1575,7 @@ function afterStep(s) {
       showOverlay(title, (vsBot ? duelResult(s) : soloResult(s)) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => beginLocal(vsBot ? 2 : 1));
       showShare(s);
       showPick($('ovPick'));
+      finishRun(s);
     }
   }
   if (mode === 'host' && !running) sendSnapshot(s);
