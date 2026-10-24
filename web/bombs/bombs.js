@@ -820,6 +820,7 @@ function showOverlay(title, html, button, action, panel) {
   btn.textContent = button || '';
   overlayAction = action;
   $('ovShare').classList.add('hidden');
+  $('ovBeat').classList.add('hidden');
   $('ovPick').classList.add('hidden');
   $('ovMenu').classList.add('hidden');
   $('overlay').classList.remove('hidden');
@@ -828,8 +829,6 @@ function showOverlay(title, html, button, action, panel) {
 function showMenu() {
   running = false;
   mode = 'local';
-  clearTimeout(botOffer);
-  $('btnBotNow').classList.add('hidden');
   view = null;
   netClose();
   showOverlay(T('title'), T('intro') + '<br>' + T('best', { n: loadBest() }), null, null);
@@ -844,7 +843,7 @@ const canPick = () => !!window.Progress && window.Progress.open('bombs', STAGE_C
 function showPick(btn) { btn.classList.toggle('hidden', !canPick()); }
 function openPick() {
   audio();
-  window.Progress.pick({ game: 'bombs', count: STAGE_COUNT, cols: 5, onPick: (i) => beginLocal(1, i) });
+  window.Progress.pick({ game: 'bombs', count: STAGE_COUNT, cols: 5, onPick: (i) => { beatView = null; beginLocal(1, i); } });
 }
 $('btnPick').addEventListener('click', openPick);
 $('ovPick').addEventListener('click', openPick);
@@ -859,7 +858,7 @@ $('ovBtn').addEventListener('click', () => {
   if (act) act();
 });
 
-$('btn1p').addEventListener('click', () => { audio(); withBot = false; beginLocal(1); });
+$('btn1p').addEventListener('click', () => { audio(); beatView = null; beginLocal(1); });
 
 function soloResult(s) {
   const p = s.players[0];
@@ -868,7 +867,7 @@ function soloResult(s) {
 
 function duelResult(s) {
   const mine = s.players[me()], other = s.players[1 - me()];
-  return T(s.mode === 'bot' ? 'duel_wins_bot' : 'duel_wins', { me: mine.wins, friend: other.wins }) + '<br>' + T('score_line', { n: mine.score });
+  return T('duel_wins', { me: mine.wins, friend: other.wins }) + '<br>' + T('score_line', { n: mine.score });
 }
 
 // «Поделиться итогом»: the result goes to any Telegram chat with a link to the bot.
@@ -946,6 +945,7 @@ let view = null;    // what the guest draws
 const net = {
   ws: null, code: '', token: '', started: false, remote: { dir: -1, a: false, b: false }, lastDir: -1, cellsKey: '', events: [],
   retry: null, ping: null, peerAway: false, resume: false, rematch: { me: false, peer: false }, guestHero: '',
+  random: false, // the room is a random search, not for a friend
 };
 const REJOIN_MS = 20000;
 const HOST_AWAY_MS = 120000;
@@ -962,6 +962,7 @@ function netClose() {
   net.token = '';
   net.started = false;
   net.peerAway = false;
+  net.random = false;
   stopRetry();
   clearInterval(net.ping);
   if (ws) { ws.onclose = null; try { ws.close(1000); } catch (e) { /* ignore */ } }
@@ -1076,29 +1077,18 @@ function lostLink(text, wasInGame) {
   else onlineMenu(text);
 }
 
-// No friend in 20 s: offer the computer as the rival instead.
-const BOT_OFFER_MS = 20000;
-let botOffer = 0;
+// A room for a friend shows its code and the invite; a random search only waits.
 function roomScreen() {
+  if (net.random) {
+    showOverlay(T('online_title'), T('finding') + '<br><br>' + T('duel_intro'), null, null, 'online');
+    $('onlineStart').classList.add('hidden');
+    $('btnInvite').classList.add('hidden');
+    return;
+  }
   showOverlay(T('room'), T('room_code', { code: '<b class="code">' + net.code + '</b>' }) + '<br><br>' + T('duel_intro'), null, null, 'online');
   $('onlineStart').classList.add('hidden');
   $('btnInvite').classList.remove('hidden');
-  clearTimeout(botOffer);
-  botOffer = setTimeout(() => {
-    if (mode === 'host' && !net.started && !$('btnInvite').classList.contains('hidden')) $('btnBotNow').classList.remove('hidden');
-  }, BOT_OFFER_MS);
 }
-// A duel with the computer (bot.js) on this phone, recorded and checked like an online duel.
-let withBot = false;
-let botMem = null;
-function playWithBot() {
-  audio();
-  showMenu();
-  withBot = true;
-  beginLocal(2);
-}
-$('btnBotNow').addEventListener('click', playWithBot);
-$('btnBot').addEventListener('click', playWithBot);
 
 function hostStarts() {
   haptic('success');
@@ -1111,12 +1101,11 @@ function onNet(m) {
   if (m.t === 'room') {
     net.code = m.code;
     net.token = m.token || '';
+    net.random = !!m.random;
     mode = 'host';
     net.guestHero = '';
     roomScreen();
   } else if (m.t === 'peer') {
-    clearTimeout(botOffer);
-    $('btnBotNow').classList.add('hidden');
     hostStarts();
   } else if (m.t === 'joined') {
     mode = 'guest';
@@ -1129,7 +1118,9 @@ function onNet(m) {
     view = null;
     guestShown = 'wait';
     net.lastDir = -1;
-    showOverlay(T('room_n', { code: m.code }), T('in_room') + '<br><br>' + T('duel_intro'), null, null, 'online');
+    net.random = !!m.random;
+    if (net.random) haptic('success');
+    showOverlay(net.random ? T('online_title') : T('room_n', { code: m.code }), (net.random ? T('found') : T('in_room')) + '<br><br>' + T('duel_intro'), null, null, 'online');
     $('onlineStart').classList.add('hidden');
   } else if (m.t === 'rejoined') {
     stopRetry();
@@ -1233,6 +1224,16 @@ $('btnCreate').addEventListener('click', () => {
   showOverlay(T('online_title'), T('creating'), null, null, 'online');
   $('onlineStart').classList.add('hidden');
   connectFresh(() => netSend({ t: 'create' }));
+});
+// «Случайный соперник»: the server pairs this player with the next one who searches.
+$('btnRandom').addEventListener('click', () => {
+  audio();
+  beatView = null;
+  showOverlay(T('online_title'), T('finding'), null, null, 'online');
+  $('onlineStart').classList.add('hidden');
+  $('btnInvite').classList.add('hidden');
+  if (!API) { onlineMenu(); return; }
+  connectFresh(() => netSend({ t: 'find' }));
 });
 function joinRoom(code) {
   code = String(code || '').replace(/\D/g, '');
@@ -1423,23 +1424,72 @@ function recNext() {
 }
 
 // quit — the player leaves in the middle: the game so far is sent if it lasted QUIT_FRAMES.
+// → Promise of the game as the server accepted it ({ seed, log, rules, mode, start }), or null;
+// a game by a challenge («Побей мой счёт», lib/beat.js) goes to the challenge instead, only finished.
 function sendRun(s, quit) {
-  if (!rec.seed || mode === 'guest' || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
+  if (!rec.seed || mode === 'guest' || (quit && rec.frames < QUIT_FRAMES) || (quit && rec.beat)) return Promise.resolve(null);
   recFlush();
-  const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(','), rules: S.RULES };
+  const body = { seed: rec.seed, players: s.players.length, log: rec.out.join(','), rules: rec.rules || S.RULES };
   if (rec.mode) body.mode = rec.mode;
   if (rec.start) body.start = rec.start;
   if (mode === 'host' && /^\d{4,8}$/.test(net.code)) body.room = net.code;
+  const beatId = rec.beat;
   rec.seed = 0;
   rec.out = [];
+  if (beatId) {
+    return window.Beat.send(beatId, body.log)
+      .then((view) => { beatView = view; showBeatResult(view); return null; })
+      .catch(() => null);
+  }
   return window.Server.request('POST', '/api/bombs/run', body, { keepalive: quit })
     .then((r) => {
-      if (!window.Wallet || !r) return;
-      window.Wallet.grants(r.wallet);
-      if (window.Wallet.achieved) window.Wallet.achieved(r.newAchievements);
+      if (window.Wallet && r) {
+        window.Wallet.grants(r.wallet);
+        if (window.Wallet.achieved) window.Wallet.achieved(r.newAchievements);
+      }
+      return body;
+    })
+    .catch(() => null);
+}
+// ---------- «Побей мой счёт» (lib/beat.js) ----------
+const beatT = (key, vars) => window.Beat.T(key, vars); // its lines, in both languages
+let beatView = null; // the challenge being played, from this page's link
+let lastRun = Promise.resolve(null); // the last finished game alone, once the server took it
+const canBeat = () => !!(window.Beat && window.Beat.enabled());
+$('ovBeat').addEventListener('click', () => {
+  audio();
+  const btn = $('ovBeat');
+  btn.disabled = true;
+  lastRun.then((run) => (run ? window.Beat.create('bombs', run) : Promise.reject(new Error('no game'))))
+    .then((view) => window.Beat.share('bombs', view, appLink('beat_bombs_' + view.id)))
+    .catch(() => { btn.textContent = beatT('error'); })
+    .then(() => { btn.disabled = false; });
+});
+// The friend's result under the game's own result, when the server has checked it.
+function showBeatResult(view) {
+  if ($('overlay').classList.contains('hidden')) return;
+  $('ovText').innerHTML += '<br><br>' + window.Beat.result(view);
+}
+// After the game alone: the result goes to the server, and a checked game can become a challenge.
+function finishRun(s) {
+  const checked = !!rec.seed && !rec.beat && mode === 'local' && s.players.length === 1;
+  const sent = sendRun(s);
+  if (checked && canBeat()) {
+    lastRun = sent;
+    $('ovBeat').textContent = beatT('btn');
+    $('ovBeat').classList.remove('hidden');
+  }
+}
+if (window.Beat && window.Beat.id) {
+  window.Beat.load(window.Beat.id)
+    .then((view) => {
+      if (view.game !== 'bombs' || mode !== 'local') return;
+      beatView = view;
+      showOverlay(beatT('title'), window.Beat.invite(view), beatT('btn_accept'), () => beginLocal(1));
     })
     .catch(() => {});
 }
+
 // The game in progress, when the page is left or closed.
 const sendQuit = () => (state ? sendRun(state, true) : Promise.resolve());
 window.addEventListener('pagehide', () => { sendQuit(); });
@@ -1475,15 +1525,16 @@ function begin(players, start) {
   clearPads();
   // A game left unfinished is sent before the new one starts.
   if (state) sendRun(state, true);
-  const t = mode !== 'guest' && ticket.next;
-  ticket.next = null;
-  keepTicket();
-  const vsBot = withBot && mode === 'local' && players === 2;
-  Object.assign(rec, { seed: t ? t.seed : 0, players, start, mode: vsBot ? 'bot' : '', out: [], prev: -1, n: 0, frames: 0 });
+  // A challenge («Побей мой счёт»): its own game, no ticket (it gives no жетоны).
+  const b = beatView && mode === 'local' && players === 1 ? beatView : null;
+  const t = !b && mode !== 'guest' && ticket.next;
+  if (!b) { ticket.next = null; keepTicket(); }
+  if (b) start = b.start;
+  const rules = b ? b.rules : S.RULES;
+  const seed = b ? b.seed : t ? t.seed : 0;
+  Object.assign(rec, { seed, players, start, mode: '', rules, beat: b ? b.id : '', out: [], prev: -1, n: 0, frames: 0 });
   shrinkTold = false;
-  botMem = vsBot && window.BombBot ? window.BombBot.newMemory() : null;
-  state = S.newGame(players, t ? t.seed : (Date.now() & 0x7fffffff) || 1, { rules: S.RULES });
-  if (vsBot) state.mode = 'bot';
+  state = S.newGame(players, seed || (Date.now() & 0x7fffffff) || 1, { rules });
   if (start) S.startStage(state, start); // the same as bot/bombs-replay.js
   fetchTicket();
   track('game_start');
@@ -1498,7 +1549,7 @@ function afterStep(s) {
   if (s.phase === 'clearDone') {
     running = false;
     const duel = s.players.length > 1;
-    const text = duel ? (s.winner === me() ? T('duel_you') : T(s.mode === 'bot' ? 'duel_bot' : 'duel_friend')) + '<br>' + duelResult(s) : soloResult(s);
+    const text = duel ? (s.winner === me() ? T('duel_you') : T('duel_friend')) + '<br>' + duelResult(s) : soloResult(s);
     showOverlay(T('stage_clear', { n: s.stage + 1 }), text, T('btn_next'), () => {
       recNext();
       S.startStage(s, s.stage + 1);
@@ -1509,17 +1560,16 @@ function afterStep(s) {
   } else if (s.phase === 'overDone') {
     running = false;
     const best = saveBest(s.players[0].score);
-    sendRun(s);
     if (mode === 'local') track('game_finish');
     if (mode === 'host') {
+      sendRun(s);
       track('match_finished', net.code);
       rematchScreen();
     } else {
-      const vsBot = s.mode === 'bot';
-      const title = vsBot ? T(s.winner === 0 ? 'bot_lost' : 'bot_won') : s.won ? T('you_won') : T('game_over');
-      showOverlay(title, (vsBot ? duelResult(s) : soloResult(s)) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => beginLocal(vsBot ? 2 : 1));
+      showOverlay(s.won ? T('you_won') : T('game_over'), soloResult(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => beginLocal(1));
       showShare(s);
       showPick($('ovPick'));
+      finishRun(s);
     }
   }
   if (mode === 'host' && !running) sendSnapshot(s);
@@ -1539,8 +1589,7 @@ function frame(now) {
     acc += Math.min(dt, 100);
     while (acc >= STEP && running) {
       acc -= STEP;
-      const inputs = mode === 'host' ? [readPad(pads[0]), remotePad()]
-        : botMem && state.duel ? [readPad(pads[0]), window.BombBot.think(state, 1, botMem)] : [readPad(pads[0])];
+      const inputs = mode === 'host' ? [readPad(pads[0]), remotePad()] : [readPad(pads[0])];
       recStep(inputs);
       S.step(state, inputs);
       for (const ev of state.events) if (SFX[ev]) SFX[ev]();

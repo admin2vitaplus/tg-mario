@@ -660,6 +660,7 @@ function showOverlay(title, html, button, action, panel, alt) {
   $('ovAlt').textContent = alt ? alt.text : '';
   altAction = alt ? alt.action : null;
   $('ovShare').classList.add('hidden');
+  $('ovBeat').classList.add('hidden');
   $('ovPick').classList.add('hidden');
   $('ovMenu').classList.add('hidden');
   $('overlay').classList.remove('hidden');
@@ -682,7 +683,7 @@ const canPick = () => !!window.Progress && window.Progress.open('range', S.ROUND
 function showPick(btn) { btn.classList.toggle('hidden', !canPick()); }
 function openPick() {
   audio();
-  window.Progress.pick({ game: 'range', count: S.ROUNDS, cols: 5, onPick: (i) => { mode = ''; play(i); } });
+  window.Progress.pick({ game: 'range', count: S.ROUNDS, cols: 5, onPick: (i) => { mode = ''; beatView = null; play(i); } });
 }
 $('btnPick').addEventListener('click', openPick);
 $('ovPick').addEventListener('click', openPick);
@@ -701,8 +702,8 @@ $('ovAlt').addEventListener('click', () => {
   altAction = null;
   if (act) act();
 });
-$('btnPlay').addEventListener('click', () => { audio(); mode = ''; play(); });
-$('btnSudden').addEventListener('click', () => { audio(); mode = 'sudden'; play(); });
+$('btnPlay').addEventListener('click', () => { audio(); mode = ''; beatView = null; play(); });
+$('btnSudden').addEventListener('click', () => { audio(); mode = 'sudden'; beatView = null; play(); });
 
 function result(s) {
   return T('round_line', { n: s.round + 1 }) + '<br>' + T('hits_line', { hits: s.stats.hits, shots: s.stats.shots }) + '<br>' + T('score_line', { n: s.score });
@@ -802,20 +803,59 @@ function recStep(shot) {
 }
 
 // quit — the player leaves in the middle: the game so far is sent if it lasted QUIT_FRAMES.
+// → Promise of the game as the server accepted it ({ seed, log, rules, mode, start }), or null;
+// a game by a challenge («Побей мой счёт», lib/beat.js) goes to the challenge instead, only finished.
 function sendRun(quit) {
-  if (!rec.seed || (quit && rec.frames < QUIT_FRAMES)) return Promise.resolve();
+  if (!rec.seed || (quit && rec.frames < QUIT_FRAMES) || (quit && rec.beat)) return Promise.resolve(null);
   if (rec.since > 0) rec.out.push('e' + rec.since.toString(36));
-  const body = { seed: rec.seed, players: 1, log: rec.out.join(','), rules: S.RULES };
+  const body = { seed: rec.seed, players: 1, log: rec.out.join(','), rules: rec.rules };
   if (rec.start) body.start = rec.start;
   if (rec.mode) body.mode = rec.mode;
+  const beatId = rec.beat;
   rec.seed = 0;
   rec.out = [];
+  if (beatId) {
+    return window.Beat.send(beatId, body.log)
+      .then((view) => { beatView = view; showBeatResult(view); return null; })
+      .catch(() => null);
+  }
   return window.Server.request('POST', '/api/range/run', body, { keepalive: quit })
     .then((r) => {
-      if (!window.Wallet || !r) return;
-      window.Wallet.grants(r.wallet);
-      if (window.Wallet.achieved) window.Wallet.achieved(r.newAchievements);
+      if (window.Wallet && r) {
+        window.Wallet.grants(r.wallet);
+        if (window.Wallet.achieved) window.Wallet.achieved(r.newAchievements);
+      }
+      return body;
     })
+    .catch(() => null);
+}
+
+// ---------- «Побей мой счёт» (lib/beat.js) ----------
+const beatT = (key, vars) => window.Beat.T(key, vars); // its lines, in both languages
+let beatView = null; // the challenge being played, from this page's link
+let lastRun = Promise.resolve(null); // the last finished game, once the server took it
+const canBeat = () => !!(window.Beat && window.Beat.enabled());
+$('ovBeat').addEventListener('click', () => {
+  audio();
+  const btn = $('ovBeat');
+  btn.disabled = true;
+  lastRun.then((run) => (run ? window.Beat.create(GAME, run) : Promise.reject(new Error('no game'))))
+    .then((view) => window.Beat.share(GAME, view, appLink('beat_' + GAME + '_' + view.id)))
+    .catch(() => { btn.textContent = beatT('error'); })
+    .then(() => { btn.disabled = false; });
+});
+// The friend's result under the game's own result, when the server has checked it.
+function showBeatResult(view) {
+  if ($('overlay').classList.contains('hidden')) return;
+  $('ovText').innerHTML += '<br><br>' + window.Beat.result(view);
+}
+function offerBeat(view) {
+  showOverlay(beatT('title'), window.Beat.invite(view), beatT('btn_accept'), () => play(view.start));
+  $('ovMenu').classList.remove('hidden');
+}
+if (window.Beat && window.Beat.id) {
+  window.Beat.load(window.Beat.id)
+    .then((view) => { if (view.game === GAME) { beatView = view; offerBeat(view); } })
     .catch(() => {});
 }
 // The game in progress, when the page is left or closed.
@@ -850,11 +890,15 @@ function begin(start) {
   start = start > 0 ? start : 0;
   // A game left unfinished is sent before the new one starts.
   if (state && running) sendQuit();
-  const t = ticket.next;
-  ticket.next = null;
-  keepTicket();
-  Object.assign(rec, { seed: t ? t.seed : 0, start, mode, out: [], since: 0, frames: 0 });
-  state = S.newGame(t ? t.seed : (Date.now() & 0x7fffffff) || 1, { rules: S.RULES, mode });
+  // A challenge: its own game, no ticket (it gives no жетоны).
+  const b = beatView;
+  const t = b ? null : ticket.next;
+  if (!b) { ticket.next = null; keepTicket(); }
+  const rules = b ? b.rules : S.RULES, m = b ? b.mode : mode;
+  if (b) start = b.start;
+  const seed = b ? b.seed : t ? t.seed : 0;
+  Object.assign(rec, { seed, start, mode: m, rules, beat: b ? b.id : '', out: [], since: 0, frames: 0 });
+  state = S.newGame(seed || (Date.now() & 0x7fffffff) || 1, { rules, mode: m });
   if (start) S.startRound(state, start); // the same as bot/range-replay.js
   fetchTicket();
   track('game_start');
@@ -870,7 +914,6 @@ function begin(start) {
 function finished(s) {
   running = false;
   const best = saveBest(s.score);
-  sendRun(false);
   track('game_finish');
   shareText = T('share_text', { n: S.cleared(s), score: s.score });
   showOverlay(s.won ? T('you_won') : T('game_over'), (s.mode === 'sudden' ? T('sudden_line') + '<br>' : '') + result(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => play());
@@ -878,6 +921,14 @@ function finished(s) {
   $('ovShare').textContent = T('btn_share');
   $('ovMenu').classList.remove('hidden');
   showPick($('ovPick'));
+  // A checked game alone can become a challenge for a friend.
+  const checked = !!rec.seed && !rec.beat;
+  const sent = sendRun(false);
+  if (checked && canBeat()) {
+    lastRun = sent;
+    $('ovBeat').textContent = beatT('btn');
+    $('ovBeat').classList.remove('hidden');
+  }
 }
 
 let last = 0, acc = 0;

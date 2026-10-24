@@ -76,7 +76,7 @@ export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
   store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
-  tanks = null, bombs = null, range = null, createInvoice = null, word = null, admin = null, notices = null, challenge = null,
+  tanks = null, bombs = null, range = null, createInvoice = null, word = null, admin = null, notices = null, challenge = null, beat = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -386,8 +386,9 @@ export function createApiServer({
         if (res.playerId === user.id) {
           mine = res;
           won = got;
-          // Испытание дня: одиночная игра, начатая с первого этапа.
-          day = challenge?.record(res.playerId, game, res.score, { fromStart: !start, solo: r.replay.players === 1 }, out) ?? null;
+          // Испытание дня: одиночная игра, начатая с первого этапа, в обычном режиме
+          // («Выживание», «Без промаха» и игры с ботом считают очки по-другому).
+          day = challenge?.record(res.playerId, game, res.score, { fromStart: !start && !mode, solo: r.replay.players === 1 }, out) ?? null;
         }
       }
       economy?.setLang(user.id, user.language_code);
@@ -426,6 +427,32 @@ export function createApiServer({
       store.touchPlayer(user);
       const weekFrom = economy ? seasonStart(seasonOf(now())) : now() - 7 * 86_400_000;
       return [200, word.chat(user.id, user.chat, weekFrom)];
+    };
+  }
+
+  // «Побей мой счёт» (beat.js): вызов другу на ту же партию и его итог.
+  if (beat) {
+    for (const game of ["tanks", "bombs", "range"]) {
+      routes[`POST /api/${game}/beat`] = (body, user) => {
+        if (!user) return [401, { error: "unauthorized" }];
+        const opts = { seed: Number(body.seed), log: body.log, rules: body.rules == null ? 1 : Number(body.rules),
+          mode: body.mode == null ? "" : String(body.mode), start: body.start == null ? 0 : Number(body.start) };
+        if (typeof opts.log !== "string" || !Number.isSafeInteger(opts.rules) || !Number.isSafeInteger(opts.start)) return [400, { error: "bad data" }];
+        const r = beat.create(user.id, game, opts);
+        return [r.status, r.body];
+      };
+    }
+    routes["GET /api/beat"] = (_body, user, url) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const r = beat.get(user.id, url.searchParams.get("id"));
+      return [r.status, r.body];
+    };
+    routes["POST /api/beat/run"] = (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      if (typeof body.log !== "string") return [400, { error: "bad data" }];
+      store.touchPlayer(user);
+      const r = beat.play(user.id, { id: String(body.id || ""), log: body.log });
+      return [r.status, r.body];
     };
   }
 
@@ -501,7 +528,7 @@ export function createApiServer({
       return send(res, 429, { error: "too many requests" });
     }
     try {
-      const limit = path === "/api/tanks/run" || path === "/api/bombs/run" || path === "/api/range/run" ? MAX_REPLAY_BODY
+      const limit = /^\/api\/(tanks|bombs|range)\/(run|beat)$/.test(path) || path === "/api/beat/run" ? MAX_REPLAY_BODY
         : path === "/api/admin/notice" ? MAX_NOTICE_BODY : MAX_BODY;
       const body = req.method === "POST" ? await readJson(req, limit) : null;
       const user = userFrom(req);
