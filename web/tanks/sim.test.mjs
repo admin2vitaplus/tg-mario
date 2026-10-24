@@ -175,3 +175,96 @@ test('survival: the difficulty follows the wave; rules 1 ignore the mode', () =>
   assert.equal(old.mode, '');
   assert.equal(old.total, 20);
 });
+
+// ---------- Duel ----------
+function duel(seed = 5) {
+  const s = S.newGame(2, seed, { rules: 2, mode: 'duel' });
+  while (s.phase === 'intro' || s.players.some((p) => !p.tank)) S.step(s, []);
+  return s;
+}
+
+// Puts both tanks in one column on an empty arena, the first one below aiming up.
+function faceOff(s) {
+  s.cells.fill(0);
+  const [a, b] = s.players.map((p) => p.tank);
+  Object.assign(a, { x: 96, y: 160, dir: UP, shield: 0 });
+  Object.assign(b, { x: 96, y: 40, dir: 2, shield: 0 });
+  return [a, b];
+}
+
+test('duel arenas: open corners for both tanks and the middle, all reachable', () => {
+  const open = (rows, tx, ty) => !'#@~'.includes(rows[ty][tx]);
+  for (const arena of S.ARENAS) {
+    const rows = arena.rows;
+    const spots = [...S.DUEL_SPAWN.map(([x, y]) => [x / 16, y / 16]), [S.DUEL_CENTRE[0] / 16, S.DUEL_CENTRE[1] / 16]];
+    for (const [tx, ty] of spots) assert.ok(open(rows, tx, ty), arena.name + ' ' + tx + ',' + ty);
+    const seen = new Set([spots[0].join()]);
+    const todo = [spots[0]];
+    while (todo.length) {
+      const [x, y] = todo.pop();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx > 12 || ny > 12 || seen.has(nx + ',' + ny) || rows[ny][nx] === '@' || rows[ny][nx] === '~') continue;
+        seen.add(nx + ',' + ny);
+        todo.push([nx, ny]);
+      }
+    }
+    for (const [tx, ty] of spots) assert.ok(seen.has(tx + ',' + ty), arena.name + ': ' + tx + ',' + ty + ' cut off');
+  }
+});
+
+test('duel: a hit wins the round, the next round is on the next arena, three rounds win the game', () => {
+  const s = duel();
+  assert.equal(s.mapName, S.ARENAS[0].name);
+  assert.ok(!s.enemies.length && !s.queue.length);
+  for (let round = 0; round < S.DUEL_WINS; round++) {
+    faceOff(s);
+    S.step(s, [{ dir: -1, fire: true }, { dir: -1, fire: false }]);
+    for (let i = 0; i < 80 && s.phase === 'play'; i++) S.step(s, []);
+    assert.equal(s.phase, 'round');
+    assert.equal(s.roundWinner, 0);
+    assert.equal(s.players[0].wins, round + 1);
+    assert.equal(s.players[1].tank, null);
+    for (let i = 0; i < S.ROUND_PAUSE; i++) S.step(s, []);
+    if (round < S.DUEL_WINS - 1) {
+      assert.equal(s.mapName, S.ARENAS[(round + 1) % S.ARENAS.length].name);
+      while (s.phase === 'intro' || s.players.some((p) => !p.tank)) S.step(s, []);
+    }
+  }
+  assert.equal(s.phase, 'over');
+  assert.equal(s.winner, 0);
+  for (let i = 0; i < 200; i++) S.step(s, []);
+  assert.equal(s.phase, 'overDone');
+  assert.deepEqual(s.players.map((p) => p.score), [0, 0]);
+});
+
+test('duel: the two players\' shells cancel each other out', () => {
+  const s = duel();
+  faceOff(s);
+  S.step(s, [{ dir: -1, fire: true }, { dir: -1, fire: true }]);
+  for (let i = 0; i < 80; i++) S.step(s, []);
+  assert.equal(s.phase, 'play');
+  assert.ok(s.players.every((p) => p.tank));
+});
+
+test('duel: a round that drags on is a draw, and nobody gets a win', () => {
+  const s = duel();
+  for (let i = 0; i < S.DUEL_ROUND + 5 && s.phase === 'play'; i++) S.step(s, []);
+  assert.equal(s.phase, 'round');
+  assert.equal(s.roundWinner, -1);
+  assert.deepEqual(s.players.map((p) => p.wins), [0, 0]);
+});
+
+test('duel: a bonus drops in the middle; the clock stops the other tank', () => {
+  const s = duel();
+  for (let i = 0; i < S.DUEL_BONUS_EVERY + 2 && !s.bonuses.length; i++) S.step(s, []);
+  assert.equal(s.bonuses.length, 1);
+  assert.deepEqual([s.bonuses[0].x, s.bonuses[0].y], S.DUEL_CENTRE);
+  s.bonuses[0].type = 'clock';
+  Object.assign(s.players[0].tank, { x: S.DUEL_CENTRE[0], y: S.DUEL_CENTRE[1] });
+  S.step(s, []);
+  assert.equal(s.bonuses.length, 0);
+  assert.ok(s.players[1].tank.stun > 0);
+  assert.equal(s.players[0].tank.stun, 0);
+  assert.equal(s.freeze, 0);
+});

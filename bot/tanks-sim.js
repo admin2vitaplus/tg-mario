@@ -37,8 +37,9 @@ const FLASH_AT = [3, 10, 17]; // these enemies carry a bonus
 // under; old games come without one and are 1.
 const RULES = 2;
 // Modes: '' the usual stages, 'survival' — one map, endless waves, alone (from rules 2);
-// 'bot' — the second tank is driven by the computer (the rules are the same; the server credits only the player).
-const MODES = ['', 'survival', 'bot'];
+// 'bot' — the second tank was driven by the computer (old games; the server credits only the player);
+// 'duel' — two players against each other on small arenas, up to DUEL_WINS rounds won.
+const MODES = ['', 'survival', 'bot', 'duel'];
 // Survival: wave n (from 0) brings 10 + n enemies, up to 20, of the kinds of stage n;
 // the difficulty (how many at once, how often they shoot) is that of stage n as well.
 const SURVIVAL_MAP = 0;
@@ -46,6 +47,80 @@ const SURVIVAL_REST = 120;  // frames between two waves
 const PLAYER_SPAWN = [[64, 192], [128, 192]];
 const ENEMY_SPAWN_X = [96, 192, 0];
 const BASE_WALL = [[11, 23], [11, 24], [11, 25], [12, 23], [13, 23], [14, 23], [14, 24], [14, 25]];
+
+// Duel: one life a round, the first to DUEL_WINS rounds wins the game. Every round is played on
+// the next arena; a bonus drops in the middle while none is lying there. A round that drags on
+// past DUEL_ROUND frames is a draw.
+const DUEL_WINS = 3;
+const DUEL_ROUND = 90 * 60;
+const DUEL_BONUS_EVERY = 8 * 60;
+const DUEL_BONUSES = ['helmet', 'star', 'clock'];
+const DUEL_STUN = 120;      // «clock» in a duel stops the other tank this long
+const DUEL_SPAWN = [[16, 176, 0], [176, 16, 2]]; // x, y, direction
+const DUEL_CENTRE = [96, 96];
+const ROUND_PAUSE = 150;    // frames of «round won» before the next one
+const ARENAS = [
+  { name: 'Перекрёсток', rows: [
+    '@@@@@@@@@@@@@',
+    '@...........@',
+    '@.##.#.#.##.@',
+    '@.##.#.#.##.@',
+    '@.....@.....@',
+    '@.#~#...#~#.@',
+    '@.#.......#.@',
+    '@.#~#...#~#.@',
+    '@.....@.....@',
+    '@.##.#.#.##.@',
+    '@.##.#.#.##.@',
+    '@...........@',
+    '@@@@@@@@@@@@@',
+  ] },
+  { name: 'Роща', rows: [
+    '@@@@@@@@@@@@@',
+    '@....%%%....@',
+    '@.#..%%%..#.@',
+    '@.#.......#.@',
+    '@...##.##...@',
+    '@%%.#...#.%%@',
+    '@%%.......%%@',
+    '@%%.#...#.%%@',
+    '@...##.##...@',
+    '@.#.......#.@',
+    '@.#..%%%..#.@',
+    '@....%%%....@',
+    '@@@@@@@@@@@@@',
+  ] },
+  { name: 'Каток', rows: [
+    '@@@@@@@@@@@@@',
+    '@...........@',
+    '@.@@.---.@@.@',
+    '@.@..---..@.@',
+    '@...#####...@',
+    '@.--.....--.@',
+    '@.--.#.#.--.@',
+    '@.--.....--.@',
+    '@...#####...@',
+    '@.@..---..@.@',
+    '@.@@.---.@@.@',
+    '@...........@',
+    '@@@@@@@@@@@@@',
+  ] },
+  { name: 'Пруды', rows: [
+    '@@@@@@@@@@@@@',
+    '@.....#.....@',
+    '@.##..#..##.@',
+    '@.#.......#.@',
+    '@...~~.~~...@',
+    '@.#.......#.@',
+    '@##.#...#.##@',
+    '@.#.......#.@',
+    '@...~~.~~...@',
+    '@.#.......#.@',
+    '@.##..#..##.@',
+    '@.....#.....@',
+    '@@@@@@@@@@@@@',
+  ] },
+];
 
 // Maps are 13x13 tiles: # кирпич, @ сталь, ~ вода, % лес, - лёд.
 // Spawn points and the base corner are cleared automatically.
@@ -817,7 +892,7 @@ function rnd(s) {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
-function parseMap(rows) {
+function parseMap(rows, arena) {
   const cells = new Uint8Array(N * N);
   const code = { '#': BRICK, '@': STEEL, '~': WATER, '%': FOREST, '-': ICE };
   const fill = (tx, ty, v) => {
@@ -826,6 +901,7 @@ function parseMap(rows) {
   for (let ty = 0; ty < 13; ty++) {
     for (let tx = 0; tx < 13; tx++) fill(tx, ty, code[(rows[ty] || '')[tx]] || EMPTY);
   }
+  if (arena) return cells; // an arena has no base and is drawn as it is
   for (const [tx, ty] of [[0, 0], [6, 0], [12, 0], [4, 12], [8, 12]]) fill(tx, ty, EMPTY);
   for (let tx = 5; tx <= 7; tx++) for (let ty = 11; ty <= 12; ty++) fill(tx, ty, EMPTY);
   for (const [x, y] of BASE_WALL) cells[y * N + x] = BRICK;
@@ -874,10 +950,45 @@ function onIce(s, t) {
 function newGame(players, seed, opts = {}) {
   const s = { rules: opts.rules || 1, mode: opts.mode || '', wave: 0, rest: 0, seed: seed | 0, frame: 0, twoP: players === 2, won: false, players: [], events: [] };
   for (let i = 0; i < players; i++) {
-    s.players.push({ pi: i, lives: 3, level: 0, score: 0, tank: null, respawn: 0, kills: [0, 0, 0, 0] });
+    s.players.push({ pi: i, lives: 3, level: 0, score: 0, tank: null, respawn: 0, kills: [0, 0, 0, 0], wins: 0 });
   }
-  startStage(s, 0);
+  s.duel = s.mode === 'duel' && players === 2;
+  if (s.duel) {
+    s.round = 0;
+    s.winner = -1;
+    startRound(s, 0);
+  } else startStage(s, 0);
   return s;
+}
+
+// A duel round: the next arena, both tanks back at their corners with one life.
+function startRound(s, n) {
+  const arena = ARENAS[n % ARENAS.length];
+  s.round = n;
+  s.stage = 0;
+  s.mapName = arena.name;
+  s.cells = parseMap(arena.rows, true);
+  s.baseAlive = true;
+  s.enemies = [];
+  s.bullets = [];
+  s.booms = [];
+  s.spawns = [];
+  s.bonuses = [];
+  s.queue = [];
+  s.total = 0;
+  s.freeze = 0;
+  s.shovel = 0;
+  s.bonusT = 0;
+  s.nextId = 1;
+  s.roundWinner = -1;
+  s.phase = 'intro';
+  s.phaseT = 0;
+  for (const p of s.players) {
+    p.lives = 1;
+    p.level = 0;
+    p.tank = null;
+    p.respawn = 1;
+  }
 }
 
 const survival = (s) => s.mode === 'survival';
@@ -1073,6 +1184,8 @@ function bulletStep(s, b, all) {
       if (!t.shield) killPlayer(s, t);
     } else if (t.side === 'e') {
       hitEnemy(s, t, b.pi);
+    } else if (s.duel) {
+      if (!t.shield) killPlayer(s, t);
     } else if (!t.shield) {
       t.stun = 150; // friendly fire freezes the partner for a moment
       s.events.push('stun');
@@ -1097,7 +1210,7 @@ function updateBullets(s) {
     if (a.dead) continue;
     for (let j = i + 1; j < s.bullets.length; j++) {
       const b = s.bullets[j];
-      if (b.dead || a.side === b.side) continue;
+      if (b.dead || (a.side === b.side && !(s.duel && a.pi !== b.pi))) continue;
       if (Math.abs(a.x - b.x) < 4 && Math.abs(a.y - b.y) < 4) { a.dead = b.dead = true; break; }
     }
   }
@@ -1134,11 +1247,14 @@ function spawnBonus(s) {
 
 function takeBonus(s, p, t, b) {
   s.bonuses = s.bonuses.filter((o) => o !== b);
-  p.score += 500;
+  if (!s.duel) p.score += 500; // a duel is won by rounds, not by points
   s.events.push('pick');
   switch (b.type) {
-    case 'helmet': t.shield = 600; break;
-    case 'clock': s.freeze = 600; break;
+    case 'helmet': t.shield = s.duel ? 300 : 600; break;
+    case 'clock':
+      if (!s.duel) { s.freeze = 600; break; }
+      for (const o of s.players) if (o !== p && o.tank) o.tank.stun = DUEL_STUN;
+      break;
     case 'shovel': setWalls(s, STEEL); s.shovel = 1200; break;
     case 'star': p.level = Math.min(3, p.level + 1); break;
     case 'grenade':
@@ -1157,10 +1273,10 @@ const NO_INPUT = { dir: -1, fire: false };
 function updatePlayer(s, p, inp) {
   if (!p.tank) {
     if (p.respawn > 0 && --p.respawn === 0) {
-      const [x, y] = PLAYER_SPAWN[p.pi];
+      const [x, y, dir] = s.duel ? DUEL_SPAWN[p.pi] : PLAYER_SPAWN[p.pi];
       if (occupied(s, x, y)) { p.respawn = 1; return; }
-      p.tank = makeTank(s, x, y, UP, 'p', 0, p.pi);
-      p.tank.shield = 180;
+      p.tank = makeTank(s, x, y, s.duel ? dir : UP, 'p', 0, p.pi);
+      p.tank.shield = s.duel ? 60 : 180;
     }
     return;
   }
@@ -1266,6 +1382,36 @@ function nextWave(s) {
   fillQueue(s, s.wave);
 }
 
+// Duel: the bonus in the middle, and the end of a round when a tank is hit or time runs out.
+function duelStep(s) {
+  if (s.phase === 'play') {
+    if (!s.bonuses.length && ++s.bonusT >= DUEL_BONUS_EVERY) {
+      s.bonusT = 0;
+      s.bonuses.push({ x: DUEL_CENTRE[0], y: DUEL_CENTRE[1], type: DUEL_BONUSES[Math.floor(rnd(s) * DUEL_BONUSES.length)], t: 0 });
+      s.events.push('bonus');
+    }
+    const alive = s.players.filter((p) => p.tank);
+    if (alive.length < 2 || ++s.phaseT >= DUEL_ROUND) {
+      s.roundWinner = alive.length === 1 ? alive[0].pi : -1;
+      if (s.roundWinner >= 0) s.players[s.roundWinner].wins++;
+      s.phase = 'round';
+      s.phaseT = 0;
+      s.events.push('round');
+    }
+  } else if (s.phase === 'round') {
+    if (++s.phaseT < ROUND_PAUSE) return;
+    const top = s.players.find((p) => p.wins >= DUEL_WINS);
+    if (top) {
+      s.winner = top.pi;
+      s.phase = 'over';
+      s.phaseT = 0;
+      s.events.push('over');
+    } else startRound(s, s.round + 1);
+  } else if (s.phase === 'over') {
+    if (++s.phaseT >= 200) s.phase = 'overDone';
+  }
+}
+
 // ---------- One frame (60 per second) ----------
 function step(s, inputs) {
   s.frame++;
@@ -1275,9 +1421,9 @@ function step(s, inputs) {
   }
   if (s.phase === 'overDone' || s.phase === 'clearDone') return;
   for (const p of s.players) {
-    updatePlayer(s, p, s.phase === 'over' ? NO_INPUT : (inputs && inputs[p.pi]) || NO_INPUT);
+    updatePlayer(s, p, s.phase === 'over' || s.phase === 'round' ? NO_INPUT : (inputs && inputs[p.pi]) || NO_INPUT);
   }
-  updateEnemies(s, s.phase === 'play');
+  if (!s.duel) updateEnemies(s, s.phase === 'play');
   updateBullets(s);
   s.enemies = s.enemies.filter((e) => !e.dead);
   for (const b of s.booms) b.t++;
@@ -1286,7 +1432,8 @@ function step(s, inputs) {
   s.bonuses = s.bonuses.filter((b) => b.t <= 1200);
   if (s.freeze > 0) s.freeze--;
   if (s.shovel > 0 && --s.shovel === 0) setWalls(s, BRICK);
-  if (s.phase === 'play') {
+  if (s.duel) duelStep(s);
+  else if (s.phase === 'play') {
     if (!s.baseAlive || s.players.every((p) => p.lives <= 0 && !p.tank)) {
       s.phase = 'over';
       s.phaseT = 0;
@@ -1313,5 +1460,6 @@ root.TankSim = {
   CELL, N, FIELD, EMPTY, BRICK, STEEL, WATER, FOREST, ICE, BASE, UP, RIGHT, DOWN, LEFT,
   ENEMY, MAPS, STAGES, wave, newGame, startStage, step,
   RULES, MODES, SURVIVAL_REST,
+  ARENAS, DUEL_WINS, DUEL_ROUND, DUEL_BONUS_EVERY, DUEL_SPAWN, DUEL_CENTRE, ROUND_PAUSE, startRound,
 };
 })(typeof window !== 'undefined' ? window : globalThis);

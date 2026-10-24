@@ -36,7 +36,7 @@ export function encode(steps) {
 
 // Статистика игрока за игру для достижений (achievements.js): подбитые танки (броневики
 // отдельно), подобранные бонусы, уровни без потери жизни.
-const newStats = () => ({ kills: 0, armored: 0, picks: 0, clean: 0, deaths: 0 });
+const newStats = () => ({ kills: 0, armored: 0, picks: 0, clean: 0, deaths: 0, duelWin: false });
 
 // Этапов в игре; игра может начаться с любого из них (start, выбор пройденных уровней).
 const COUNT = typeof S.STAGES === "number" ? S.STAGES : S.MAPS.length;
@@ -46,7 +46,8 @@ const COUNT = typeof S.STAGES === "number" ? S.STAGES : S.MAPS.length;
 // quit — игра не закончена (игрок вышел), но в неё играли не меньше MIN_QUIT_FRAMES.
 // rules — версия правил, с которыми сыграна игра (старые игры — 1), mode — режим (S.MODES):
 // «Выживание» (survival) — только один игрок с первой волны; пройденными уровнями считается
-// каждая вторая отбитая волна.
+// каждая вторая отбитая волна. «Дуэль» (duel) — двое друг против друга до трёх побед в раундах:
+// очков в ней нет, победителю — duelWin.
 export function replay({ seed, players, log, start = 0, rules = 1, mode = "" }) {
   const bad = (why) => ({ ok: false, why });
   if (!Number.isSafeInteger(seed) || seed <= 0) return bad("bad seed");
@@ -56,7 +57,7 @@ export function replay({ seed, players, log, start = 0, rules = 1, mode = "" }) 
   const maxCode = players === 1 ? 9 : 99;
   if (!Number.isSafeInteger(rules) || rules < 1 || rules > S.RULES) return bad("bad rules");
   if (!S.MODES.includes(mode) || (mode && rules < 2) || (mode === "survival" && (players !== 1 || start > 0))
-    || (mode === "bot" && players !== 2)) return bad("bad mode");
+    || ((mode === "bot" || mode === "duel") && players !== 2)) return bad("bad mode");
   const s = S.newGame(players, seed, { rules, mode });
   if (start > 0) S.startStage(s, start); // так же делает игра (tanks.js, bombs.js)
   const stats = s.players.map(newStats);
@@ -109,6 +110,7 @@ export function replay({ seed, players, log, start = 0, rules = 1, mode = "" }) 
       }
     }
   }
+  if (s.duel && s.winner >= 0) stats[s.winner].duelWin = true;
   const finished = s.phase === "overDone" || s.phase === "clearDone";
   if (!finished && frames < MIN_QUIT_FRAMES) return bad("game not finished");
   // Пройденные уровни: текущий засчитывается, если он пройден (последний — победа).

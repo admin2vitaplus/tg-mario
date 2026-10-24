@@ -55,6 +55,18 @@ test("«Выживание» (rules 2) replays with its mode; it is for one play
   assert.equal(replay({ seed: 41, players: 1, log: g.log, rules: 9 }).why, "bad rules");
 });
 
+test("a duel (mode «duel») replays for two: no points, the winner gets duelWin", () => {
+  const g = play(7, 2, { rules: 2, mode: "duel" });
+  assert.equal(g.state.phase, "overDone");
+  const r = replay({ seed: 7, players: 2, log: g.log, rules: 2, mode: "duel" });
+  assert.equal(r.ok, true, r.why);
+  assert.deepEqual(r.scores, [0, 0]);
+  assert.equal(r.stages, 0);
+  assert.deepEqual(r.stats.map((st) => st.duelWin), g.state.players.map((p) => p.pi === g.state.winner));
+  assert.equal(replay({ seed: 7, players: 1, log: g.log, rules: 2, mode: "duel" }).why, "bad mode");
+  assert.equal(replay({ seed: 7, players: 2, log: g.log, mode: "duel" }).why, "bad mode", "needs rules 2");
+});
+
 test("a game with the bot (mode «bot») replays for two and is credited to the player only", () => {
   const g = play(43, 2, { rules: 2, mode: "bot" });
   const r = replay({ seed: 43, players: 2, log: g.log, rules: 2, mode: "bot" });

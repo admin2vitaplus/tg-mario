@@ -546,6 +546,8 @@ const findItem = (cat, id) => cat.items.find((it) => it.id === id);
 const lookItem = (key) => findItem(LOOK_CATS.find((c) => c.key === key), look[key]);
 const tankSkin = (id) => TANK_SKINS.find((t) => t.id === id) || TANK_SKINS[0];
 const partnerSkin = (id) => (id === 'green' ? 'gold' : 'green');
+// The guest's own colour, unless it is the host's too: the two tanks must differ (above all in a duel).
+const guestSkin = () => (net.guestSkin && net.guestSkin !== look.tank ? net.guestSkin : partnerSkin(look.tank));
 
 // Skins of player 1 and 2 in the current game (online each player brings their own).
 let skins = [look.tank, partnerSkin(look.tank)];
@@ -877,7 +879,7 @@ function render(s) {
   drawScorch(s);
   drawShadows(s);
   drawCells(s, false);
-  ctx.drawImage(s.baseAlive ? BASE_OK : BASE_DEAD, 96, 192);
+  if (!s.duel) ctx.drawImage(s.baseAlive ? BASE_OK : BASE_DEAD, 96, 192);
   for (const sp of s.spawns) drawSpawn(sp);
   for (const p of s.players) if (p.tank) drawTank(s, p.tank);
   for (const e of s.enemies) drawTank(s, e);
@@ -927,26 +929,57 @@ function hud(s) {
   const score = s.players.reduce((a, p) => a + p.score, 0);
   const lives = s.players.map((p) => Math.max(0, p.lives)).join(' · ');
   const foes = s.queue.length + s.spawns.length + s.enemies.length;
-  const line = [score, lives, foes, s.stage, s.wave].join('|');
+  const line = [score, lives, foes, s.stage, s.wave, s.duel ? s.round + ':' + s.players.map((p) => p.wins) : ''].join('|');
   if (line === lastHud) return;
   lastHud = line;
-  $('score').textContent = String(score).padStart(6, '0');
+  const label = (key, text) => { document.querySelector('[data-t="' + key + '"]').textContent = text; };
+  // A duel shows the rounds won, the arena and the round instead of points, enemies and the stage.
+  if (s.duel) {
+    $('score').textContent = s.players.map((p) => p.wins).join(':');
+    $('foes').textContent = String(s.round % S.ARENAS.length + 1);
+    $('stage').textContent = String(s.round + 1);
+  } else {
+    $('score').textContent = String(score).padStart(6, '0');
+    $('foes').textContent = String(foes);
+    $('stage').textContent = String((s.mode === 'survival' ? s.wave : s.stage) + 1);
+  }
   $('lives').textContent = lives;
-  $('foes').textContent = String(foes);
-  $('stage').textContent = String((s.mode === 'survival' ? s.wave : s.stage) + 1);
-  document.querySelector('[data-t="hud_stage"]').textContent = T(s.mode === 'survival' ? 'hud_wave' : 'hud_stage');
+  label('hud_score', T(s.duel ? 'hud_wins' : 'hud_score'));
+  label('hud_foes', T(s.duel ? 'hud_arena' : 'hud_foes'));
+  label('hud_stage', T(s.duel ? 'hud_round' : s.mode === 'survival' ? 'hud_wave' : 'hud_stage'));
 }
 
 // Map names live in sim.js in Russian; the dictionary has them by map number.
 function mapTitle(name) {
   const i = S.MAPS.findIndex((m) => m.name === name);
-  return i < 0 ? String(name || '') : T('map_' + i);
+  const a = S.ARENAS.findIndex((m) => m.name === name);
+  return i >= 0 ? T('map_' + i) : a >= 0 ? T('arena_' + a) : String(name || '');
+}
+
+// Duel: which player this phone plays (the host and a game at one keyboard are 0, the guest 1).
+const mySide = () => (mode === 'guest' ? 1 : 0);
+// Who took the round or the game: «игрок 2» at one keyboard, «вы» or «соперник» online.
+function roundTitle(s) {
+  if (s.roundWinner < 0) return T('round_draw');
+  if (mode === 'local') return T('round_player', { n: s.roundWinner + 1 });
+  return T(s.roundWinner === mySide() ? 'round_you' : 'round_rival');
+}
+function duelTitle(s) {
+  if (s.winner < 0) return T('game_over');
+  if (mode === 'local') return T('duel_player_won', { n: s.winner + 1 });
+  return T(s.winner === mySide() ? 'duel_win' : 'duel_lose');
+}
+function duelText(s) {
+  return T('duel_score', { a: s.players[0].wins, b: s.players[1].wins });
 }
 
 let bannerText = '';
 function banner(s) {
   let text = '', cls = '';
-  if (s.phase === 'intro') text = s.mode === 'survival' ? T('banner_survival') : T('banner_stage', { n: s.stage + 1, map: mapTitle(s.mapName).toUpperCase() });
+  if (s.duel && s.phase === 'intro') text = T('banner_round', { n: s.round + 1, map: mapTitle(s.mapName).toUpperCase() });
+  else if (s.duel && s.phase === 'round') text = roundTitle(s);
+  else if (s.duel && (s.phase === 'over' || s.phase === 'overDone')) text = duelTitle(s);
+  else if (s.phase === 'intro') text = s.mode === 'survival' ? T('banner_survival') : T('banner_stage', { n: s.stage + 1, map: mapTitle(s.mapName).toUpperCase() });
   else if (s.mode === 'survival' && s.rest > 0 && s.phase === 'play') text = T('banner_wave_done', { n: s.wave + 1 });
   else if (s.won) text = T('won_title');
   else if (s.phase === 'over' || s.phase === 'overDone') { text = T('game_over'); cls = 'over'; }
@@ -986,6 +1019,7 @@ function showOverlay(title, html, button, action, panel) {
   $('ovBeat').classList.add('hidden');
   $('ovPick').classList.add('hidden');
   $('ovMenu').classList.add('hidden');
+  $('btnDuelLocal').classList.add('hidden');
   $('overlay').classList.remove('hidden');
 }
 
@@ -1029,6 +1063,7 @@ for (const b of document.querySelectorAll('#menu button[data-players]')) {
 $('btnSurvival').addEventListener('click', () => { audio(); variant = 'survival'; beatView = null; beginLocal(1); });
 
 function resultText(s) {
+  if (s.duel) return duelText(s);
   const score = s.players.reduce((a, p) => a + p.score, 0);
   const how = s.won ? T('won_text', { n: S.STAGES }) : s.baseAlive ? T('all_killed') : T('base_lost');
   const reached = s.mode === 'survival' ? T('wave_line', { n: s.wave }) : T('stage_line', { n: s.stage + 1 });
@@ -1039,7 +1074,7 @@ function resultText(s) {
 let shareText = '';
 function showShare(s) {
   const score = s.players.reduce((a, p) => a + p.score, 0);
-  shareText = s.mode === 'survival' ? T('share_survival', { n: s.wave, score }) : T(s.players.length > 1 ? 'share_duo' : 'share_solo', { n: s.stage + 1, score });
+  shareText = s.duel ? T('share_duel', { a: s.players[0].wins, b: s.players[1].wins }) : s.mode === 'survival' ? T('share_survival', { n: s.wave, score }) : T(s.players.length > 1 ? 'share_duo' : 'share_solo', { n: s.stage + 1, score });
   $('ovShare').textContent = T('btn_share');
   $('ovShare').classList.remove('hidden');
 }
@@ -1270,7 +1305,8 @@ function lostLink(text, wasInGame) {
 // A room for a friend shows its code and the invite; a random search only waits.
 function roomScreen() {
   if (net.random) {
-    showOverlay(T('online_title'), T('finding'), null, null, 'online');
+    const duel = variant === 'duel';
+    showOverlay(T(duel ? 'duel_title' : 'online_title'), T(duel ? 'finding_duel' : 'finding'), null, null, 'online');
     $('onlineStart').classList.add('hidden');
     $('btnInvite').classList.add('hidden');
     return;
@@ -1347,7 +1383,7 @@ function onNet(m) {
   } else if (m.t === 'look' && mode === 'host') {
     // The guest's own tank colour; one the host does not know falls back to the default.
     net.guestSkin = TANK_SKINS.some((t) => t.id === m.tank) ? m.tank : '';
-    skins[1] = net.guestSkin || partnerSkin(look.tank);
+    skins[1] = guestSkin();
   } else if (m.t === 'i' && mode === 'host') {
     net.remote.dir = m.d;
     if (m.f) net.remote.fire = true;
@@ -1373,7 +1409,7 @@ function rematchScreen() {
   }
   const score = s.players.reduce((a, p) => a + p.score, 0);
   const note = net.rematch.me ? T('rematch_wait') : net.rematch.peer ? T('rematch_peer') : '';
-  showOverlay(T(s.won ? 'won_title' : 'game_over'), resultText(s) + (note ? '<br><br>' + note : ''),
+  showOverlay(s.duel ? duelTitle(s) : T(s.won ? 'won_title' : 'game_over'), resultText(s) + (note ? '<br><br>' + note : ''),
     net.rematch.me ? T('btn_exit') : T('btn_rematch'), net.rematch.me ? showMenu : pressRematch);
   showShare(s);
 }
@@ -1392,11 +1428,14 @@ let serverAlive = false;
 function onlineMenu(text) {
   running = false;
   mode = 'local';
+  const duel = variant === 'duel';
   const html = API
-    ? (text ? text + '<br>' : '') + T('online_menu')
+    ? (text ? text + '<br>' : '') + T(duel ? 'duel_menu' : 'online_menu')
     : NO_SERVER[apiProblem];
-  showOverlay(T('online_title'), html, null, null, 'online');
+  showOverlay(T(duel ? 'duel_title' : 'online_title'), html, null, null, 'online');
   $('onlineStart').classList.toggle('hidden', !API);
+  $('btnDuelRandom').classList.toggle('hidden', !duel || !API);
+  $('btnDuelLocal').classList.toggle('hidden', !duel);
   $('btnInvite').classList.add('hidden');
   if (API && !text) checkServer();
 }
@@ -1416,7 +1455,9 @@ function checkServer() {
     .finally(() => clearTimeout(timer));
 }
 
-$('btnOnline').addEventListener('click', () => { audio(); onlineMenu(); });
+$('btnOnline').addEventListener('click', () => { audio(); variant = ''; onlineMenu(); });
+$('btnDuel').addEventListener('click', () => { audio(); variant = 'duel'; beatView = null; onlineMenu(); });
+$('btnDuelLocal').addEventListener('click', () => { audio(); beatView = null; showMenu(); variant = 'duel'; beginLocal(2); });
 $('btnCancel').addEventListener('click', () => { audio(); showMenu(); });
 $('btnCreate').addEventListener('click', () => {
   audio();
@@ -1424,16 +1465,20 @@ $('btnCreate').addEventListener('click', () => {
   $('onlineStart').classList.add('hidden');
   connectFresh(() => netSend({ t: 'create' }));
 });
-// «Случайный напарник»: the server pairs this player with the next one who searches.
-$('btnRandom').addEventListener('click', () => {
+// «Случайный напарник» (or «Случайный соперник» for a duel): the server pairs this player
+// with the next one who searches for the same.
+function findRandom() {
   audio();
   beatView = null;
-  showOverlay(T('online_title'), T('finding'), null, null, 'online');
+  if (!API) { onlineMenu(); return; }
+  const duel = variant === 'duel';
+  showOverlay(T(duel ? 'duel_title' : 'online_title'), T(duel ? 'finding_duel' : 'finding'), null, null, 'online');
   $('onlineStart').classList.add('hidden');
   $('btnInvite').classList.add('hidden');
-  if (!API) { onlineMenu(); return; }
-  connectFresh(() => netSend({ t: 'find' }));
-});
+  connectFresh(() => netSend(duel ? { t: 'find', kind: 'duel' } : { t: 'find' }));
+}
+$('btnRandom').addEventListener('click', () => { variant = ''; findRandom(); });
+$('btnDuelRandom').addEventListener('click', findRandom);
 function joinRoom(code) {
   code = String(code || '').replace(/\D/g, '');
   if (code.length !== 6) { onlineMenu(T('code_6')); return; }
@@ -1446,7 +1491,7 @@ $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($
 $('btnInvite').addEventListener('click', () => {
   // The bot answers /start tanks_<code> with a button that opens the game inside Telegram.
   const link = appLink('room_' + net.code);
-  const text = T('invite_text', { code: net.code });
+  const text = T(variant === 'duel' ? 'duel_invite_text' : 'invite_text', { code: net.code });
   track('invite_created', net.code);
   try {
     if (tg && tg.openTelegramLink) {
@@ -1468,7 +1513,8 @@ function sendSnapshot(s) {
   const m = {
     t: 's', f: s.frame, ph: s.phase, pt: s.phaseT, st: s.stage, mn: s.mapName, ba: s.baseAlive ? 1 : 0, wo: s.won ? 1 : 0,
     q: s.queue.length, fr: s.freeze, sh: s.shovel,
-    pl: s.players.map((p) => [p.lives, p.level, p.score, p.kills, p.tank ? packTank(p.tank) : 0]),
+    du: s.duel ? [s.round, s.roundWinner, s.winner] : 0,
+    pl: s.players.map((p) => [p.lives, p.level, p.score, p.kills, p.tank ? packTank(p.tank) : 0, p.wins || 0]),
     en: s.enemies.map(packTank),
     bu: s.bullets.map((b) => [b.x, b.y]),
     bo: s.booms.map((b) => [b.x, b.y, b.big ? 1 : 0, b.t]),
@@ -1488,7 +1534,8 @@ function applySnapshot(m) {
   Object.assign(v, {
     frame: m.f, phase: m.ph, phaseT: m.pt, stage: m.st, mapName: m.mn, baseAlive: !!m.ba, won: !!m.wo,
     queue: { length: m.q }, freeze: m.fr, shovel: m.sh,
-    players: m.pl.map((a) => ({ lives: a[0], level: a[1], score: a[2], kills: a[3], tank: a[4] ? unpackTank(a[4]) : null })),
+    duel: Array.isArray(m.du), round: m.du ? m.du[0] : 0, roundWinner: m.du ? m.du[1] : -1, winner: m.du ? m.du[2] : -1,
+    players: m.pl.map((a) => ({ lives: a[0], level: a[1], score: a[2], kills: a[3], tank: a[4] ? unpackTank(a[4]) : null, wins: a[5] || 0 })),
     enemies: m.en.map(unpackTank),
     bullets: m.bu.map(([x, y]) => ({ x, y })),
     booms: m.bo.map(([x, y, big, t]) => ({ x, y, big: !!big, t })),
@@ -1692,7 +1739,7 @@ let running = false;
 function begin(players, start) {
   start = players === 1 && start > 0 ? start : 0;
   keyMap = players === 2 && mode === 'local' ? KEYS_2P : KEYS_1P;
-  skins = [look.tank, mode === 'host' && net.guestSkin ? net.guestSkin : partnerSkin(look.tank)];
+  skins = [look.tank, mode === 'host' ? guestSkin() : partnerSkin(look.tank)];
   net.remote = { dir: -1, fire: false };
   net.rematch = { me: false, peer: false };
   net.resume = false;
@@ -1705,7 +1752,8 @@ function begin(players, start) {
   const b = beatView && mode === 'local' && players === 1 ? beatView : null;
   const t = !b && mode !== 'guest' && ticket.next;
   if (!b) { ticket.next = null; keepTicket(); }
-  let v = !start && mode === 'local' && players === 1 ? variant : '';
+  // A duel: at one keyboard or online as the host; otherwise survival is for one player only.
+  let v = variant === 'duel' ? (players === 2 && mode !== 'guest' ? 'duel' : '') : !start && mode === 'local' && players === 1 ? variant : '';
   if (b) { v = b.mode; start = b.start; }
   const rules = b ? b.rules : S.RULES;
   const seed = b ? b.seed : t ? t.seed : 0;
@@ -1757,7 +1805,7 @@ function afterStep(s) {
       track('match_finished', net.code);
       rematchScreen();
     } else {
-      showOverlay(T(s.won ? 'won_title' : 'game_over'), resultText(s) + '<br>' + T('best_line', { n: best }), T('btn_again'), () => beginLocal(s.players.length));
+      showOverlay(s.duel ? duelTitle(s) : T(s.won ? 'won_title' : 'game_over'), resultText(s) + (s.duel ? '' : '<br>' + T('best_line', { n: best })), T('btn_again'), () => beginLocal(s.players.length));
       showShare(s);
       showPick($('ovPick'));
       finishRun(s);
