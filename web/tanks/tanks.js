@@ -951,6 +951,7 @@ function hud(s) {
 
 // Map names live in sim.js in Russian; the dictionary has them by map number.
 function mapTitle(name) {
+  if (name === S.CUSTOM_NAME) return T('custom_name');
   const i = S.MAPS.findIndex((m) => m.name === name);
   const a = S.ARENAS.findIndex((m) => m.name === name);
   return i >= 0 ? T('map_' + i) : a >= 0 ? T('arena_' + a) : String(name || '');
@@ -1010,6 +1011,7 @@ function showOverlay(title, html, button, action, panel) {
   $('ovHint').classList.toggle('hidden', panel !== 'menu');
   $('back').classList.toggle('hidden', panel !== 'menu');
   $('online').classList.toggle('hidden', panel !== 'online');
+  $('editor').classList.toggle('hidden', panel !== 'editor');
   $('ovText').classList.toggle('hidden', !html);
   const btn = $('ovBtn');
   btn.classList.toggle('hidden', !button);
@@ -1017,6 +1019,7 @@ function showOverlay(title, html, button, action, panel) {
   overlayAction = action;
   $('ovShare').classList.add('hidden');
   $('ovBeat').classList.add('hidden');
+  $('ovEdit').classList.add('hidden');
   $('ovPick').classList.add('hidden');
   $('ovMenu').classList.add('hidden');
   $('btnDuelLocal').classList.add('hidden');
@@ -1048,6 +1051,130 @@ if (window.Progress) window.Progress.load().then(() => { if (!$('menu').classLis
 
 $('btnLook').addEventListener('click', () => { audio(); openLook(); });
 
+// ---------- «🛠 Своя карта» ----------
+// A map drawn here is played alone as one stage (sim.js, custom) and is not sent to the server.
+// The last drawn map is kept on this phone; a link (startapp=map_<code>) brings a friend's map.
+const MAP_KEY = 'tankodrom_map';
+const EMPTY_MAP = Array(13).fill('.............');
+let edRows = (() => {
+  try {
+    const rows = JSON.parse(localStorage.getItem(MAP_KEY));
+    if (S.validMap(rows)) return rows;
+  } catch (e) { /* none yet */ }
+  return EMPTY_MAP.slice();
+})();
+let edTool = 1;
+let edCopy = 0;
+const edCanvas = $('edCanvas');
+const saveMap = () => { try { localStorage.setItem(MAP_KEY, JSON.stringify(edRows)); } catch (e) { /* ignore */ } };
+// The tile picture of each block, as the game draws it.
+const toolImage = (i) => (i === 1 ? wallTile() : i === 3 ? WATER_FRAMES[0] : TILE[i]);
+
+function drawEditor() {
+  const main = ctx;
+  ctx = edCanvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  try {
+    ctx.drawImage(groundImage(), 0, 0);
+    const shown = { frame: 0, shovel: 0, cells: S.newGame(1, 1, { rules: S.RULES, map: edRows }).cells };
+    drawCells(shown, false);
+    drawCells(shown, true);
+    ctx.drawImage(BASE_OK, 96, 192);
+    // Where enemies (red) and players (green) appear stays clear.
+    for (const [tx, ty, col] of [[0, 0, 'e'], [6, 0, 'e'], [12, 0, 'e'], [4, 12, 'p'], [8, 12, 'p']]) {
+      ctx.fillStyle = col === 'e' ? 'rgba(232, 56, 32, 0.35)' : 'rgba(88, 184, 48, 0.35)';
+      ctx.fillRect(tx * 16 + 2, ty * 16 + 2, 12, 12);
+    }
+  } finally {
+    ctx = main;
+  }
+}
+
+function drawTools() {
+  const box = $('edTools');
+  if (!box.children.length) {
+    S.TILE_CHARS.split('').forEach((_c, i) => {
+      const b = document.createElement('button');
+      const pic = document.createElement('canvas');
+      pic.width = 16;
+      pic.height = 16;
+      b.append(pic, T('tool_' + i));
+      b.addEventListener('click', () => { edTool = i; drawTools(); });
+      box.appendChild(b);
+    });
+  }
+  [...box.children].forEach((b, i) => {
+    b.classList.toggle('on', i === edTool);
+    const g = b.querySelector('canvas').getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(groundImage(), 0, 0, 16, 16, 0, 0, 16, 16);
+    const img = toolImage(i);
+    if (img) for (const [x, y] of [[0, 0], [8, 0], [0, 8], [8, 8]]) g.drawImage(img, x, y);
+  });
+}
+
+function openEditor(text) {
+  showOverlay(T('editor_title'), text || T('editor_hint'), null, null, 'editor');
+  $('edCopy').textContent = T('editor_copy');
+  drawTools();
+  drawEditor();
+}
+
+let painting = false;
+function paintAt(e) {
+  const r = edCanvas.getBoundingClientRect();
+  const tx = Math.floor(((e.clientX - r.left) / r.width) * 13);
+  const ty = Math.floor(((e.clientY - r.top) / r.height) * 13);
+  if (tx < 0 || ty < 0 || tx > 12 || ty > 12 || S.reservedTile(tx, ty)) return;
+  const ch = S.TILE_CHARS[edTool];
+  if (edRows[ty][tx] === ch) return;
+  edRows = edRows.slice();
+  edRows[ty] = edRows[ty].slice(0, tx) + ch + edRows[ty].slice(tx + 1);
+  drawEditor();
+}
+edCanvas.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  painting = true;
+  try { edCanvas.setPointerCapture(e.pointerId); } catch (err) { /* old browser */ }
+  paintAt(e);
+});
+edCanvas.addEventListener('pointermove', (e) => { if (painting) paintAt(e); });
+for (const ev of ['pointerup', 'pointercancel']) {
+  edCanvas.addEventListener(ev, () => {
+    if (!painting) return;
+    painting = false;
+    saveMap();
+  });
+}
+
+$('btnEditor').addEventListener('click', () => { audio(); openEditor(); });
+$('ovEdit').addEventListener('click', () => { audio(); openEditor(); });
+$('edBack').addEventListener('click', () => { audio(); showMenu(); });
+$('edPlay').addEventListener('click', () => { audio(); saveMap(); variant = 'custom'; beatView = null; beginLocal(1); });
+$('edClear').addEventListener('click', () => { edRows = EMPTY_MAP.slice(); saveMap(); drawEditor(); });
+// A stage's map to start from: each press takes the next one.
+$('edCopy').addEventListener('click', () => {
+  const i = edCopy++ % S.MAPS.length;
+  edRows = S.MAPS[i].rows.map((r) => r.padEnd(13, '.').slice(0, 13));
+  saveMap();
+  drawEditor();
+  $('edCopy').textContent = T('editor_copy') + ' ' + (i + 1);
+});
+$('edShare').addEventListener('click', () => {
+  saveMap();
+  const link = appLink('map_' + S.encodeMap(edRows));
+  const text = T('map_share_text');
+  track('share_clicked');
+  try {
+    if (tg && tg.openTelegramLink) {
+      tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent(text));
+      return;
+    }
+  } catch (e) { /* fall through */ }
+  if (navigator.share) navigator.share({ text, url: link }).catch(() => {});
+  else if (navigator.clipboard) navigator.clipboard.writeText(text + '\n' + link).then(() => { $('edShare').textContent = T('link_copied'); });
+});
+
 $('ovBtn').addEventListener('click', () => {
   audio();
   const act = overlayAction;
@@ -1065,7 +1192,8 @@ $('btnSurvival').addEventListener('click', () => { audio(); variant = 'survival'
 function resultText(s) {
   if (s.duel) return duelText(s);
   const score = s.players.reduce((a, p) => a + p.score, 0);
-  const how = s.won ? T('won_text', { n: S.STAGES }) : s.baseAlive ? T('all_killed') : T('base_lost');
+  const how = s.won ? (s.custom ? T('custom_won_text') : T('won_text', { n: S.STAGES })) : s.baseAlive ? T('all_killed') : T('base_lost');
+  if (s.custom) return how + '<br>' + T('score_line', { n: score });
   const reached = s.mode === 'survival' ? T('wave_line', { n: s.wave }) : T('stage_line', { n: s.stage + 1 });
   return how + '<br>' + reached + '<br>' + T('score_line', { n: score });
 }
@@ -1750,15 +1878,18 @@ function begin(players, start) {
   if (state) sendRun(state, true);
   // A challenge («Побей мой счёт»): its own game, no ticket (it gives no жетоны).
   const b = beatView && mode === 'local' && players === 1 ? beatView : null;
-  const t = !b && mode !== 'guest' && ticket.next;
-  if (!b) { ticket.next = null; keepTicket(); }
+  // An own map («🛠 Своя карта»): no ticket either, the game is not sent.
+  const custom = !b && variant === 'custom' && mode === 'local' && players === 1;
+  const t = !b && !custom && mode !== 'guest' && ticket.next;
+  if (!b && !custom) { ticket.next = null; keepTicket(); }
   // A duel: at one keyboard or online as the host; otherwise survival is for one player only.
   let v = variant === 'duel' ? (players === 2 && mode !== 'guest' ? 'duel' : '') : !start && mode === 'local' && players === 1 ? variant : '';
   if (b) { v = b.mode; start = b.start; }
+  if (custom) { v = ''; start = 0; }
   const rules = b ? b.rules : S.RULES;
   const seed = b ? b.seed : t ? t.seed : 0;
   Object.assign(rec, { seed, players, start, mode: v, rules, beat: b ? b.id : '', out: [], prev: -1, n: 0, frames: 0 });
-  state = S.newGame(players, seed || (Date.now() & 0x7fffffff) || 1, { rules, mode: v });
+  state = S.newGame(players, seed || (Date.now() & 0x7fffffff) || 1, { rules, mode: v, map: custom ? edRows : undefined });
   if (start) S.startStage(state, start); // the same as bot/tanks-replay.js
   fetchTicket();
   track('game_start');
@@ -1798,9 +1929,12 @@ function afterStep(s) {
   } else if (s.phase === 'overDone') {
     running = false;
     const score = s.players.reduce((a, p) => a + p.score, 0);
-    const best = saveBest(score);
+    const best = s.custom ? 0 : saveBest(score);
     if (mode === 'local') track('game_finish');
-    if (mode === 'host') {
+    if (s.custom) {
+      showOverlay(T(s.won ? 'custom_won' : 'game_over'), resultText(s), T('btn_again'), () => beginLocal(1));
+      $('ovEdit').classList.remove('hidden');
+    } else if (mode === 'host') {
       sendRun(s);
       track('match_finished', net.code);
       rematchScreen();
@@ -1894,6 +2028,12 @@ render(state);
 state = null;
 showMenu();
 const invited = new URLSearchParams(location.search).get('room');
+// A friend's map from a link (menu.js: startapp=map_<code>).
+const sharedMap = S.decodeMap(new URLSearchParams(location.search).get('map'));
+if (sharedMap) {
+  edRows = sharedMap;
+  openEditor(T('editor_shared'));
+}
 if (invited && API) {
   $('code').value = invited;
   joinRoom(invited);

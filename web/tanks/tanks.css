@@ -196,6 +196,30 @@ html, body {
 
 #back { margin-top: 8px; width: min(280px, 100%); }
 
+/* «🛠 Своя карта» */
+#editor { display: flex; flex-direction: column; align-items: center; gap: 10px; width: min(320px, 100%); }
+#edCanvas {
+  width: min(300px, 100%, 36vh);
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  touch-action: none;
+}
+#edTools { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; width: 100%; }
+#overlay #edTools button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 4px 0; border: 2px solid transparent; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08); color: #fff; font: bold 10px "Courier New", monospace;
+}
+#overlay #edTools button.on { border-color: #f8d020; background: rgba(248, 208, 32, 0.15); }
+#edTools canvas { width: 24px; height: 24px; image-rendering: pixelated; }
+#editor .ui-stack { width: 100%; gap: 8px; }
+#overlay:has(#editor:not(.hidden)) { justify-content: safe center; overflow-y: auto; padding: 10px 16px; }
+#overlay:has(#editor:not(.hidden)) h1 { font-size: 22px; margin-bottom: 6px; }
+#overlay:has(#editor:not(.hidden)) #ovText { font-size: 13px; margin-bottom: 8px; line-height: 1.35; }
+.edRow { display: flex; gap: 8px; }
+.edRow .ui-btn { flex: 1; font-size: 13px; }
+
 @media (max-width: 420px) {
   #controls { padding-left: 12px; padding-right: 12px; }
   #dpad, #actions { gap: 8px; }
