@@ -455,6 +455,15 @@
     "bodyEn": "Every level hides three medals: in bonus rooms and in the hardest places to reach. The level title card shows the medals you have found, and the level choice shows three dots under each level and your total."
   },
   {
+    "id": "2026-10-24-pryg-classic-maps",
+    "date": "2026-10-24",
+    "size": "major",
+    "title": "«Прыг-Скок»: все 32 уровня как в классике",
+    "body": "Все восемь миров перестроены по классическим уровням приставки блок в блок: те же ямы, трубы, враги, лифты, лозы, облака, бонусные комнаты и время на таймере. В замках-лабиринтах 4-4 и 7-4 нужно найти верный путь, а в последнем замке пройти через нужные трубы.",
+    "titleEn": "Hop-Skip: all 32 levels as in the classic",
+    "bodyEn": "All eight worlds are rebuilt block by block after the classic console levels: the same pits, pipes, enemies, lifts, climbing plants, clouds, bonus rooms and timers. In the maze castles 4-4 and 7-4 find the right way, and in the last castle go through the right pipes."
+  },
+  {
     "id": "2026-10-24-pryg-time",
     "size": "major",
     "title": "«Прыг-Скок»: режим «На время»",

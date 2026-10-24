@@ -41,7 +41,7 @@ const EN_NAMES = {
   'НОЧНОЙ ЛУГ': 'NIGHT MEADOW', 'НОЧНАЯ ДОРОГА': 'NIGHT ROAD', 'НОЧНЫЕ ДЕРЕВЬЯ': 'NIGHT TREES',
   'ОБЛАЧНЫЙ ЛУГ': 'CLOUD MEADOW', 'ГЛУБОКОЕ ПОДЗЕМЕЛЬЕ': 'DEEP UNDERGROUND', 'ГРИБЫ': 'MUSHROOMS',
   'ЗАМОК-ЛАБИРИНТ': 'MAZE CASTLE', 'ЗОНА ПЕРЕХОДА': 'WARP ZONE',
-  'ВЕЧЕРНИЙ ЛУГ': 'EVENING MEADOW', 'ХОЛМЫ И ПРУЖИНЫ': 'HILLS AND SPRINGS', 'ДЕРЕВЬЯ НА ВЕТРУ': 'WINDY TREES',
+  'ВЕЧЕРНИЙ ЛУГ': 'EVENING MEADOW', 'СЕРЫЕ ДЕРЕВЬЯ': 'GREY TREES', 'ХОЛМЫ И ПРУЖИНЫ': 'HILLS AND SPRINGS', 'ДЕРЕВЬЯ НА ВЕТРУ': 'WINDY TREES',
   'НОЧНОЙ НАЕЗДНИК': 'NIGHT RIDER', 'ДОЛИНА ТРУБ': 'PIPE VALLEY', 'НОЧНЫЕ ГРИБЫ': 'NIGHT MUSHROOMS',
   'ПОЛЕ МЕТАТЕЛЕЙ': 'THROWERS FIELD', 'ГЛУБОКОЕ МОРЕ': 'DEEP SEA', 'МОСТЫ И РЫБЫ': 'BRIDGES AND FISH',
   'A — ПРЫЖОК, ДЕРЖИ — ВЫШЕ': 'A — JUMP, HOLD — HIGHER', 'БЕЙ БЛОКИ СНИЗУ': 'HIT BLOCKS FROM BELOW',
@@ -1969,6 +1969,8 @@ class Play extends Phaser.Scene {
       p.setPosition(x, to.y * TILE);
       finish();
     }
+    // A pipe carries the hero past castle maze checks without tripping them.
+    this.prevX = x;
     this.lead = 0;
     cam.scrollX = Phaser.Math.Clamp(x - VIEW_W * 0.42, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
   }

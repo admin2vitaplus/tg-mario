@@ -132,7 +132,8 @@ test('worlds 2-4 bring their own features', () => {
   assert.ok(byId['4-1'].rider, '4-1 has the cloud rider');
   assert.equal(byId['4-3'].areas[0].tiles, 'tilesMush', '4-3 is on mushrooms');
   assert.equal(byId['4-4'].loops.length, 2, '4-4 is a maze with two forks');
-  assert.equal(byId['7-4'].loops.length, 3, '7-4 is a maze with three forks');
+  assert.ok(byId['7-4'].loops.length >= 3, '7-4 is a maze with several forks');
+  assert.ok(byId['8-4'].loops.length >= 3, '8-4 is a maze passed through the right pipes');
   for (const { id, lvl } of all) {
     for (const lp of lvl.loops || []) {
       assert.ok(lp.back < lp.x, id);
@@ -170,7 +171,7 @@ test('cannons stand where the original has bullets, with room to fire', () => {
     lvl.grid.forEach((r, y) => r.forEach((ch, x) => {
       if (ch !== 'u') return;
       assert.ok(!SOLID.has(at(lvl, x - 1, y)) || !SOLID.has(at(lvl, x + 1, y)), `${id}: cannon at ${x} is walled in`);
-      for (let yy = y + 1; yy < 13; yy++) assert.equal(at(lvl, x, yy), 'j', `${id}: cannon at ${x} stands on its stand`);
+      assert.ok(SOLID.has(at(lvl, x, y + 1)), `${id}: cannon at ${x} stands on its stand or a block`);
     }));
   }
 });
