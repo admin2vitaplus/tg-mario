@@ -478,5 +478,13 @@
     "body": "Новая кнопка «🛠 Своя карта»: рисуйте поле пальцем из кирпича, стали, воды, леса и льда или возьмите за основу карту любого уровня. Сыграйте на ней против двадцати врагов и отправьте ссылку другу: она откроет вашу карту у него. Очки и жетоны на своей карте не идут.",
     "titleEn": "Tank Field: your own map",
     "bodyEn": "New «🛠 Own map» button: draw the field with your finger from brick, steel, water, forest and ice, or start from any stage map. Play it against twenty enemies and send a link to a friend: it opens your map for them. An own map gives no points and no ◆."
+  },
+  {
+    "id": "2026-10-24-bombs-party",
+    "size": "major",
+    "title": "«Бомбодром»: бой на четверых",
+    "body": "Новая кнопка «👥 Бой на четверых»: три или четыре бомбера на одном поле, у каждого три жизни, побеждает последний, у кого они остались. Создайте комнату и отправьте код друзьям или найдите случайных соперников: полная комната начинает бой сама. Очки и жетоны в этом бою не идут.",
+    "titleEn": "Bomb Field: battle for four",
+    "bodyEn": "New «👥 Battle for four» button: three or four bombers on one field, three lives each, the last one with lives left wins. Create a room and send the code to friends, or find random opponents: a full room starts the battle by itself. This battle gives no points and no ◆."
   }
 ]

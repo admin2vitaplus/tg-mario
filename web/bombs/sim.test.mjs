@@ -22,7 +22,7 @@ function bare(s) {
 
 test('the field: steel border, a pillar on every second cell, the starts free', () => {
   for (let seed = 1; seed < 30; seed++) {
-    for (const players of [1, 2]) {
+    for (const players of [1, 2, 3, 4]) {
       const s = S.newGame(players, seed);
       for (let x = 0; x < COLS; x++) { assert.equal(at(s, x, 0), HARD); assert.equal(at(s, x, ROWS - 1), HARD); }
       for (let y = 0; y < ROWS; y++) { assert.equal(at(s, 0, y), HARD); assert.equal(at(s, COLS - 1, y), HARD); }
@@ -363,4 +363,23 @@ test('rules 1 and solo games never close in', () => {
     idle(s, S.SHRINK_AT + 600);
     assert.equal(s.cells.filter((c) => c === HARD).length, steel);
   }
+});
+
+test('four bombers: one per corner; out of lives they drop out, the last one standing wins', () => {
+  const s = playing(4);
+  assert.equal(s.duel, true);
+  assert.deepEqual(s.players.map((p) => [p.x / TS, p.y / TS]), S.STARTS);
+  bare(s);
+  const [a, b, c, d] = s.players;
+  // Two of them lose their last life: the game goes on without them.
+  for (const p of [b, c]) { p.lives = 1; p.alive = false; p.dieT = 0; }
+  idle(s, S.DIE + 1);
+  assert.equal(s.phase, 'play');
+  assert.deepEqual([b.out, c.out, b.alive, c.alive], [true, true, false, false]);
+  // The third one out: the one left wins.
+  d.lives = 1; d.alive = false; d.dieT = 0;
+  idle(s, S.DIE + 1);
+  assert.equal(s.phase, 'over');
+  assert.equal(s.winner, a.pi);
+  assert.equal(S.newGame(9, 1).players.length, S.MAX_PLAYERS);
 });

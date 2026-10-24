@@ -560,8 +560,8 @@ function openLook() {
 }
 
 // ---------- Drawing ----------
-// Whose screen this is: online the guest plays the second hero.
-const me = () => (mode === 'guest' ? 1 : 0);
+// Whose screen this is: online the guest plays the second hero (in a battle for four, its own one).
+const me = () => (mode === 'guest' ? net.pi : 0);
 let camX = 0;
 
 function drawFlame(x, y, kind, t) {
@@ -761,7 +761,8 @@ let lastHud = '';
 function hud(s) {
   const p = s.players[me()] || s.players[0];
   const duel = s.players.length > 1;
-  const first = duel ? p.wins + ':' + s.players[1 - me()].wins : String(p.score).padStart(6, '0');
+  const rival = Math.max(0, ...s.players.filter((o) => o !== p).map((o) => o.wins));
+  const first = duel ? p.wins + ':' + rival : String(p.score).padStart(6, '0');
   const time = Math.max(0, Math.ceil(s.time / 60));
   const line = [first, p.lives, time, s.stage, duel].join('|');
   if (line === lastHud) return;
@@ -823,6 +824,7 @@ function showOverlay(title, html, button, action, panel) {
   $('ovBeat').classList.add('hidden');
   $('ovPick').classList.add('hidden');
   $('ovMenu').classList.add('hidden');
+  $('btnPartyGo').classList.add('hidden');
   $('overlay').classList.remove('hidden');
 }
 
@@ -866,13 +868,26 @@ function soloResult(s) {
 }
 
 function duelResult(s) {
-  const mine = s.players[me()], other = s.players[1 - me()];
+  const mine = s.players[me()];
+  if (s.players.length > 2) {
+    const list = s.players.map((p) => nameOf(p.pi) + ' ' + p.wins).join(' · ');
+    return T('party_wins', { list }) + '<br>' + T('score_line', { n: mine.score });
+  }
+  const other = s.players[1 - me()];
   return T('duel_wins', { me: mine.wins, friend: other.wins }) + '<br>' + T('score_line', { n: mine.score });
+}
+// A player in a battle for four: «вы» or «игрок N».
+const nameOf = (pi) => (pi === me() ? T('party_you') : T('party_player', { n: pi + 1 }));
+// Who found the door first on a stage just cleared.
+function stageWinner(s) {
+  if (s.players.length > 2) return T('party_stage', { name: nameOf(s.winner) });
+  return s.winner === me() ? T('duel_you') : T('duel_friend');
 }
 
 // «Поделиться итогом»: the result goes to any Telegram chat with a link to the bot.
 let shareText = '';
 function showShare(s) {
+  if (s.players.length > 2) return;
   if (s.players.length > 1) {
     shareText = T('share_duo', { me: s.players[me()].wins, friend: s.players[1 - me()].wins });
   } else shareText = T('share_solo', { n: s.stage + 1, score: s.players[0].score });
@@ -946,7 +961,11 @@ const net = {
   ws: null, code: '', token: '', started: false, remote: { dir: -1, a: false, b: false }, lastDir: -1, cellsKey: '', events: [],
   retry: null, ping: null, peerAway: false, resume: false, rematch: { me: false, peer: false }, guestHero: '',
   random: false, // the room is a random search, not for a friend
+  // A battle for four (room size 3…4, bot/tanks-rooms.js): my seat in the room, my player in the
+  // game; the host keeps the guests' seats (lobby), their heroes, the seats in game order and their buttons.
+  size: 2, seat: 0, pi: 1, lobby: [], seatHero: {}, order: [], remotes: [],
 };
+const party = () => net.size > 2;
 const REJOIN_MS = 20000;
 const HOST_AWAY_MS = 120000;
 
@@ -963,6 +982,12 @@ function netClose() {
   net.started = false;
   net.peerAway = false;
   net.random = false;
+  net.size = 2;
+  net.seat = 0;
+  net.pi = 1;
+  net.lobby = [];
+  net.seatHero = {};
+  net.order = [];
   stopRetry();
   clearInterval(net.ping);
   if (ws) { ws.onclose = null; try { ws.close(1000); } catch (e) { /* ignore */ } }
@@ -1054,7 +1079,7 @@ function pauseOnline(title, text) {
 function resumeOnline() {
   if (net.retry || net.peerAway) return;
   if (!net.started) {
-    if (mode === 'host') roomScreen();
+    if (mode === 'host') party() ? partyLobby() : roomScreen();
     else if (mode === 'guest') showOverlay(T('room_n', { code: net.code }), T('in_room'), null, null, 'online');
     return;
   }
@@ -1104,13 +1129,23 @@ function onNet(m) {
     net.random = !!m.random;
     mode = 'host';
     net.guestHero = '';
-    roomScreen();
+    net.size = m.size || 2;
+    if (party()) partyLobby(); else roomScreen();
   } else if (m.t === 'peer') {
-    hostStarts();
+    if (!party()) { hostStarts(); return; }
+    if (!net.lobby.includes(m.seat)) net.lobby.push(m.seat);
+    haptic('light');
+    if (!running && !(state && state.phase === 'overDone' && net.order.length)) partyLobby();
+    else if (state && state.phase === 'overDone') rematchScreen();
+    // A full room starts by itself.
+    if (!net.order.length && net.lobby.length >= 3) partyStart();
   } else if (m.t === 'joined') {
     mode = 'guest';
     net.code = m.code;
     net.token = m.token || '';
+    net.size = m.size || 2;
+    net.seat = m.seat || 1;
+    net.pi = 1;
     net.started = true;
     net.rematch = { me: false, peer: false };
     netSend({ t: 'look', hero: look.hero });
@@ -1120,13 +1155,50 @@ function onNet(m) {
     net.lastDir = -1;
     net.random = !!m.random;
     if (net.random) haptic('success');
+    if (party()) { guestLobby(0); return; }
     showOverlay(net.random ? T('online_title') : T('room_n', { code: m.code }), (net.random ? T('found') : T('in_room')) + '<br><br>' + T('duel_intro'), null, null, 'online');
     $('onlineStart').classList.add('hidden');
+  } else if (m.t === 'lobby' && mode === 'guest') {
+    if (!view || guestShown === 'overDone') guestLobby(m.n);
+  } else if (m.t === 'go' && mode === 'guest') {
+    // The host started a battle: my player is my seat's place in its order.
+    net.pi = Array.isArray(m.o) ? Math.max(0, m.o.indexOf(net.seat)) : 1;
+    net.rematch = { me: false, peer: false };
+    view = null;
+    guestShown = 'wait';
+    haptic('success');
+  } else if (m.t === 'g' && mode === 'host') {
+    // A guest's message in a battle for four, with its seat.
+    let inner;
+    try { inner = JSON.parse(m.m); } catch (e) { return; }
+    if (!inner || typeof inner !== 'object') return;
+    if (inner.t === 'look') { net.seatHero[m.s] = knownHero(inner.hero) ? inner.hero : ''; return; }
+    const pi = net.order.indexOf(m.s);
+    if (inner.t === 'i' && pi > 0 && net.remotes[pi]) {
+      const r = net.remotes[pi];
+      r.dir = inner.d;
+      if (inner.a) r.a = true;
+      if (inner.b) r.b = true;
+    }
+  } else if (m.t === 'gone' && mode === 'host') {
+    // A guest left a battle for four: the others go on; that bomber just stands still.
+    net.lobby = net.lobby.filter((x) => x !== m.seat);
+    const pi = net.order.indexOf(m.seat);
+    if (pi > 0 && net.remotes[pi]) net.remotes[pi] = { dir: -1, a: false, b: false };
+    if (pi > 0) toast(T('party_gone', { n: pi + 1 }));
+    if (!net.order.length) partyLobby();
+    else if (!running && state && state.phase === 'overDone') rematchScreen();
+  } else if ((m.t === 'wait' || m.t === 'back') && mode === 'host' && m.seat) {
+    // A guest's link in a battle for four: the game does not stop for one player.
+    const pi = net.order.indexOf(m.seat);
+    if (pi > 0 && net.remotes[pi]) net.remotes[pi] = { dir: -1, a: false, b: false };
   } else if (m.t === 'rejoined') {
     stopRetry();
     haptic('success');
     net.peerAway = !m.peer;
     if (mode === 'guest') netSend({ t: 'look', hero: look.hero });
+    if (m.size) { net.size = m.size; net.seat = m.seat || 0; }
+    if (mode === 'host' && party()) { if (!net.started) partyLobby(); else resumeOnline(); return; }
     if (mode === 'host' && m.peer && !net.started) hostStarts();
     else if (net.peerAway) pauseOnline(T('peer_lost_title'), T('peer_wait'));
     else resumeOnline();
@@ -1153,10 +1225,12 @@ function onNet(m) {
     // The guest's own hero; one the host does not know, or the same as the host's, gets another colour.
     net.guestHero = knownHero(m.hero) && m.hero !== look.hero ? m.hero : '';
     heroes[1] = net.guestHero || partnerHero(look.hero);
-  } else if (m.t === 'i' && mode === 'host') {
-    net.remote.dir = m.d;
-    if (m.a) net.remote.a = true;
-    if (m.b) net.remote.b = true;
+  } else if (m.t === 'i' && mode === 'host' && !party()) {
+    const r = net.remotes[1];
+    if (!r) return;
+    r.dir = m.d;
+    if (m.a) r.a = true;
+    if (m.b) r.b = true;
   } else if (m.t === 's' && mode === 'guest') {
     applySnapshot(m);
   }
@@ -1171,6 +1245,7 @@ function pressRematch() {
 function rematchScreen() {
   const s = state;
   if (!s || s.phase !== 'overDone' || net.peerAway || net.retry) return;
+  if (party()) { partyOver(s); return; }
   if (net.rematch.me && net.rematch.peer) {
     if (mode === 'host') begin(2);
     else showOverlay(T('rematch_title'), T('rematch_go'), null, null, 'online');
@@ -1195,11 +1270,13 @@ let serverAlive = false;
 function onlineMenu(text) {
   running = false;
   mode = 'local';
+  const many = variant === 'party';
   const html = API
-    ? (text ? text + '<br>' : '') + T('online_menu') + '<br><br>' + T('duel_intro')
+    ? (text ? text + '<br>' : '') + T(many ? 'party_menu' : 'online_menu') + '<br><br>' + T(many ? 'party_intro' : 'duel_intro')
     : NO_SERVER[apiProblem];
-  showOverlay(T('online_title'), html, null, null, 'online');
+  showOverlay(T(many ? 'party_title' : 'online_title'), html, null, null, 'online');
   $('onlineStart').classList.toggle('hidden', !API);
+  $('btnPartyRandom').classList.toggle('hidden', !many);
   $('btnInvite').classList.add('hidden');
   if (API && !text) checkServer();
 }
@@ -1217,13 +1294,77 @@ function checkServer() {
     .finally(() => clearTimeout(timer));
 }
 
-$('btnOnline').addEventListener('click', () => { audio(); onlineMenu(); });
+// ---------- «👥 Бой на четверых» ----------
+// A room for four (bot/tanks-rooms.js): the host sees who came in and starts the battle with
+// three or four; a full room starts by itself. The host runs the game for everybody.
+let variant = ''; // '' a duel, 'party' a battle for four: what the online panel makes
+
+function partyHeroes() {
+  const used = [];
+  return net.order.map((seat) => {
+    let id = seat === 0 ? look.hero : net.seatHero[seat];
+    if (!knownHero(id) || used.includes(id)) id = HEROES.map((h) => h.id).find((h) => !used.includes(h));
+    used.push(id);
+    return id;
+  });
+}
+
+function partyLobby() {
+  const n = 1 + net.lobby.length;
+  const head = net.random ? T('party_finding') : T('party_code', { code: '<b class="code">' + net.code + '</b>' });
+  showOverlay(T('party_title'), head + '<br><br>' + T('party_count', { n }) + '<br>' + T('party_need'), null, null, 'online');
+  $('onlineStart').classList.add('hidden');
+  $('btnInvite').classList.toggle('hidden', net.random);
+  const go = $('btnPartyGo');
+  go.classList.remove('hidden');
+  go.disabled = n < 3;
+  netSend({ t: 'lobby', n });
+}
+
+function guestLobby(n) {
+  showOverlay(T('party_title'), (n ? T('party_count', { n }) + '<br>' : '') + T('party_wait_host') + '<br><br>' + T('party_intro'), null, null, 'online');
+  $('onlineStart').classList.add('hidden');
+}
+
+function partyStart() {
+  if (!net.lobby.length) return;
+  haptic('success');
+  net.order = [0, ...net.lobby.slice().sort((a, b) => a - b)];
+  netSend({ t: 'lock' });
+  netSend({ t: 'go', o: net.order });
+  mode = 'host';
+  net.started = true;
+  begin(net.order.length);
+}
+$('btnPartyGo').addEventListener('click', () => { audio(); if (1 + net.lobby.length >= 3) partyStart(); });
+
+// The end of a battle: the host can start another one with whoever is still here.
+function partyOver(s) {
+  const won = s.winner >= 0 && s.winner === me();
+  const who = s.winner >= 0 ? T('party_winner', { name: nameOf(s.winner) }) + '<br>' : '';
+  const text = who + duelResult(s);
+  if (mode === 'host') {
+    showOverlay(won ? T('party_won') : T('party_lost'), text + '<br><br>' + T('party_count', { n: 1 + net.lobby.length }),
+      net.lobby.length ? T('party_again') : T('btn_exit'), net.lobby.length ? partyStart : showMenu);
+  } else showOverlay(won ? T('party_won') : T('party_lost'), text + '<br><br>' + T('party_next_wait'), T('btn_exit'), showMenu);
+}
+
+$('btnParty').addEventListener('click', () => { audio(); variant = 'party'; beatView = null; onlineMenu(); });
+$('btnPartyRandom').addEventListener('click', () => {
+  audio();
+  showOverlay(T('party_title'), T('party_finding'), null, null, 'online');
+  $('onlineStart').classList.add('hidden');
+  $('btnInvite').classList.add('hidden');
+  if (!API) { onlineMenu(); return; }
+  connectFresh(() => netSend({ t: 'find', kind: 'party' }));
+});
+$('btnOnline').addEventListener('click', () => { audio(); variant = ''; onlineMenu(); });
 $('btnCancel').addEventListener('click', () => { audio(); showMenu(); });
 $('btnCreate').addEventListener('click', () => {
   audio();
   showOverlay(T('online_title'), T('creating'), null, null, 'online');
   $('onlineStart').classList.add('hidden');
-  connectFresh(() => netSend({ t: 'create' }));
+  connectFresh(() => netSend(variant === 'party' ? { t: 'create', seats: 4 } : { t: 'create' }));
 });
 // «Случайный соперник»: the server pairs this player with the next one who searches.
 $('btnRandom').addEventListener('click', () => {
@@ -1247,7 +1388,7 @@ $('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($
 $('btnInvite').addEventListener('click', () => {
   // bomb_<code> opens the collection, and the menu sends the friend straight into this room (../menu.js).
   const link = appLink('bomb_' + net.code);
-  const text = T('invite_text', { code: net.code });
+  const text = T(party() ? 'party_invite' : 'invite_text', { code: net.code });
   track('invite_created', net.code);
   try {
     if (tg && tg.openTelegramLink) {
@@ -1332,7 +1473,7 @@ function guestScreens(v) {
     return;
   }
   if (done === 'overDone') { track('match_finished', net.code); rematchScreen(); return; }
-  showOverlay(T('stage_clear', { n: v.stage + 1 }), (v.winner === me() ? T('duel_you') : T('duel_friend')) + '<br>' + duelResult(v) + '<br><br>' + T('wait_friend_next'), T('btn_exit'), showMenu);
+  showOverlay(T('stage_clear', { n: v.stage + 1 }), stageWinner(v) + '<br>' + duelResult(v) + '<br><br>' + T('wait_friend_next'), T('btn_exit'), showMenu);
 }
 
 function guestTick() {
@@ -1343,8 +1484,8 @@ function guestTick() {
   }
 }
 
-function remotePad() {
-  const r = net.remote;
+function remotePad(pi) {
+  const r = net.remotes[pi] || { dir: -1, a: false, b: false };
   const out = { dir: Number.isInteger(r.dir) && r.dir >= -1 && r.dir <= 3 ? r.dir : -1, a: !!r.a, b: !!r.b };
   r.a = false;
   r.b = false;
@@ -1516,8 +1657,8 @@ let running = false;
 // start — the stage chosen on «▦ Выбрать этап» (alone only), 0 — from the first one.
 function begin(players, start) {
   start = players === 1 && start > 0 ? start : 0;
-  heroes = [look.hero, mode === 'host' && net.guestHero ? net.guestHero : partnerHero(look.hero)];
-  net.remote = { dir: -1, a: false, b: false };
+  heroes = players > 2 ? partyHeroes() : [look.hero, mode === 'host' && net.guestHero ? net.guestHero : partnerHero(look.hero)];
+  net.remotes = Array.from({ length: players }, () => ({ dir: -1, a: false, b: false }));
   net.rematch = { me: false, peer: false };
   net.resume = false;
   net.cellsKey = '';
@@ -1527,8 +1668,9 @@ function begin(players, start) {
   if (state) sendRun(state, true);
   // A challenge («Побей мой счёт»): its own game, no ticket (it gives no жетоны).
   const b = beatView && mode === 'local' && players === 1 ? beatView : null;
-  const t = !b && mode !== 'guest' && ticket.next;
-  if (!b) { ticket.next = null; keepTicket(); }
+  // A battle for four is not checked by the server: no ticket, nothing sent.
+  const t = !b && mode !== 'guest' && players <= 2 && ticket.next;
+  if (!b && players <= 2) { ticket.next = null; keepTicket(); }
   if (b) start = b.start;
   const rules = b ? b.rules : S.RULES;
   const seed = b ? b.seed : t ? t.seed : 0;
@@ -1549,7 +1691,7 @@ function afterStep(s) {
   if (s.phase === 'clearDone') {
     running = false;
     const duel = s.players.length > 1;
-    const text = duel ? (s.winner === me() ? T('duel_you') : T('duel_friend')) + '<br>' + duelResult(s) : soloResult(s);
+    const text = duel ? stageWinner(s) + '<br>' + duelResult(s) : soloResult(s);
     showOverlay(T('stage_clear', { n: s.stage + 1 }), text, T('btn_next'), () => {
       recNext();
       S.startStage(s, s.stage + 1);
@@ -1589,7 +1731,8 @@ function frame(now) {
     acc += Math.min(dt, 100);
     while (acc >= STEP && running) {
       acc -= STEP;
-      const inputs = mode === 'host' ? [readPad(pads[0]), remotePad()] : [readPad(pads[0])];
+      const inputs = [readPad(pads[0])];
+      if (mode === 'host') for (let pi = 1; pi < state.players.length; pi++) inputs.push(remotePad(pi));
       recStep(inputs);
       S.step(state, inputs);
       for (const ev of state.events) if (SFX[ev]) SFX[ev]();

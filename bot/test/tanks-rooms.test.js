@@ -290,3 +290,73 @@ test("a random duel opponent is looked for only among those who want a duel", ()
     assert.deepEqual([joined.t, joined.code], ["joined", room.code]);
     assert.equal((await a.next()).t, "peer");
   }));
+
+test("a room for four: seats in order, the host talks to all, guests to the host, lock and leaving", () =>
+  withRooms({}, async ({ rooms, connect }) => {
+    const host = await connect();
+    host.send({ t: "create", seats: 4 });
+    const room = await host.next();
+    assert.deepEqual([room.t, room.size], ["room", 4]);
+    const guests = [];
+    for (let i = 1; i <= 3; i++) {
+      const g = await connect();
+      g.send({ t: "join", code: room.code });
+      const joined = await g.next();
+      assert.deepEqual([joined.t, joined.seat, joined.size], ["joined", i, 4]);
+      assert.deepEqual(await host.next(), { t: "peer", seat: i });
+      guests.push(g);
+    }
+    const fifth = await connect();
+    fifth.send({ t: "join", code: room.code });
+    assert.equal((await fifth.next()).code, "full");
+    // The host's world goes to every guest; a guest's buttons come to the host with the seat.
+    host.send({ t: "s", f: 1 });
+    for (const g of guests) assert.deepEqual(await g.next(), { t: "s", f: 1 });
+    guests[1].send({ t: "i", d: 3 });
+    const got = await host.next();
+    assert.deepEqual([got.t, got.s, JSON.parse(got.m)], ["g", 2, { t: "i", d: 3 }]);
+    // A guest who leaves frees the seat; the game goes on for the others.
+    guests[0].ws.close(1000);
+    assert.deepEqual(await host.next(), { t: "gone", seat: 1 });
+    assert.equal(rooms.rooms.get(room.code).seats[1], null);
+    // Locked by the host: nobody new comes in, even to a free seat; the lock is not passed on.
+    host.send({ t: "lock" });
+    host.send({ t: "s", f: 2 });
+    assert.deepEqual(await guests[1].next(), { t: "s", f: 2 });
+    assert.deepEqual(await guests[2].next(), { t: "s", f: 2 });
+    const late = await connect();
+    late.send({ t: "join", code: room.code });
+    assert.equal((await late.next()).code, "full");
+    // The host leaving closes the room for everybody.
+    host.ws.close(1000);
+    assert.equal((await guests[1].next()).t, "left");
+    assert.equal((await guests[2].next()).t, "left");
+  }));
+
+test("a random game for four: searchers fill one room, a two-player search stays apart", () =>
+  withRooms({ limits: { rejoinMs: 50, sweepMs: 20 } }, async ({ rooms, connect }) => {
+    const duel = await connect();
+    duel.send({ t: "find" });
+    const duelRoom = await duel.next();
+    const host = await connect();
+    host.send({ t: "find", kind: "party" });
+    const room = await host.next();
+    assert.deepEqual([room.t, room.size, room.random], ["room", 4, true]);
+    assert.notEqual(room.code, duelRoom.code);
+    const a = await connect();
+    a.send({ t: "find", kind: "party" });
+    const ja = await a.next();
+    assert.deepEqual([ja.code, ja.seat, ja.size], [room.code, 1, 4]);
+    assert.deepEqual(await host.next(), { t: "peer", seat: 1 });
+    const b = await connect();
+    b.send({ t: "find", kind: "party" });
+    assert.equal((await b.next()).seat, 2);
+    assert.deepEqual(await host.next(), { t: "peer", seat: 2 });
+    // A guest whose link drops: the host is told, and after the wait the seat is free.
+    await cut(rooms, room.code, 1, a);
+    assert.deepEqual(await host.next(), { t: "wait", seat: 1 });
+    assert.deepEqual(await host.next(), { t: "gone", seat: 1 });
+    const c = await connect();
+    c.send({ t: "find", kind: "party" });
+    assert.equal((await c.next()).seat, 1);
+  }));
