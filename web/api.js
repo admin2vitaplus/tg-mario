@@ -86,6 +86,18 @@ function runDone(score, levels, completed, keepalive) {
   }).catch(() => null);
 }
 
+// «⏱ На время»: попытка начинается на сервере (он сверяет, что прошло не меньше времени, чем
+// заявлено), итог — лучшее время игрока и таблица уровня { top, mine, rank } или null.
+let timeStarted = Promise.resolve();
+function timeStart(world, level) {
+  if (!canSave()) return;
+  timeStarted = request('POST', '/time/start', { world, level }).catch(() => {});
+}
+function timeDone(world, level, ms) {
+  if (!canSave()) return Promise.resolve(null);
+  return timeStarted.then(() => request('POST', '/time', { world, level, ms })).catch(() => null);
+}
+
 // ---------- Всплывающее уведомление о достижении ----------
 const toastBox = document.createElement('div');
 toastBox.id = 'achToasts';
@@ -147,5 +159,5 @@ function quit(score, levels) {
   return runDone(score, levels, false, true);
 }
 
-window.GameAPI = { enabled: !!base, ready, track, levelDone, runDone, newRun, begin, quit, openScores, reopenViaBot };
+window.GameAPI = { enabled: !!base, ready, track, levelDone, runDone, timeStart, timeDone, newRun, begin, quit, openScores, reopenViaBot };
 })();

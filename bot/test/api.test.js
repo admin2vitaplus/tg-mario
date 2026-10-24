@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { openDb } from "../db.js";
 import { createApiServer } from "../server.js";
+import { createTimeAttack } from "../time-attack.js";
 import { LAST_LEVEL, WORLD_TIMES } from "../plausibility.js";
 
 const TOKEN = "123456:TEST";
@@ -24,6 +25,7 @@ async function withServer(fn, { limits } = {}) {
     store, botToken: TOKEN, allowedOrigins: ["https://game.example"],
     onAchievements: (id, list) => notified.push([id, list]),
     now: () => clock.t, ...(limits ? { limits } : {}),
+    timeAttack: createTimeAttack(store, { now: () => clock.t }),
   });
   await new Promise((ok) => server.listen(0, ok));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -288,4 +290,21 @@ test("medals of a level come with its report and add up in the progress", () =>
     const r = await call("GET", "/api/progress", { user: alice });
     assert.deepEqual(r.json.mario, [0, 1]);
     assert.deepEqual(r.json.medals, { mario: { 0: 7 } });
+  }));
+
+test("time trial: a run is started, checked and kept in the level's table", () =>
+  withServer(async (call, _n, wait) => {
+    assert.equal((await call("POST", "/api/mario/time/start", { user: alice, body: { world: 1, level: 5 } })).status, 400);
+    assert.equal((await call("POST", "/api/mario/time/start", { user: alice, body: { world: 1, level: 1 } })).status, 409, "not open yet");
+    assert.equal((await call("POST", "/api/mario/time", { user: alice, body: { world: 1, level: 0, ms: 30000 } })).status, 409, "not started");
+    assert.equal((await call("POST", "/api/mario/time/start", { user: alice, body: { world: 1, level: 0 } })).status, 200);
+    wait(40);
+    let r = await call("POST", "/api/mario/time", { user: alice, body: { world: 1, level: 0, ms: 36500 } });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.newRecord, true);
+    assert.deepEqual(r.json.top, [{ name: "Алиса", ms: 36500, me: true }]);
+    r = await call("GET", "/api/mario/times?world=1&level=0", { user: bob });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.mine, null);
+    assert.equal(r.json.top[0].me, false);
   }));

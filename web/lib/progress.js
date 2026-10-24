@@ -85,7 +85,8 @@ function close() {
 }
 window.addEventListener('keydown', (e) => { if (box && e.key === 'Escape') { e.stopPropagation(); close(); } }, true);
 
-function pick({ game, count, label, onPick, onClose, cols }) {
+// title, hint — own heading and line; note(i) — own small line under a level instead of the medals.
+function pick({ game, count, label, onPick, onClose, cols, title, hint: hintText, note }) {
   close();
   const can = new Set(open(game, count));
   const passed = setOf(game);
@@ -95,11 +96,11 @@ function pick({ game, count, label, onPick, onClose, cols }) {
   const panel = document.createElement('div');
   panel.className = 'ui-pick-box';
   const h = document.createElement('h2');
-  h.textContent = T('title');
+  h.textContent = title || T('title');
   const hint = document.createElement('p');
-  hint.textContent = T('hint');
+  hint.textContent = hintText || T('hint');
   // Игра с медалями: под номером уровня три точки, в подсказке — сколько найдено из всех.
-  const withMedals = game === 'mario';
+  const withMedals = game === 'mario' && !note;
   const medalLine = (i) => [1, 2, 4].map((b) => (medals(game, i) & b ? '●' : '○')).join('');
   if (withMedals) {
     let n = 0;
@@ -118,6 +119,11 @@ function pick({ game, count, label, onPick, onClose, cols }) {
       const m = document.createElement('small');
       m.className = 'ui-pick-medals';
       m.textContent = medalLine(i);
+      b.appendChild(m);
+    } else if (note && note(i)) {
+      const m = document.createElement('small');
+      m.className = 'ui-pick-medals';
+      m.textContent = note(i);
       b.appendChild(m);
     }
     b.disabled = !can.has(i);

@@ -162,6 +162,10 @@ html, body {
 #overlay h1 { margin: 0 0 12px; font-size: 30px; color: #f8d020; letter-spacing: 2px; }
 #overlay p { margin: 0 0 20px; font-size: 15px; line-height: 1.5; }
 #overlay .hint { margin-top: 20px; font-size: 12px; opacity: 0.6; }
+/* «⏱ На время»: the level's table under the time */
+#overlay .taTable { display: block; margin: 8px auto 0; max-width: 260px; text-align: left; font-size: 13px; line-height: 1.4; }
+#overlay .taTable span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overlay .taTable .me { color: #f8d020; font-weight: bold; }
 
 
 

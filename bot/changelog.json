@@ -453,5 +453,13 @@
     "body": "На каждом уровне спрятаны три медали: в бонусных комнатах и в самых труднодоступных местах. На заставке уровня видно, какие уже найдены, а на экране выбора уровня под каждым уровнем есть три точки и общий счёт медалей.",
     "titleEn": "Medals in Hop-Skip",
     "bodyEn": "Every level hides three medals: in bonus rooms and in the hardest places to reach. The level title card shows the medals you have found, and the level choice shows three dots under each level and your total."
+  },
+  {
+    "id": "2026-10-24-pryg-time",
+    "size": "major",
+    "title": "«Прыг-Скок»: режим «На время»",
+    "body": "Новая кнопка «⏱ На время»: выберите любой открытый уровень и пройдите его как можно быстрее. Жизни не кончаются, после падения уровень начинается заново. Ваш лучший забег бежит рядом полупрозрачным призраком, а после финиша видна таблица лучшего времени на этом уровне.",
+    "titleEn": "Hop-Skip: Time trial",
+    "bodyEn": "New «⏱ Time trial» button: pick any open level and clear it as fast as you can. Lives never run out, a fall starts the level over. Your best run races along as a see-through ghost, and after the flag you see the best times on that level."
   }
 ]
