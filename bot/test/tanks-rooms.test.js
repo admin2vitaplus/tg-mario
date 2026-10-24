@@ -219,3 +219,57 @@ test("one address can hold only a few rooms", () =>
     c.send({ t: "create" });
     assert.equal((await c.next()).t, "error");
   }));
+
+test("a random opponent: the first one waits in an open room, the next one comes into it", () =>
+  withRooms({}, async ({ rooms, connect }) => {
+    // A room made by «create» is for a friend only: nobody random comes into it.
+    const friend = await connect();
+    friend.send({ t: "create" });
+    const own = await friend.next();
+    assert.equal(own.random, undefined);
+
+    const first = await connect();
+    first.send({ t: "find" });
+    const room = await first.next();
+    assert.equal(room.t, "room");
+    assert.equal(room.random, true);
+    assert.notEqual(room.code, own.code);
+
+    const second = await connect();
+    second.send({ t: "find" });
+    const joined = await second.next();
+    assert.deepEqual([joined.t, joined.code, joined.random], ["joined", room.code, true]);
+    assert.equal((await first.next()).t, "peer");
+    assert.deepEqual(rooms.members(room.code), { host: null, guest: null });
+
+    // The room is full now: the next one searching gets a room of their own.
+    const third = await connect();
+    third.send({ t: "find" });
+    const next = await third.next();
+    assert.equal(next.t, "room");
+    assert.notEqual(next.code, room.code);
+    second.send({ t: "i", d: 2, f: 0 });
+    assert.deepEqual(await first.next(), { t: "i", d: 2, f: 0 });
+  }));
+
+test("a random opponent is never the same player, nor a host whose link dropped", () =>
+  withRooms({ botToken: TOKEN }, async ({ rooms, connect }) => {
+    const auth = "?auth=" + encodeURIComponent(initData({ id: 7, first_name: "Аня" }));
+    const a = await connect(auth);
+    a.send({ t: "find" });
+    const room = await a.next();
+    // The same player from a second phone waits on their own.
+    const again = await connect(auth);
+    again.send({ t: "find" });
+    const own = await again.next();
+    assert.equal(own.t, "room");
+    assert.notEqual(own.code, room.code);
+    // The first host's link drops: the next player gets the second room.
+    await cut(rooms, room.code, 0, a);
+    const b = await connect("?auth=" + encodeURIComponent(initData({ id: 8, first_name: "Боря" })));
+    b.send({ t: "find" });
+    const joined = await b.next();
+    assert.equal(joined.code, own.code);
+    assert.equal((await again.next()).t, "peer");
+    assert.deepEqual(rooms.members(own.code), { host: 7, guest: 8 });
+  }));

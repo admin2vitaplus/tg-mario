@@ -9,6 +9,9 @@ import { verifyInitData } from "./auth.js";
 // Протокол (JSON-текст):
 //   клиент → сервер  { t: "create" }               → { t: "room", code, token }
 //   клиент → сервер  { t: "join", code }           → гостю { t: "joined", code, token }, хозяину { t: "peer" }
+//   клиент → сервер  { t: "find" }                 → случайный соперник: если кто-то уже ищет, как «join»
+//     в его комнату ({ t: "joined", code, token, random: true }, ему { t: "peer" }), иначе своя
+//     комната, которую найдёт следующий ищущий ({ t: "room", code, token, random: true })
 //   клиент → сервер  { t: "rejoin", code, token }  → { t: "rejoined", code, role, peer }, второму { t: "back" }
 //     (peer — есть ли сейчас на связи второй игрок)
 //   клиент → сервер  {"t":"ping"}                  — держит соединение, никуда не пересылается
@@ -156,7 +159,24 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
       try { msg = JSON.parse(text); } catch { return; }
       if (!msg || typeof msg !== "object") return;
 
-      if (msg.t === "create") {
+      // Случайный соперник: самая давняя открытая комната, хозяин которой на связи и не этот же игрок.
+      if (msg.t === "find") {
+        for (const room of rooms.values()) {
+          const host = room.seats[0];
+          if (!room.open || room.seats[1] || !host.ws || host.ws === ws || (ws.userId && host.userId === ws.userId)) continue;
+          const token = newToken();
+          room.seats[1] = { ws, token, gone: 0, userId: ws.userId };
+          room.open = false;
+          room.met = true;
+          remember(room);
+          ws.room = room.code;
+          send(ws, { t: "joined", code: room.code, token, random: true });
+          send(host.ws, { t: "peer" });
+          return;
+        }
+      }
+
+      if (msg.t === "create" || msg.t === "find") {
         if (rooms.size >= L.maxRooms) return send(ws, { t: "error", code: "busy", msg: "Сервер занят, попробуйте позже" });
         let mine = 0;
         for (const room of rooms.values()) if (room.ip === ws.ip) mine++;
@@ -164,9 +184,10 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
         const code = newCode();
         if (!code) return send(ws, { t: "error", code: "create", msg: "Не удалось создать комнату" });
         const token = newToken();
-        rooms.set(code, { code, ip: ws.ip, seats: [{ ws, token, gone: 0, userId: ws.userId }, null], created: Date.now() });
+        const open = msg.t === "find";
+        rooms.set(code, { code, ip: ws.ip, open, seats: [{ ws, token, gone: 0, userId: ws.userId }, null], created: Date.now() });
         ws.room = code;
-        send(ws, { t: "room", code, token });
+        send(ws, open ? { t: "room", code, token, random: true } : { t: "room", code, token });
       } else if (msg.t === "join" || msg.t === "rejoin") {
         if (tooManyTries(ws)) return send(ws, { t: "error", code: "tries", msg: "Слишком много попыток, подождите минуту" });
         const code = String(msg.code || "").trim();

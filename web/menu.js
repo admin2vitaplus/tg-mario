@@ -50,11 +50,14 @@ const URL_GAME_WAIT_MS = 400;
   // Coming back from a game (lib/back.js) the launch link has been followed already.
   try { if (sessionStorage.getItem('cartridge_start_done')) return; } catch (e) { /* ignore */ }
   const params = new URLSearchParams(location.search);
-  // room_<code> is a «Танкодром» room, bomb_<code> a «Бомбодром» duel.
+  // room_<code> is a «Танкодром» room, bomb_<code> a «Бомбодром» duel,
+  // beat_<game>_<id> a challenge to the same game («Побей мой счёт», lib/beat.js).
   const room = /^(room|tanks|bomb)_(\d{4,8})$/.exec(m[1]);
-  const roomGame = room && (room[1] === 'bomb' ? 'bombs' : 'tanks');
-  if (room && window.CARTRIDGE && window.CARTRIDGE.isEnabled(roomGame)) {
-    params.set('room', room[2]);
+  const beat = /^beat_(tanks|bombs|range)_([a-z0-9]{8})$/.exec(m[1]);
+  const roomGame = room ? (room[1] === 'bomb' ? 'bombs' : 'tanks') : beat ? beat[1] : '';
+  if ((room || beat) && window.CARTRIDGE && window.CARTRIDGE.isEnabled(roomGame)) {
+    if (room) params.set('room', room[2]);
+    else params.set('beat', beat[2]);
     // lib/server.js checks the tunnel from the link against the remembered address;
     // the room page gets the one that answered.
     const server = window.Server;
