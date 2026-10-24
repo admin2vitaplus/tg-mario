@@ -52,7 +52,7 @@ const EN_NAMES = {
 const nameOf = (ru) => L(ru, EN_NAMES[ru] || ru);
 
 // Server scores and achievements (api.js). The stub keeps the game working without it.
-const api = window.GameAPI || { track() {}, levelDone() {}, runDone() { return Promise.resolve(null); }, newRun() {}, begin() {}, quit() { return Promise.resolve(null); } };
+const api = window.GameAPI || { track() {}, levelDone() {}, runDone() { return Promise.resolve(null); }, timeStart() {}, timeDone() { return Promise.resolve(null); }, newRun() {}, begin() {}, quit() { return Promise.resolve(null); } };
 
 function haptic(kind) {
   try {
@@ -201,10 +201,26 @@ const $ = (id) => document.getElementById(id);
 function hud(s) {
   $('score').textContent = String(s.score).padStart(6, '0');
   $('coins').textContent = '×' + String(s.coins).padStart(2, '0');
-  $('lives').textContent = String(s.lives);
-  $('time').textContent = String(Math.max(0, s.timeLeft)).padStart(3, '0');
+  $('lives').textContent = s.ta ? '∞' : String(s.lives);
+  $('time').textContent = s.ta ? secs(s.taMs) : String(Math.max(0, s.timeLeft)).padStart(3, '0');
   $('world').textContent = (s.world || 1) + '-' + (s.level + 1);
 }
+
+// «⏱ На время»: seconds with tenths, and the best run of a level with its ghost
+// ({ ms, f: [[x, y, texture, flip], ...] } every GHOST_STEP ms), kept on this phone.
+const secs = (ms) => (Math.floor((ms || 0) / 100) / 10).toFixed(1);
+const GHOST_KEY = 'prygskok_ghost_';
+const GHOST_STEP = 50;
+function loadGhost(i) {
+  try {
+    const g = JSON.parse(localStorage.getItem(GHOST_KEY + i));
+    return g && Number.isFinite(g.ms) && Array.isArray(g.f) ? g : null;
+  } catch (e) { return null; }
+}
+function saveGhost(i, g) {
+  try { localStorage.setItem(GHOST_KEY + i, JSON.stringify(g)); } catch (e) { /* ignore */ }
+}
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 function loadBest() {
   try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch (e) { return 0; }
@@ -227,6 +243,7 @@ function showOverlay(title, text, button, action) {
   lifeAction = null;
   $('ovLife').classList.add('hidden');
   $('ovPick').classList.add('hidden');
+  $('ovTime').classList.add('hidden');
   $('ovBtn').classList.add('primary');
   $('ovTitle').textContent = title;
   $('ovText').innerHTML = text;
@@ -1432,6 +1449,11 @@ class Play extends Phaser.Scene {
     // lifeTaken: extra-life blocks already emptied in this game ("world-level:x,y"); like on the console
     // they stay empty after the hero loses a life, until the game is over.
     this.s = Object.assign({ lives: 3, score: 0, coins: 0, level: 0, world: 1, cleared: 0, lifeTaken: [] }, data || {});
+    // «⏱ На время» (s.ta): one level against the clock, no lives, a death starts it over.
+    this.ta = !!this.s.ta;
+    this.s.taMs = 0;
+    this.taClock = 0;
+    this.taRec = [];
     // Past the checkpoint the hero restarts from it after losing a life.
     this.fromCheckpoint = this.s.checkpoint === this.s.level;
     delete this.s.checkpoint;
@@ -1597,7 +1619,7 @@ class Play extends Phaser.Scene {
 
     // Three of the coins are medals (levels.js); one found before shows faint and gives nothing new.
     this.medalLevel = absLevel(this.s.world, this.s.level);
-    const medalSpots = window.PrygLevels.medalSpots ? window.PrygLevels.medalSpots(lvl) : [];
+    const medalSpots = window.PrygLevels.medalSpots && !this.ta ? window.PrygLevels.medalSpots(lvl) : [];
     const isMedal = new Set(medalSpots.map(([x, y]) => x + ',' + y));
     const found = this.medalsFound();
     this.medalItems = this.physics.add.staticGroup();
@@ -1704,6 +1726,10 @@ class Play extends Phaser.Scene {
 
     // The physics world outlives scene restarts, so its paused flag does too.
     this.physics.pause();
+    // The best run of this level on this phone runs alongside as a faint ghost.
+    this.ghostRun = this.ta ? loadGhost(this.medalLevel) : null;
+    this.ghost = this.ghostRun ? this.add.image(-100, -100, 'hs0').setOrigin(0.5, 1).setAlpha(0.4).setDepth(DEPTH.HERO - 1).setVisible(false) : null;
+    if (this.ta && started) api.timeStart(this.s.world, this.s.level);
     if (started) this.showIntro();
     hud(this.s);
     window.__scene = this;
@@ -1870,6 +1896,8 @@ class Play extends Phaser.Scene {
     const b = p.body;
     let over = null;
     for (const pipe of this.lvl.pipes) {
+      // Against the clock the run ends at this level's flag: no warps to other worlds.
+      if (this.ta && pipe.to && pipe.to.world) continue;
       if (pipe.type === 'down') {
         const px = pipe.x * TILE;
         if (onGround && Math.abs(b.bottom - pipe.y * TILE) < 2 && b.left >= px && b.right <= px + 2 * TILE) over = pipe;
@@ -2112,12 +2140,19 @@ class Play extends Phaser.Scene {
       this.add.rectangle(0, 0, VIEW_W, VIEW_H, 0x000000).setOrigin(0),
       this.add.text(VIEW_W / 2, 92, `${L('МИР', 'WORLD')} ${this.s.world}-${this.s.level + 1}`, { fontFamily: 'Courier New, monospace', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0.5),
       this.add.text(VIEW_W / 2, 116, nameOf(this.def.name), { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#f8d020', resolution: 4 }).setOrigin(0.5),
-      this.add.image(VIEW_W / 2 - 14, 150, this.heroTex() + '0').setOrigin(0.5, 1),
-      this.add.text(VIEW_W / 2 + 2, 142, `× ${this.s.lives}`, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0, 0.5),
     ];
-    // The level's medals: found ones bright, the rest faint.
-    const found = this.medalsFound();
-    for (let i = 0; i < 3; i++) items.push(this.add.image(VIEW_W / 2 + (i - 1) * 20, 178, 'medal').setAlpha(found & (1 << i) ? 1 : 0.3));
+    if (this.ta) {
+      items.push(this.add.text(VIEW_W / 2, 150, `⏱ ${L('НА ВРЕМЯ', 'TIME TRIAL')}`, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0.5));
+      if (this.ghostRun) items.push(this.add.text(VIEW_W / 2, 172, `${L('Лучшее', 'Best')}: ${secs(this.ghostRun.ms)}`, { fontFamily: 'Courier New, monospace', fontSize: '10px', fontStyle: 'bold', color: '#f8d020', resolution: 4 }).setOrigin(0.5));
+    } else {
+      items.push(
+        this.add.image(VIEW_W / 2 - 14, 150, this.heroTex() + '0').setOrigin(0.5, 1),
+        this.add.text(VIEW_W / 2 + 2, 142, `× ${this.s.lives}`, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0, 0.5),
+      );
+      // The level's medals: found ones bright, the rest faint.
+      const found = this.medalsFound();
+      for (let i = 0; i < 3; i++) items.push(this.add.image(VIEW_W / 2 + (i - 1) * 20, 178, 'medal').setAlpha(found & (1 << i) ? 1 : 0.3));
+    }
     for (const it of items) it.setScrollFactor(0).setDepth(100);
     this.time.delayedCall(1600, () => {
       for (const it of items) it.destroy();
@@ -2270,6 +2305,7 @@ class Play extends Phaser.Scene {
     const cam = this.cameras.main;
 
     if (this.intro) return;
+    if (this.ta) this.timeTick(delta);
     this.updateLifts(time, delta);
     this.updateEnemies(time, cam);
     this.updateItems();
@@ -2928,6 +2964,10 @@ class Play extends Phaser.Scene {
     p.setTexture(this.heroTex() + '2');
     p.body.setGravityY(0);
     p.body.setVelocity(0, fell ? 0 : -350);
+    if (this.ta) {
+      this.time.delayedCall(1200, () => this.scene.restart({ ta: true, world: this.s.world, level: this.s.level }));
+      return;
+    }
     this.time.delayedCall(2500, () => {
       this.s.lives--;
       if (this.s.lives > 0) {
@@ -3005,6 +3045,7 @@ class Play extends Phaser.Scene {
   win(poleTileX) {
     if (this.won || this.dead) return;
     this.won = true;
+    if (this.ta) this.timeRecord();
     const p = this.player;
     const b = p.body;
     // Higher grab on the pole gives more points.
@@ -3039,6 +3080,7 @@ class Play extends Phaser.Scene {
   }
 
   finishLevel() {
+    if (this.ta) { this.timeDone(); return; }
     api.levelDone(this.s.level, this.s.score, this.s.timeLeft, this.s.world, this.medalsFound());
     if (window.Progress) window.Progress.mark('mario', absLevel(this.s.world, this.s.level));
     this.s.cleared++;
@@ -3051,6 +3093,49 @@ class Play extends Phaser.Scene {
     } else {
       this.gameOver(L('ВСЕ МИРЫ ПРОЙДЕНЫ!', 'ALL WORLDS CLEARED!'), true);
     }
+  }
+
+  // ---------- «⏱ На время» ----------
+  // The clock runs from the end of the title card to the flag; the hero's path is kept for the ghost.
+  timeTick(delta) {
+    this.taClock += delta;
+    if (!this.won && !this.dead) {
+      const shown = secs(this.s.taMs);
+      this.s.taMs = this.taClock;
+      while (this.taRec.length * GHOST_STEP <= this.taClock) this.timeRecord();
+      if (secs(this.s.taMs) !== shown) $('time').textContent = secs(this.s.taMs);
+    }
+    const g = this.ghostRun && this.ghostRun.f[Math.floor(this.taClock / GHOST_STEP)];
+    if (!this.ghost) return;
+    this.ghost.setVisible(!!g);
+    if (g && this.textures.exists(g[2])) this.ghost.setPosition(g[0], g[1]).setTexture(g[2]).setFlipX(!!g[3]);
+  }
+
+  timeRecord() {
+    const p = this.player;
+    this.taRec.push([Math.round(p.x), Math.round(p.y), p.texture.key, p.flipX ? 1 : 0]);
+  }
+
+  // At the flag: the time, the best on this phone (and its ghost) and the level's table on the server.
+  timeDone() {
+    this.physics.pause();
+    const i = this.medalLevel;
+    const ms = Math.round(this.s.taMs);
+    const old = loadGhost(i);
+    const record = !old || ms < old.ms;
+    if (record) saveGhost(i, { ms, f: this.taRec });
+    const { world, level } = this.s;
+    const line = `${L('Время', 'Time')}: ${secs(ms)} ${L('с', 's')}` +
+      (!old ? '' : record ? `<br>${L('Новый рекорд!', 'New best!')}` : `<br>${L('Лучшее', 'Best')}: ${secs(old.ms)} ${L('с', 's')}`);
+    showOverlay(`⏱ ${world}-${level + 1}`, line, L('Ещё раз', 'Again'), () => startTime(i));
+    showPick();
+    const shown = overlayShown;
+    api.timeDone(world, level, ms).then((r) => {
+      if (!r || !r.top || shown !== overlayShown) return;
+      const rows = r.top.map((t, n) => `<span${t.me ? ' class="me"' : ''}>${n + 1}. ${esc(t.name)} — ${secs(t.ms)}</span>`).join('');
+      const place = r.rank && !r.top.some((t) => t.me) ? `<span class="me">${r.rank}. ${L('Вы', 'You')} — ${secs(r.mine)}</span>` : '';
+      $('ovText').innerHTML = `${line}<span class="taTable">${rows}${place}</span>`;
+    });
   }
 
   lifeKey(x, y) {
@@ -3174,6 +3259,7 @@ function showPick() {
   const btn = $('ovPick');
   const can = window.Progress && window.Progress.open('mario', LEVEL_AT.length).length > 1;
   btn.classList.toggle('hidden', !can);
+  $('ovTime').classList.toggle('hidden', !window.Progress);
 }
 function startAt(i) {
   const [world, level] = LEVEL_AT[i];
@@ -3185,6 +3271,25 @@ function startAt(i) {
   api.begin();
   game.scene.getScene('play').scene.restart({ world, level });
 }
+// «⏱ На время»: any open level against the clock, see Play.timeTick.
+function startTime(i) {
+  const [world, level] = LEVEL_AT[i];
+  if (endRun) endRun(false);
+  overlayAction = null;
+  $('overlay').classList.add('hidden');
+  started = true;
+  game.scene.getScene('play').scene.restart({ ta: true, world, level });
+}
+$('ovTime').addEventListener('click', () => {
+  audio();
+  window.Progress.pick({
+    game: 'mario', count: LEVEL_AT.length, cols: 4, onPick: startTime,
+    title: L('⏱ НА ВРЕМЯ', '⏱ TIME TRIAL'),
+    hint: L('Пройдите уровень как можно быстрее. Ваш лучший забег бежит рядом призраком.', 'Clear the level as fast as you can. Your best run races along as a ghost.'),
+    note: (i) => { const g = loadGhost(i); return g ? secs(g.ms) : ''; },
+    label: (i) => `${LEVEL_AT[i][0]}-${LEVEL_AT[i][1] + 1}`,
+  });
+});
 $('ovPick').addEventListener('click', () => {
   audio();
   window.Progress.pick({

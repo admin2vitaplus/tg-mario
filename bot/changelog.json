@@ -462,5 +462,13 @@
     "body": "Все восемь миров перестроены по классическим уровням приставки блок в блок: те же ямы, трубы, враги, лифты, лозы, облака, бонусные комнаты и время на таймере. В замках-лабиринтах 4-4 и 7-4 нужно найти верный путь, а в последнем замке пройти через нужные трубы.",
     "titleEn": "Hop-Skip: all 32 levels as in the classic",
     "bodyEn": "All eight worlds are rebuilt block by block after the classic console levels: the same pits, pipes, enemies, lifts, climbing plants, clouds, bonus rooms and timers. In the maze castles 4-4 and 7-4 find the right way, and in the last castle go through the right pipes."
+  },
+  {
+    "id": "2026-10-24-pryg-time",
+    "size": "major",
+    "title": "«Прыг-Скок»: режим «На время»",
+    "body": "Новая кнопка «⏱ На время»: выберите любой открытый уровень и пройдите его как можно быстрее. Жизни не кончаются, после падения уровень начинается заново. Ваш лучший забег бежит рядом полупрозрачным призраком, а после финиша видна таблица лучшего времени на этом уровне.",
+    "titleEn": "Hop-Skip: Time trial",
+    "bodyEn": "New «⏱ Time trial» button: pick any open level and clear it as fast as you can. Lives never run out, a fall starts the level over. Your best run races along as a see-through ghost, and after the flag you see the best times on that level."
   }
 ]

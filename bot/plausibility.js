@@ -32,7 +32,7 @@ export const SEQUENCE_TTL_MS = 3 * 60 * 60 * 1000;
 
 const reject = (why) => ({ ok: false, why });
 const OK = { ok: true };
-const timeOf = (abs) => (WORLD_TIMES[Math.floor(abs / PER_WORLD)] || [])[abs % PER_WORLD];
+export const timeOf = (abs) => (WORLD_TIMES[Math.floor(abs / PER_WORLD)] || [])[abs % PER_WORLD];
 
 // Следующий уровень той же игры: соседний или, через трубу-переход из 1-2, первый уровень
 // одного из следующих миров; счёт при этом не уменьшается.
