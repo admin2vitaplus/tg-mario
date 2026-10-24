@@ -273,3 +273,20 @@ test("a random opponent is never the same player, nor a host whose link dropped"
     assert.equal((await again.next()).t, "peer");
     assert.deepEqual(rooms.members(own.code), { host: 7, guest: 8 });
   }));
+
+test("a random duel opponent is looked for only among those who want a duel", () =>
+  withRooms({}, async ({ connect }) => {
+    const coop = await connect();
+    coop.send({ t: "find" });
+    const together = await coop.next();
+    const a = await connect();
+    a.send({ t: "find", kind: "duel" });
+    const room = await a.next();
+    assert.equal(room.t, "room");
+    assert.notEqual(room.code, together.code);
+    const b = await connect();
+    b.send({ t: "find", kind: "duel" });
+    const joined = await b.next();
+    assert.deepEqual([joined.t, joined.code], ["joined", room.code]);
+    assert.equal((await a.next()).t, "peer");
+  }));

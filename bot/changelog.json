@@ -429,5 +429,13 @@
     "body": "Вместо бота теперь живые игроки: в «Танкодроме» кнопка «🎲 Случайный напарник», в «Бомбодроме» «🎲 Случайный соперник». Игра сама найдёт того, кто тоже ищет пару, звать друга не нужно.",
     "titleEn": "Random opponent",
     "bodyEn": "Real players instead of the bot: «🎲 Random partner» in Tank Field and «🎲 Random opponent» in Bomb Field. The game finds someone else who is looking for a match, no need to invite a friend."
+  },
+  {
+    "id": "2026-10-24-tanks-duel",
+    "size": "major",
+    "title": "Дуэль в «Танкодроме»",
+    "body": "Новый режим «⚔ Дуэль»: танк против танка на маленьких аренах, одна жизнь на раунд, побеждает тот, кто первым выиграет три раунда. В центре арены падают бонусы. Играть можно с другом по коду комнаты, со случайным соперником или вдвоём за одной клавиатурой.",
+    "titleEn": "Tank Field duel",
+    "bodyEn": "New «⚔ Duel» mode: tank against tank on small arenas, one life a round, the first to win three rounds wins. Bonuses drop in the middle. Play a friend by room code, a random opponent or two at one keyboard."
   }
 ]
