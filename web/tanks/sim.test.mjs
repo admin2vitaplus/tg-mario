@@ -268,3 +268,40 @@ test('duel: a bonus drops in the middle; the clock stops the other tank', () => 
   assert.equal(s.players[0].tank.stun, 0);
   assert.equal(s.freeze, 0);
 });
+
+test('own maps: a link code gives back the same map; bad codes are refused', () => {
+  const rows = S.MAPS[3].rows;
+  const code = S.encodeMap(rows);
+  assert.match(code, /^1[0-9a-z]{85}$/);
+  assert.deepEqual(S.decodeMap(code), rows.map((r) => r.padEnd(13, '.')));
+  assert.equal(S.decodeMap(code.slice(0, -1)), null);
+  assert.equal(S.decodeMap('2' + code.slice(1)), null);
+  assert.equal(S.decodeMap(code.slice(0, -1) + 'Z'), null);
+  assert.equal(S.decodeMap(null), null);
+  const empty = Array(13).fill('.............');
+  assert.deepEqual(S.decodeMap(S.encodeMap(empty)), empty);
+});
+
+test('own maps: one stage on the drawn map with the base, clearing it wins', () => {
+  const rows = Array(13).fill('@@@@@@@@@@@@@');
+  const s = S.newGame(1, 5, { rules: S.RULES, map: rows });
+  assert.equal(s.mapName, S.CUSTOM_NAME);
+  // Spawns and the base corner are cleared, the base and its wall are in place, the rest is steel.
+  for (let ty = 0; ty < 13; ty++) {
+    for (let tx = 0; tx < 13; tx++) {
+      const c = s.cells[ty * 2 * N + tx * 2];
+      if (!S.reservedTile(tx, ty)) assert.equal(c, STEEL, `${tx},${ty}`);
+    }
+  }
+  assert.equal(s.cells[24 * N + 12], BASE);
+  assert.equal(s.cells[0], 0);
+  // A map that is not 13×13 of known tiles, or another mode, plays the usual stage 1.
+  assert.equal(S.newGame(1, 5, { map: ['@@'] }).mapName, S.MAPS[0].name);
+  assert.equal(S.newGame(1, 5, { mode: 'survival', map: rows }).custom, null);
+  // Clearing it wins the game at once.
+  const g = S.newGame(1, 5, { rules: S.RULES, map: Array(13).fill('.............') });
+  while (g.phase === 'intro') S.step(g, []);
+  g.queue = []; g.spawns = []; g.enemies = [];
+  for (let i = 0; i < 200 && g.phase !== 'overDone'; i++) S.step(g, []);
+  assert.equal(g.won, true);
+});

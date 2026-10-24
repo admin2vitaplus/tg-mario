@@ -883,6 +883,42 @@ const MAPS = [
 ];
 const STAGES = MAPS.length; // clearing the last one wins the game
 
+// ---------- Own maps («🛠 Своя карта») ----------
+// A map drawn by a player: 13 rows like MAPS, one stage, clearing it wins the game.
+// In a link it is 'v' + two tiles per character (TILE_CHARS index a * 6 + b in base 36).
+const TILE_CHARS = '.#@~%-';
+const B36 = '0123456789abcdefghijklmnopqrstuvwxyz';
+const MAP_VERSION = '1';
+const MAP_CODE_LEN = 1 + Math.ceil(13 * 13 / 2);
+const CUSTOM_NAME = '*';
+// Tiles the game clears itself: the three enemy spawns, the two player spawns and the base.
+function reservedTile(tx, ty) {
+  if ([[0, 0], [6, 0], [12, 0], [4, 12], [8, 12]].some(([x, y]) => x === tx && y === ty)) return true;
+  return tx >= 5 && tx <= 7 && ty >= 11;
+}
+function encodeMap(rows) {
+  const t = [];
+  for (let y = 0; y < 13; y++) for (let x = 0; x < 13; x++) t.push(Math.max(0, TILE_CHARS.indexOf((rows[y] || '')[x])));
+  let code = MAP_VERSION;
+  for (let i = 0; i < t.length; i += 2) code += B36[t[i] * 6 + (t[i + 1] || 0)];
+  return code;
+}
+// → 13 rows, or null for a code that is not a map.
+function decodeMap(code) {
+  if (typeof code !== 'string' || code.length !== MAP_CODE_LEN || code[0] !== MAP_VERSION) return null;
+  const t = [];
+  for (const ch of code.slice(1)) {
+    const v = B36.indexOf(ch);
+    if (v < 0) return null;
+    t.push(Math.floor(v / 6), v % 6);
+  }
+  const rows = [];
+  for (let y = 0; y < 13; y++) rows.push(t.slice(y * 13, y * 13 + 13).map((v) => TILE_CHARS[v]).join(''));
+  return rows;
+}
+const validMap = (rows) => Array.isArray(rows) && rows.length === 13 &&
+  rows.every((r) => typeof r === 'string' && r.length === 13 && [...r].every((c) => TILE_CHARS.includes(c)));
+
 // ---------- Helpers ----------
 function rnd(s) {
   s.seed = (s.seed + 0x6D2B79F5) | 0;
@@ -946,13 +982,14 @@ function onIce(s, t) {
 }
 
 // ---------- Game setup ----------
-// opts: { rules, mode } — see RULES and MODES.
+// opts: { rules, mode, map } — see RULES and MODES; map — an own map (13 rows), stages mode only.
 function newGame(players, seed, opts = {}) {
-  const s = { rules: opts.rules || 1, mode: opts.mode || '', wave: 0, rest: 0, seed: seed | 0, frame: 0, twoP: players === 2, won: false, players: [], events: [] };
+  const s = { rules: opts.rules || 1, mode: opts.mode || '', custom: null, wave: 0, rest: 0, seed: seed | 0, frame: 0, twoP: players === 2, won: false, players: [], events: [] };
   for (let i = 0; i < players; i++) {
     s.players.push({ pi: i, lives: 3, level: 0, score: 0, tank: null, respawn: 0, kills: [0, 0, 0, 0], wins: 0 });
   }
   s.duel = s.mode === 'duel' && players === 2;
+  if (!s.mode && validMap(opts.map)) s.custom = opts.map.slice();
   if (s.duel) {
     s.round = 0;
     s.winner = -1;
@@ -1014,7 +1051,7 @@ function fillQueue(s, n) {
 }
 
 function startStage(s, n) {
-  const map = MAPS[survival(s) ? SURVIVAL_MAP : Math.min(n, STAGES - 1)];
+  const map = s.custom ? { name: CUSTOM_NAME, rows: s.custom } : MAPS[survival(s) ? SURVIVAL_MAP : Math.min(n, STAGES - 1)];
   s.stage = n;
   s.mapName = map.name;
   s.cells = parseMap(map.rows);
@@ -1450,7 +1487,7 @@ function step(s, inputs) {
   } else if (s.phase === 'clear') {
     if (++s.phaseT >= 150) {
       // The last stage cleared: the game is won and ends like a lost one.
-      if (s.stage >= STAGES - 1) { s.won = true; s.phase = 'overDone'; } else s.phase = 'clearDone';
+      if (s.stage >= STAGES - 1 || s.custom) { s.won = true; s.phase = 'overDone'; } else s.phase = 'clearDone';
     }
   }
 }
@@ -1459,6 +1496,7 @@ root.TankSim = {
   fieldCap, spawnDelay, bonusSpotOk, spawnBonus,
   CELL, N, FIELD, EMPTY, BRICK, STEEL, WATER, FOREST, ICE, BASE, UP, RIGHT, DOWN, LEFT,
   ENEMY, MAPS, STAGES, wave, newGame, startStage, step,
+  TILE_CHARS, CUSTOM_NAME, reservedTile, encodeMap, decodeMap, validMap,
   RULES, MODES, SURVIVAL_REST,
   ARENAS, DUEL_WINS, DUEL_ROUND, DUEL_BONUS_EVERY, DUEL_SPAWN, DUEL_CENTRE, ROUND_PAUSE, startRound,
 };

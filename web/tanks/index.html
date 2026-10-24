@@ -47,6 +47,7 @@
         <button id="btnOnline" class="ui-btn" data-t="menu_online">Онлайн вдвоём</button>
         <button id="btnRandom" class="ui-btn" data-t="menu_random">🎲 Случайный напарник</button>
         <button id="btnDuel" class="ui-btn" data-t="menu_duel">⚔ Дуэль</button>
+        <button id="btnEditor" class="ui-btn" data-t="menu_editor">🛠 Своя карта</button>
         <button id="btnWallet" class="ui-btn teal wGameBtn" data-wallet-game="tanks">◆ Жетоны</button>
         <button id="btnLook" class="ui-btn" data-t="menu_look">🎨 Внешний вид</button>
       </div>
@@ -63,10 +64,24 @@
         <button id="btnInvite" class="ui-btn primary hidden" data-t="btn_invite">Позвать друга в Telegram</button>
         <button id="btnCancel" class="ui-btn ghost" data-t="btn_back">Назад</button>
       </div>
+      <div id="editor" class="hidden">
+        <canvas id="edCanvas" width="208" height="208"></canvas>
+        <div id="edTools"></div>
+        <div class="ui-stack">
+          <button id="edPlay" class="ui-btn primary" data-t="editor_play">▶ Играть</button>
+          <button id="edShare" class="ui-btn" data-t="editor_share">🔗 Поделиться картой</button>
+          <div class="edRow">
+            <button id="edCopy" class="ui-btn" data-t="editor_copy">▦ Взять карту уровня</button>
+            <button id="edClear" class="ui-btn" data-t="editor_clear">🗑 Очистить</button>
+          </div>
+          <button id="edBack" class="ui-btn ghost" data-t="btn_back">Назад</button>
+        </div>
+      </div>
       <div class="ui-stack" id="ovActs">
         <button id="ovBtn" class="ui-btn primary hidden">Дальше</button>
         <button id="ovPick" class="ui-btn hidden" data-t="menu_pick">▦ Выбрать уровень</button>
         <button id="ovBeat" class="ui-btn teal hidden">⚔ Побей мой счёт</button>
+        <button id="ovEdit" class="ui-btn hidden" data-t="btn_edit_map">🛠 Изменить карту</button>
         <button id="ovShare" class="ui-btn hidden">Поделиться итогом</button>
         <button id="ovMenu" class="ui-btn ghost hidden" data-t="btn_all_games">← Все игры</button>
       </div>

@@ -461,5 +461,13 @@
     "body": "Новая кнопка «⏱ На время»: выберите любой открытый уровень и пройдите его как можно быстрее. Жизни не кончаются, после падения уровень начинается заново. Ваш лучший забег бежит рядом полупрозрачным призраком, а после финиша видна таблица лучшего времени на этом уровне.",
     "titleEn": "Hop-Skip: Time trial",
     "bodyEn": "New «⏱ Time trial» button: pick any open level and clear it as fast as you can. Lives never run out, a fall starts the level over. Your best run races along as a see-through ghost, and after the flag you see the best times on that level."
+  },
+  {
+    "id": "2026-10-24-tanks-editor",
+    "size": "major",
+    "title": "«Танкодром»: своя карта",
+    "body": "Новая кнопка «🛠 Своя карта»: рисуйте поле пальцем из кирпича, стали, воды, леса и льда или возьмите за основу карту любого уровня. Сыграйте на ней против двадцати врагов и отправьте ссылку другу: она откроет вашу карту у него. Очки и жетоны на своей карте не идут.",
+    "titleEn": "Tank Field: your own map",
+    "bodyEn": "New «🛠 Own map» button: draw the field with your finger from brick, steel, water, forest and ice, or start from any stage map. Play it against twenty enemies and send a link to a friend: it opens your map for them. An own map gives no points and no ◆."
   }
 ]
