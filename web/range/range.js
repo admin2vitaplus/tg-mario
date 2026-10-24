@@ -591,11 +591,10 @@ function strip(s) {
 function fitCanvas() {
   const box = $('game').getBoundingClientRect();
   const full = Math.min(box.width / W, box.height / H);
-  // Whole screen pixels per field pixel keep every pixel the same size. That is
-  // used when it costs at most a tenth of the size; otherwise the field fills the space.
+  // Bigger targets are easier to hit: the field always fills the space, rounded only
+  // to whole screen pixels.
   const dpr = window.devicePixelRatio || 1;
-  const n = Math.floor(full * dpr);
-  const k = n >= 1 && n / dpr >= full * 0.9 ? n / dpr : full;
+  const k = full;
   canvas.style.width = Math.floor(W * k * dpr) / dpr + 'px';
   canvas.style.height = Math.floor(H * k * dpr) / dpr + 'px';
 }
