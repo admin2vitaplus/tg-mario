@@ -4,9 +4,10 @@
 
 const S = window.BombSim;
 const { COLS, ROWS, TILE, TS, EMPTY, HARD, SOFT, BURN, UP, RIGHT, DOWN, LEFT } = S;
-// The screen follows the player: 15 columns (240 x 208), or 11 on a phone held upright,
-// so the field is bigger there (see fitCanvas).
-const WIDE_COLS = 15, TALL_COLS = 11;
+// The screen follows the player: 15 columns (240 x 208), 11 on a phone held upright, so
+// the field is bigger there, and on a phone on its side as many as fill its wide screen
+// (up to 21), so the field goes from side to side (see fitCanvas).
+const WIDE_COLS = 15, TALL_COLS = 11, MAX_COLS = 21;
 let VIEW_COLS = WIDE_COLS;
 let W = VIEW_COLS * TILE;
 const H = ROWS * TILE;
@@ -749,7 +750,9 @@ function render(s) {
 // ---------- HUD and screens ----------
 function fitCanvas() {
   const box = $('game').getBoundingClientRect();
-  const cols = box.height > box.width ? TALL_COLS : WIDE_COLS;
+  const short = window.matchMedia && matchMedia('(max-height: 560px)').matches;
+  const cols = box.height > box.width ? TALL_COLS
+    : short ? Math.max(WIDE_COLS, Math.min(MAX_COLS, COLS, Math.floor((box.width / box.height) * ROWS))) : WIDE_COLS;
   if (cols !== VIEW_COLS) {
     VIEW_COLS = cols;
     W = cols * TILE;
