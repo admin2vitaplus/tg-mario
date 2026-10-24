@@ -1,4 +1,5 @@
 import { createBeat } from "./beat.js";
+import { createTimeAttack } from "./time-attack.js";
 import { openDb } from "./db.js";
 import { createApiServer } from "./server.js";
 import { attachTanksRooms } from "./tanks-rooms.js";
@@ -100,7 +101,7 @@ export async function startApp({
   });
   const server = createApiServer({
     store, botToken, allowedOrigins, onAchievements, commit, tracker, economy, tanks: tanksResults, bombs: bombsResults, range: rangeResults, createInvoice, word, admin, notices,
-    challenge, beat: createBeat(store),
+    challenge, beat: createBeat(store), timeAttack: createTimeAttack(store),
   });
   tanks = attachTanksRooms(server, { allowedOrigins, botToken, limits: tanksLimits });
   // Дуэль «Бомбодрома» — такие же комнаты на своём пути.

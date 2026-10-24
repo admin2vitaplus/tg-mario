@@ -372,6 +372,17 @@ export const MIGRATIONS = [
       db.exec("ALTER TABLE level_results ADD COLUMN medals INTEGER NOT NULL DEFAULT 0");
     }
   },
+  // 17. «На время» в «Прыг-Скоке» (time-attack.js): лучшее время игрока на уровне, мс.
+  `
+    CREATE TABLE IF NOT EXISTS mario_times (
+      player_id INTEGER NOT NULL,
+      level INTEGER NOT NULL,
+      ms INTEGER NOT NULL,
+      at INTEGER NOT NULL,
+      PRIMARY KEY (player_id, level)
+    );
+    CREATE INDEX IF NOT EXISTS mario_times_level ON mario_times (level, ms);
+  `,
 ];
 
 export function migrate(db) {

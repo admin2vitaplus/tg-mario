@@ -76,7 +76,7 @@ export const DEFAULT_LIMITS = { ipPerMinute: 120, userWritesPerMinute: 30 };
 
 export function createApiServer({
   store, botToken, allowedOrigins, onAchievements, tracker = null, economy = null,
-  tanks = null, bombs = null, range = null, createInvoice = null, word = null, admin = null, notices = null, challenge = null, beat = null,
+  tanks = null, bombs = null, range = null, createInvoice = null, word = null, admin = null, notices = null, challenge = null, beat = null, timeAttack = null,
   commit = "unknown", startedAt = Date.now(), now = Date.now, limits = DEFAULT_LIMITS,
 }) {
   const userFrom = (req) => {
@@ -458,6 +458,35 @@ export function createApiServer({
       store.touchPlayer(user);
       const r = beat.play(user.id, { id: String(body.id || ""), log: body.log });
       return [r.status, r.body];
+    };
+  }
+
+  // «На время» в «Прыг-Скоке» (time-attack.js): { world 1…4, level 0…3 } как в /api/mario/level.
+  if (timeAttack) {
+    const absLevel = (body) => {
+      const world = int(body.world, LIMITS.world), inWorld = int(body.level, LIMITS.level);
+      return world && inWorld !== null ? (world - 1) * PER_WORLD + inWorld : null;
+    };
+    const reply = (r) => [r.status, r.body || { error: r.error }];
+    routes["POST /api/mario/time/start"] = (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const level = absLevel(body);
+      if (level === null) return [400, { error: "bad data" }];
+      store.touchPlayer(user);
+      return reply(timeAttack.start(user.id, level));
+    };
+    routes["POST /api/mario/time"] = (body, user) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const level = absLevel(body), ms = int(body.ms, 10_000_000);
+      if (level === null || ms === null) return [400, { error: "bad data" }];
+      return reply(timeAttack.finish(user.id, { level, ms }));
+    };
+    routes["GET /api/mario/times"] = (_body, user, url) => {
+      if (!user) return [401, { error: "unauthorized" }];
+      const p = url.searchParams;
+      const level = absLevel({ world: Number(p.get("world")), level: Number(p.get("level")) });
+      if (level === null) return [400, { error: "bad data" }];
+      return reply(timeAttack.table(user.id, level));
     };
   }
 
