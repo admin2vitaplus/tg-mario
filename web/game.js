@@ -114,6 +114,9 @@ const JUMP_BUFFER = 110;
 const COYOTE = 90;
 // Feet this many pixels below the top of a step in front still put the hero on the step.
 const LEDGE_STEP = 6;
+// How long the lucky star keeps the hero safe, ms.
+const STAR_MS = 10000;
+const STAR_TINTS = [0xff8080, 0xffff80, 0x80ff80, 0x80c0ff];
 // Share of the screen the camera shifts forward while the hero runs right.
 const LOOK_AHEAD = 0.12;
 const TURBO_MS = 67; // about 7.5 presses per second, like a turbo button
@@ -563,6 +566,45 @@ function makeTextures(scene) {
     '...QYYQQQQUUQ...',
     '....QUUUUUUQ....',
     '.....QQQQQQ.....',
+  ]);
+
+  // A fire bloom grows from a berry block when the hero is already big: it stays where it grew.
+  pix(scene, 'bloom', [
+    '.....OOOOOO.....',
+    '...OOFFFFFFOO...',
+    '..OFFJJJJJJFFO..',
+    '..OFJJWWWWJJFO..',
+    '..OFFJJJJJJFFO..',
+    '...OOFFFFFFOO...',
+    '.....OOOOOO.....',
+    '.......GN.......',
+    '..LL...GN...LL..',
+    '.LNNL..GN..LNNL.',
+    '.LNNNL.GN.LNNNL.',
+    '..LNNNLGNLNNNL..',
+    '...LLNNGNNNLL...',
+    '.....LLGNLL.....',
+    '.......GN.......',
+    '.......GN.......',
+  ]);
+  // A lucky star bounces away from its brick; catching it makes the hero untouchable for a while.
+  pix(scene, 'luckStar', [
+    '.......QQ.......',
+    '......QJJQ......',
+    '......QJJQ......',
+    '.....QJJJJQ.....',
+    'QQQQQQJJJJQQQQQQ',
+    '.QJJJJJJJJJJJJQ.',
+    '..QJJJKJJKJJJQ..',
+    '...QJJKJJKJJQ...',
+    '....QJJJJJJQ....',
+    '....QJJJJJJQ....',
+    '...QJJJJJJJJQ...',
+    '...QJJJQQJJJQ...',
+    '..QJJJQ..QJJJQ..',
+    '..QJJQ....QJJQ..',
+    '.QJQQ......QQJQ.',
+    '.QQ..........QQ.',
   ]);
 
   // Green berry gives an extra life: same shape, other colors.
@@ -1162,14 +1204,15 @@ function drawScenery(scene) {
 // ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
 // h hidden block with an extra life, k hidden block with a coin (invisible until hit from below),
 // v water surface, y water, s fish, p springboard, t bolt thrower, n spiky, V brick with a vine, c cloud,
-// u cannon barrel (fires bullets at the hero), j cannon stand.
+// u cannon barrel (fires bullets at the hero), j cannon stand, W brick with a berry,
+// S brick with a lucky star, U brick with an extra life.
 const TILE_OF = {
   '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'L': T.BONUS, 'H': T.HARD, 'r': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
   '~': T.LAVA_TOP, '=': T.LAVA, 'f': T.LAVA_TOP,
   '(': T.TREE_L, '-': T.TREE_M, ')': T.TREE_R, 'i': T.TRUNK, '_': T.BRIDGE,
   'q': T.SIDE_LIP_T, 'w': T.SIDE_LIP_B, 'z': T.SIDE_T, 'x': T.SIDE_B,
-  'v': T.WATER_TOP, 'y': T.WATER, 'V': T.BRICK, 'c': T.CLOUD,
+  'v': T.WATER_TOP, 'y': T.WATER, 'V': T.BRICK, 'c': T.CLOUD, 'W': T.BRICK, 'S': T.BRICK, 'U': T.BRICK,
   'u': T.CANNON, 'j': T.CANNON_BASE,
 };
 
@@ -1469,6 +1512,7 @@ class Play extends Phaser.Scene {
     this.dead = false;
     this.won = false;
     this.invUntil = 0;
+    this.starUntil = 0;
     this.bumpUntil = 0;
     this.prevJump = false;
     this.headHits = [];
@@ -1502,10 +1546,11 @@ class Play extends Phaser.Scene {
       for (let x = 0; x < lvl.W; x++) {
         const ch = lvl.grid[y][x];
         if (ch === '?') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
-        if (ch === 'M') this.contents.set(x + ',' + y, { kind: 'berry', left: 1 });
-        const lifeGone = (ch === 'L' || ch === 'h') && this.s.lifeTaken.includes(this.lifeKey(x, y));
-        if (ch === 'L' && lifeGone) usedSpots.push([x, y]);
-        if ((ch === 'L' || ch === 'h') && !lifeGone) this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
+        if (ch === 'M' || ch === 'W') this.contents.set(x + ',' + y, { kind: 'berry', left: 1 });
+        if (ch === 'S') this.contents.set(x + ',' + y, { kind: 'star', left: 1 });
+        const lifeGone = (ch === 'L' || ch === 'U' || ch === 'h') && this.s.lifeTaken.includes(this.lifeKey(x, y));
+        if ((ch === 'L' || ch === 'U') && lifeGone) usedSpots.push([x, y]);
+        if ((ch === 'L' || ch === 'U' || ch === 'h') && !lifeGone) this.contents.set(x + ',' + y, { kind: 'life', left: 1 });
         if (ch === 'k') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
         if (ch === 'k' || (ch === 'h' && !lifeGone)) this.hidden.add(x + ',' + y);
         if (ch === 'C') this.contents.set(x + ',' + y, { kind: 'coin', left: 8 });
@@ -1684,6 +1729,7 @@ class Play extends Phaser.Scene {
       const kind = it.getData('kind');
       it.destroy();
       if (kind === 'life') this.extraLife();
+      else if (kind === 'star') this.starPower();
       else this.grow();
     });
 
@@ -2501,6 +2547,8 @@ class Play extends Phaser.Scene {
     else if (Math.abs(b.velocity.x) > 5) frame = pre + '1303'[Math.floor(time / (run ? 50 : 80)) % 4];
     if (p.texture.key !== frame) p.setTexture(frame);
     p.setAlpha(time < this.invUntil && Math.floor(time / 60) % 2 ? 0.3 : 1);
+    if (time < this.starUntil) p.setTint(STAR_TINTS[Math.floor(time / 70) % STAR_TINTS.length]);
+    else if (p.isTinted) p.clearTint();
   }
 
   updateEnemies(time, cam) {
@@ -2617,6 +2665,7 @@ class Play extends Phaser.Scene {
 
   touchFoe(f) {
     if (this.dead || this.won || f.getData('state') === 'dead') return;
+    if (this.time.now < this.starUntil) { this.killFoe(f); return; }
     const b = this.player.body;
     if (f.getData('stomp') && !this.inWater && b.velocity.y > 0 && b.bottom <= f.body.top + 8) {
       this.killFoe(f);
@@ -2742,8 +2791,11 @@ class Play extends Phaser.Scene {
   updateItems() {
     for (const it of this.items.getChildren().slice()) {
       if (!it.body.enable) continue;
-      if (it.body.blocked.left) it.body.setVelocityX(50);
-      else if (it.body.blocked.right) it.body.setVelocityX(-50);
+      const speed = it.getData('speed') || 0;
+      if (it.body.blocked.left) it.body.setVelocityX(speed);
+      else if (it.body.blocked.right) it.body.setVelocityX(-speed);
+      // The star hops along.
+      if (it.getData('kind') === 'star' && it.body.blocked.down) it.body.setVelocityY(-260);
       if (it.y > VIEW_H + 32) it.destroy();
     }
   }
@@ -2829,7 +2881,10 @@ class Play extends Phaser.Scene {
 
   spawnBerry(tx, ty, kind) {
     SFX.sprout();
-    const it = this.items.create(tx * TILE + 8, ty * TILE + 8, kind === 'life' ? 'berry1' : 'berry');
+    // Already big, the berry block grows a fire bloom that stays on the block.
+    if (kind === 'berry' && this.big) kind = 'bloom';
+    const tex = { life: 'berry1', bloom: 'bloom', star: 'luckStar' }[kind] || 'berry';
+    const it = this.items.create(tx * TILE + 8, ty * TILE + 8, tex);
     it.setData('kind', kind);
     it.setDepth(DEPTH.SPROUT);
     it.body.enable = false;
@@ -2841,7 +2896,13 @@ class Play extends Phaser.Scene {
         it.setDepth(DEPTH.ITEM);
         it.body.enable = true;
         it.body.reset(it.x, it.y);
-        it.body.setVelocityX(50);
+        if (kind === 'bloom') {
+          it.body.allowGravity = false;
+          it.body.setImmovable(true);
+        } else {
+          it.setData('speed', kind === 'star' ? 70 : 50);
+          it.body.setVelocityX(it.getData('speed'));
+        }
       },
     });
   }
@@ -2868,6 +2929,7 @@ class Play extends Phaser.Scene {
 
   touchEnemy(e) {
     if (this.dead || this.won || e.getData('state') === 'dead') return;
+    if (this.time.now < this.starUntil) { this.flipEnemy(e); return; }
     const b = this.player.body;
     const kind = e.getData('kind');
     // Spikies can't be stomped, and under water nothing can.
@@ -2901,6 +2963,14 @@ class Play extends Phaser.Scene {
     hud(this.s);
     SFX.life();
     haptic('success');
+  }
+
+  // The lucky star: for STAR_MS the hero flashes, nothing hurts him and foes he touches fall.
+  starPower() {
+    this.addScore(1000);
+    SFX.power();
+    haptic('medium');
+    this.starUntil = this.time.now + STAR_MS;
   }
 
   grow() {
@@ -2941,7 +3011,7 @@ class Play extends Phaser.Scene {
   }
 
   hurt() {
-    if (this.time.now < this.invUntil) return;
+    if (this.time.now < this.invUntil || this.time.now < this.starUntil) return;
     if (this.big) {
       this.setBig(false);
       this.invUntil = this.time.now + 1500;
