@@ -992,8 +992,6 @@ function showOverlay(title, html, button, action, panel) {
 function showMenu() {
   running = false;
   mode = 'local';
-  clearTimeout(botOffer);
-  $('btnBotNow').classList.add('hidden');
   view = null;
   netClose();
   showOverlay(T('title'), T('intro') + '<br>' + T('best', { n: loadBest() }), null, null);
@@ -1128,6 +1126,7 @@ let view = null;    // what the guest draws
 const net = {
   ws: null, code: '', token: '', started: false, remote: { dir: -1, fire: false }, lastDir: -1, cellsKey: '', events: [],
   retry: null, ping: null, peerAway: false, resume: false, rematch: { me: false, peer: false },
+  random: false, // the room is a random search, not for a friend
 };
 const REJOIN_MS = 20000; // the server keeps a dropped player's seat this long
 const HOST_AWAY_MS = 120000; // and the host's seat this long before the guest arrives
@@ -1145,6 +1144,7 @@ function netClose() {
   net.token = '';
   net.started = false;
   net.peerAway = false;
+  net.random = false;
   stopRetry();
   clearInterval(net.ping);
   if (ws) { ws.onclose = null; try { ws.close(1000); } catch (e) { /* ignore */ } }
@@ -1267,38 +1267,28 @@ function lostLink(text, wasInGame) {
   else onlineMenu(text);
 }
 
-// No friend in 20 s: offer the computer as the partner instead.
-const BOT_OFFER_MS = 20000;
-let botOffer = 0;
+// A room for a friend shows its code and the invite; a random search only waits.
 function roomScreen() {
+  if (net.random) {
+    showOverlay(T('online_title'), T('finding'), null, null, 'online');
+    $('onlineStart').classList.add('hidden');
+    $('btnInvite').classList.add('hidden');
+    return;
+  }
   showOverlay(T('room'), T('room_code', { code: '<b class="code">' + net.code + '</b>' }), null, null, 'online');
   $('onlineStart').classList.add('hidden');
   $('btnInvite').classList.remove('hidden');
-  clearTimeout(botOffer);
-  botOffer = setTimeout(() => {
-    if (mode === 'host' && !net.started && !$('btnInvite').classList.contains('hidden')) $('btnBotNow').classList.remove('hidden');
-  }, BOT_OFFER_MS);
 }
-function playWithBot() {
-  audio();
-  showMenu();
-  variant = 'bot';
-  beatView = null;
-  beginLocal(2);
-}
-$('btnBotNow').addEventListener('click', playWithBot);
-$('btnBot').addEventListener('click', playWithBot);
 
 function onNet(m) {
   if (m.t === 'room') {
     net.code = m.code;
     net.token = m.token || '';
+    net.random = !!m.random;
     mode = 'host';
     roomScreen();
   } else if (m.t === 'peer') {
     haptic('success');
-    clearTimeout(botOffer);
-    $('btnBotNow').classList.add('hidden');
     net.guestSkin = '';
     mode = 'host';
     net.started = true;
@@ -1315,7 +1305,9 @@ function onNet(m) {
     view = null;
     guestShown = 'wait';
     net.lastDir = -1;
-    showOverlay(T('room_n', { code: m.code }), T('in_room'), null, null, 'online');
+    net.random = !!m.random;
+    if (net.random) haptic('success');
+    showOverlay(net.random ? T('online_title') : T('room_n', { code: m.code }), net.random ? T('found') : T('in_room'), null, null, 'online');
     $('onlineStart').classList.add('hidden');
   } else if (m.t === 'rejoined') {
     stopRetry();
@@ -1431,6 +1423,16 @@ $('btnCreate').addEventListener('click', () => {
   showOverlay(T('online_title'), T('creating'), null, null, 'online');
   $('onlineStart').classList.add('hidden');
   connectFresh(() => netSend({ t: 'create' }));
+});
+// «Случайный напарник»: the server pairs this player with the next one who searches.
+$('btnRandom').addEventListener('click', () => {
+  audio();
+  beatView = null;
+  showOverlay(T('online_title'), T('finding'), null, null, 'online');
+  $('onlineStart').classList.add('hidden');
+  $('btnInvite').classList.add('hidden');
+  if (!API) { onlineMenu(); return; }
+  connectFresh(() => netSend({ t: 'find' }));
 });
 function joinRoom(code) {
   code = String(code || '').replace(/\D/g, '');
@@ -1685,12 +1687,11 @@ window.addEventListener('pagehide', () => { sendQuit(); });
 // ---------- Game flow ----------
 let state = null;
 let running = false;
-let botMem = null; // the computer partner's plans (bot.js), in a game with the bot
 
 // start — the stage chosen on «▦ Выбрать уровень» (alone only), 0 — from the first one.
 function begin(players, start) {
   start = players === 1 && start > 0 ? start : 0;
-  keyMap = players === 2 && mode === 'local' && variant !== 'bot' ? KEYS_2P : KEYS_1P;
+  keyMap = players === 2 && mode === 'local' ? KEYS_2P : KEYS_1P;
   skins = [look.tank, mode === 'host' && net.guestSkin ? net.guestSkin : partnerSkin(look.tank)];
   net.remote = { dir: -1, fire: false };
   net.rematch = { me: false, peer: false };
@@ -1704,11 +1705,10 @@ function begin(players, start) {
   const b = beatView && mode === 'local' && players === 1 ? beatView : null;
   const t = !b && mode !== 'guest' && ticket.next;
   if (!b) { ticket.next = null; keepTicket(); }
-  let v = !start && mode === 'local' && players === (variant === 'bot' ? 2 : 1) ? variant : '';
+  let v = !start && mode === 'local' && players === 1 ? variant : '';
   if (b) { v = b.mode; start = b.start; }
   const rules = b ? b.rules : S.RULES;
   const seed = b ? b.seed : t ? t.seed : 0;
-  botMem = window.TankBot ? window.TankBot.newMemory() : null;
   Object.assign(rec, { seed, players, start, mode: v, rules, beat: b ? b.id : '', out: [], prev: -1, n: 0, frames: 0 });
   state = S.newGame(players, seed || (Date.now() & 0x7fffffff) || 1, { rules, mode: v });
   if (start) S.startStage(state, start); // the same as bot/tanks-replay.js
@@ -1781,7 +1781,7 @@ function frame(now) {
     acc += Math.min(dt, 100);
     while (acc >= STEP && running) {
       acc -= STEP;
-      const inputs = [readPad(pads[0]), mode === 'host' ? remotePad() : state.mode === 'bot' && botMem ? window.TankBot.think(state, 1, botMem) : readPad(pads[1])];
+      const inputs = [readPad(pads[0]), mode === 'host' ? remotePad() : readPad(pads[1])];
       recStep(inputs);
       S.step(state, inputs);
       for (const ev of state.events) if (SFX[ev]) SFX[ev]();

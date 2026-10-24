@@ -421,5 +421,13 @@
     "body": "После игры в «Танкодроме», «Бомбодроме» или «Тире» нажмите «⚔ Побей мой счёт» и отправьте другу ссылку. Он сыграет ту же партию: те же враги и мишени в том же порядке. Под итогом видна таблица всех, кто принял вызов.",
     "titleEn": "Beat my score",
     "bodyEn": "After a game of Tank Field, Bomb Field or Shooting Range, tap «⚔ Beat my score» and send a friend the link. They play the very same game: the same enemies and targets in the same order. A table of everyone who took the challenge is shown under the result."
+  },
+  {
+    "id": "2026-10-24-random",
+    "size": "major",
+    "title": "Случайный соперник",
+    "body": "Вместо бота теперь живые игроки: в «Танкодроме» кнопка «🎲 Случайный напарник», в «Бомбодроме» «🎲 Случайный соперник». Игра сама найдёт того, кто тоже ищет пару, звать друга не нужно.",
+    "titleEn": "Random opponent",
+    "bodyEn": "Real players instead of the bot: «🎲 Random partner» in Tank Field and «🎲 Random opponent» in Bomb Field. The game finds someone else who is looking for a match, no need to invite a friend."
   }
 ]
