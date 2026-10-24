@@ -146,6 +146,7 @@ export function createApiServer({
 
     // Пройденные уровни игрока во всех играх (выбор уровня, web/lib/progress.js): номера с 0.
     // «Прыг-Скок» — сквозные номера уровней (plausibility.js), остальные — этапы по порядку.
+    // medals — собранные медали «Прыг-Скока» по уровням: { mario: { уровень: биты 1, 2, 4 } }.
     "GET /api/progress": (_body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
       const upTo = (n) => Array.from({ length: n }, (_, i) => i);
@@ -154,10 +155,11 @@ export function createApiServer({
         tanks: upTo(tanks ? tanks.passed(user.id) : 0),
         bombs: upTo(bombs ? bombs.passed(user.id) : 0),
         range: upTo(range ? range.passed(user.id) : 0),
+        medals: { mario: store.medals(user.id) },
       }];
     },
 
-    // Итог пройденного уровня: { world, level, score, timeLeft, deaths, start }; world 1…4 (старая игра — без него),
+    // Итог пройденного уровня: { world, level, score, timeLeft, deaths, start, medals }; world 1…4 (старая игра — без него),
     // level — уровень в мире 0…3. Дальше level — сквозной номер (plausibility.js).
     "POST /api/mario/level": (body, user) => {
       if (!user) return [401, { error: "unauthorized" }];
@@ -173,6 +175,9 @@ export function createApiServer({
       if (Object.values(e).includes(null)) return [400, { error: "bad data" }];
       // Первый уровень игры, начатой с выбранного уровня (или с 1-1): с него начинается новая игра.
       e.start = body.start === true;
+      // Медали этого уровня, собранные игроком (биты 1, 2, 4; старая игра их не присылает).
+      e.medals = body.medals === undefined ? 0 : int(body.medals, 7);
+      if (e.medals === null) return [400, { error: "bad data" }];
       store.touchPlayer(user);
       const verdict = checkLevel(e, sequence(user.id), now(), openLevels(store.passedLevels(user.id)));
       // Уровень ещё не открыт на сервере (телефон отметил его, а отчёт не дошёл): игра не

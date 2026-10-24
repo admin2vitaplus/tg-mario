@@ -128,6 +128,8 @@
 .ui-pick-cell.next { border-color: var(--ui-yellow); color: var(--ui-yellow); }
 .ui-pick-cell:active { transform: scale(0.95); }
 .ui-pick-cell:disabled { opacity: 0.3; cursor: default; transform: none; }
+/* Medals of a level («Прыг-Скок»): three dots under its number. */
+.ui-pick-medals { display: block; font-size: 10px; letter-spacing: 1px; color: var(--ui-yellow); }
 
 /* A phone on its side: lower buttons so the column fits the short screen. */
 @media (orientation: landscape) and (max-height: 500px) {

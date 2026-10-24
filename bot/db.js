@@ -365,6 +365,13 @@ export const MIGRATIONS = [
       PRIMARY KEY (challenge_id, player_id)
     );
   `,
+  // 16. Медали «Прыг-Скока»: на каждом уровне три спрятанные медали; отчёт о пройденном уровне
+  // несёт собранные на нём (биты 1, 2, 4), выбор уровня показывает, сколько собрано.
+  (db) => {
+    if (!db.prepare("PRAGMA table_info(level_results)").all().some((c) => c.name === "medals")) {
+      db.exec("ALTER TABLE level_results ADD COLUMN medals INTEGER NOT NULL DEFAULT 0");
+    }
+  },
 ];
 
 export function migrate(db) {
@@ -404,8 +411,9 @@ export function openDb(file) {
         best_at = CASE WHEN ? > best_score THEN ? ELSE best_at END,
         best_score = MAX(best_score, ?)
       WHERE id = ?`),
-    addLevel: db.prepare(`INSERT INTO level_results (player_id, level, score, time_left, deaths, start, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`),
+    addLevel: db.prepare(`INSERT INTO level_results (player_id, level, score, time_left, deaths, start, medals, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+    medals: db.prepare("SELECT level, medals FROM level_results WHERE player_id = ? AND medals > 0"),
     passedLevels: db.prepare("SELECT DISTINCT level FROM level_results WHERE player_id = ? ORDER BY level"),
     earned: db.prepare("SELECT code, earned_at FROM achievements WHERE player_id = ?"),
     earn: db.prepare("INSERT OR IGNORE INTO achievements (player_id, code, earned_at) VALUES (?, ?, ?)"),
@@ -444,7 +452,13 @@ export function openDb(file) {
       q.addRun.run(id, r.score, r.coins, r.levels, r.deaths, r.completed ? 1 : 0, r.bossFire ? 1 : 0, now);
       q.bumpPlayer.run(r.coins, r.score, now, r.score, id);
     },
-    addLevel: (id, l, at = Date.now()) => q.addLevel.run(id, l.level, l.score, l.timeLeft, l.deaths, l.start ? 1 : 0, at),
+    addLevel: (id, l, at = Date.now()) => q.addLevel.run(id, l.level, l.score, l.timeLeft, l.deaths, l.start ? 1 : 0, l.medals || 0, at),
+    // Собранные медали «Прыг-Скока»: { уровень: биты } по всем отчётам игрока.
+    medals(id) {
+      const out = {};
+      for (const r of q.medals.all(id)) out[r.level] = (out[r.level] || 0) | r.medals;
+      return out;
+    },
     // Уровни «Прыг-Скока», которые игрок проходил хоть раз (сквозные номера, plausibility.js).
     passedLevels: (id) => q.passedLevels.all(id).map((r) => r.level),
     lastRunAt: (id) => q.lastRunAt.get(id).at ?? 0,
