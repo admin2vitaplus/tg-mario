@@ -134,6 +134,9 @@ html, body {
   #overlay h1 { margin: 0 0 6px; font-size: 22px; }
   #overlay p { margin: 0 0 10px; font-size: 13px; }
   #overlay .hint { display: none; }
+  /* Two columns of buttons, so «← Все игры» stays on the screen too. */
+  #ovActs { display: grid; grid-template-columns: 1fr 1fr; width: min(520px, 100%); }
+  #ovActs > .primary, #ovActs > .ghost { grid-column: 1 / -1; }
 
   #menu h1 { margin: 0 0 8px; font-size: 18px; }
   #menu ol { grid-template-columns: repeat(4, 1fr); max-width: none; }
