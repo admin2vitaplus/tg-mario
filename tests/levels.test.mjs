@@ -245,3 +245,11 @@ test('cannons stand where the original has bullets, with room to fire', () => {
     }));
   }
 });
+
+test('4-2: warp pipes to worlds 5-8, over the ceiling and up the vine', () => {
+  const lvl = byId['4-2'];
+  const warps = lvl.pipes.filter((p) => p.to.world);
+  assert.deepEqual([...warps.map((p) => p.to.world)].sort(), [5, 6, 7, 8]);
+  const cells = reach(lvl, lvl.start || [3, 13]);
+  for (const p of warps) assert.ok(cells.has(`${p.x},${p.y - 1}`), `warp pipe ${p.to.world} reachable`);
+});
