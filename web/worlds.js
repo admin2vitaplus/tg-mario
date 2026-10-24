@@ -555,7 +555,7 @@ function level42() {
   pipe(62, 4);
   L.plants.push({ x: 62, y: 9 });
   row(68, 9, 'B?');
-  put(70, 1, '.');
+  fill(69, 71, 1, 1, '.');
   L.lifts.push({ x: 77, y: 9, w: 3, axis: 'x', dist: 6, period: 4, phase: 0 });
   row(80, 6, 'ooo');
   fill(87, 92, 9, 12, 'H');
@@ -716,7 +716,7 @@ function level44() {
 // ---------- World 5 (evening) ----------
 const DUSK = '#e8906a';
 
-// 5-1: an evening meadow; bolt throwers stand on brick towers, beetles walk in packs,
+// 5-1: an evening meadow; cannons fire bullets, bolt throwers stand on brick towers, beetles walk in packs,
 // a pipe leads down to a coin room.
 function level51() {
   const L = grid(226);
@@ -732,7 +732,7 @@ function level51() {
   row(15, 5, 'M');
   pipe(22, 2);
   column(30, 3);
-  column(31, 3);
+  L.cannon(31, 3);
   put(30, 9, 't');
   row(36, 9, 'oooo');
   pipe(42, 3);
@@ -745,7 +745,7 @@ function level51() {
   pipe(78, 4);
   L.plants.push({ x: 78, y: 9 });
   column(86, 2);
-  column(87, 2);
+  L.cannon(87, 2);
   put(86, 10, 't');
   row(90, 9, 'BMB');
   stairsUp(100, 4);
@@ -754,7 +754,7 @@ function level51() {
   put(112, 5, 'h');
   pipe(118, 2);
   column(126, 4);
-  column(127, 4);
+  L.cannon(127, 4);
   put(126, 8, 't');
   row(132, 9, 'oooo');
   stairsUp(136, 4);
@@ -762,7 +762,7 @@ function level51() {
   row(152, 9, 'BBCBB');
   pipe(160, 3);
   L.plants.push({ x: 160, y: 10 });
-  column(168, 3);
+  L.cannon(168, 3);
   put(168, 9, 't');
   pipe(176, 2);
   stairsUp(186, 8);
@@ -1201,7 +1201,7 @@ function level64() {
 
 // ---------- World 7 ----------
 
-// 7-1: a field held by bolt throwers on towers and on the ground, spikies among the beetles.
+// 7-1: a field held by cannons and bolt throwers on towers and on the ground, spikies among the beetles.
 function level71() {
   const L = grid(226);
   const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
@@ -1212,7 +1212,7 @@ function level71() {
   L.gap(126, 129);
 
   row(14, 9, '?M?');
-  column(24, 3);
+  L.cannon(24, 3);
   column(25, 3);
   put(24, 9, 't');
   row(30, 9, 'BBBB');
@@ -1220,6 +1220,7 @@ function level71() {
   pipe(38, 3);
   L.plants.push({ x: 38, y: 10 });
   put(46, 12, 't');
+  L.cannon(48, 2);
   row(50, 9, 'oooo');
   stairsUp(60, 3);
   column(63, 3);
@@ -1228,7 +1229,7 @@ function level71() {
   row(68, 5, 'oooo');
   pipe(80, 2);
   put(88, 12, 'n');
-  column(94, 4);
+  L.cannon(94, 4);
   column(95, 4);
   put(94, 8, 't');
   row(100, 9, 'BhB');
@@ -1240,11 +1241,12 @@ function level71() {
   column(136, 4);
   row(142, 8, 'oooooo');
   put(148, 12, 'n');
-  column(154, 3);
+  L.cannon(154, 3);
   column(155, 3);
   put(154, 9, 't');
   pipe(162, 2);
   put(172, 12, 't');
+  L.cannon(176, 2);
   stairsUp(186, 8);
   column(194, 8);
   L.flagpole(203);
@@ -1491,7 +1493,7 @@ function level81() {
   return L.done({ goal: 'pole', goalX: 217, checkpoint: { x: 116, start: [117, 13] } });
 }
 
-// 8-2: cliffs under the cloud rider: steps over pits, springboards, a thrower on a tower.
+// 8-2: cliffs under the cloud rider: steps over pits, springboards, cannons, a thrower on a tower.
 function level82() {
   const L = grid(226);
   const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
@@ -1509,7 +1511,7 @@ function level82() {
   stairsUp(46, 4);
   fill(50, 51, 9, 12, 'H');
   fill(56, 57, 9, 12, 'H');
-  column(64, 4);
+  L.cannon(64, 4);
   column(65, 4);
   put(64, 8, 't');
   row(70, 9, '?B?');
@@ -1517,6 +1519,7 @@ function level82() {
   fill(77, 77, 9, 12, 'H');
   fill(82, 83, 9, 12, 'H');
   row(88, 8, 'oooo');
+  L.cannon(91, 2);
   pipe(94, 3);
   L.plants.push({ x: 94, y: 10 });
   stairsUp(100, 4);
@@ -1532,6 +1535,8 @@ function level82() {
   fill(154, 155, 9, 12, 'H');
   fill(160, 161, 9, 12, 'H');
   row(166, 8, 'oooo');
+  L.cannon(168, 2);
+  L.cannon(181, 3);
   stairsUp(186, 8);
   column(194, 8);
   L.flagpole(203);
@@ -1540,7 +1545,7 @@ function level82() {
   return L.done({ goal: 'pole', goalX: 203, rider: { x0: 10, x1: 180 }, checkpoint: { x: 110, start: [112, 13] } });
 }
 
-// 8-3: fortress walls: wide towers with bolt throwers on top and between them.
+// 8-3: fortress walls: wide towers with bolt throwers on top and cannons between them.
 function level83() {
   const L = grid(226);
   const { row, fill, pipe, column, stairsUp, stairsDown, put, tree } = L;
@@ -1555,6 +1560,7 @@ function level83() {
   put(31, 8, 't');
   row(29, 5, 'oooooo');
   put(40, 12, 't');
+  L.cannon(43, 2);
   fill(46, 51, 9, 12, 'H');
   put(48, 8, 't');
   row(56, 9, 'B?B');
@@ -1565,6 +1571,7 @@ function level83() {
   put(82, 8, 't');
   row(79, 5, 'B?B?B');
   put(90, 12, 't');
+  L.cannon(93, 2);
   pipe(96, 3);
   L.plants.push({ x: 96, y: 10 });
   fill(102, 109, 9, 12, 'H');
@@ -1573,6 +1580,7 @@ function level83() {
   fill(120, 127, 9, 12, 'H');
   put(124, 8, 't');
   put(132, 12, 't');
+  L.cannon(128, 3);
   fill(136, 143, 9, 12, 'H');
   put(140, 8, 't');
   row(137, 5, 'oooooo');

@@ -17,7 +17,7 @@ const byId = Object.fromEntries(all.map((l) => [l.id, l.lvl]));
 const built = WORLDS[0].map((_, i) => all[i].lvl);
 
 const EMPTY = new Set(['.', 'o', 'e', 's', 't', 'n', 'v', 'y']);
-const SOLID = new Set(['#', 'B', '?', 'M', 'L', 'C', 'H', '[', ']', '{', '}', '(', '-', ')', '_', 'q', 'w', 'z', 'x', 'r', 'p', 'V', 'c']);
+const SOLID = new Set(['#', 'B', '?', 'M', 'L', 'C', 'H', '[', ']', '{', '}', '(', '-', ')', '_', 'q', 'w', 'z', 'x', 'r', 'p', 'V', 'c', 'u', 'j']);
 const at = (lvl, x, y) => lvl.grid[y]?.[x];
 const areaOf = (lvl, x) => lvl.areas.findIndex((a) => x >= a.x0 && x < a.x1);
 
@@ -231,5 +231,17 @@ test('vines grow to bonus clouds that drop the hero back onto the course', () =>
         assert.ok(finished(lvl, reach(lvl, [v.to.x + 1, v.to.y])), `${id}: the goal can still be reached after the clouds`);
       }
     }
+  }
+});
+
+test('cannons stand where the original has bullets, with room to fire', () => {
+  const has = (lvl) => lvl.grid.some((r) => r.includes('u'));
+  for (const id of ['5-1', '7-1', '8-2', '8-3']) assert.ok(has(byId[id]), `${id} has cannons`);
+  for (const { id, lvl } of all) {
+    lvl.grid.forEach((r, y) => r.forEach((ch, x) => {
+      if (ch !== 'u') return;
+      assert.ok(!SOLID.has(at(lvl, x - 1, y)) || !SOLID.has(at(lvl, x + 1, y)), `${id}: cannon at ${x} is walled in`);
+      for (let yy = y + 1; yy < 13; yy++) assert.equal(at(lvl, x, yy), 'j', `${id}: cannon at ${x} stands on its stand`);
+    }));
   }
 });

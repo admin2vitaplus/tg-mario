@@ -6,7 +6,7 @@
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
 // ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
 // h hidden block with an extra life, k hidden block with a coin (invisible until hit from below),
-// V brick with a vine, c cloud block.
+// V brick with a vine, c cloud block, u cannon barrel (fires bullets), j cannon stand.
 (function () {
 'use strict';
 
@@ -45,6 +45,8 @@ function grid(W) {
       for (let yy = top; yy <= y + 1; yy++) { put(x + 2, yy, '{'); put(x + 3, yy, '}'); }
     },
     column(x, h) { for (let y = 13 - h; y < 13; y++) put(x, y, 'H'); },
+    // Cannon h tiles tall on the ground: the barrel on top fires bullets, the stand below.
+    cannon(x, h) { put(x, 13 - h, 'u'); for (let y = 14 - h; y < 13; y++) put(x, y, 'j'); },
     stairsUp(x, n) { for (let i = 0; i < n; i++) L.column(x + i, i + 1); },
     stairsDown(x, n) { for (let i = 0; i < n; i++) L.column(x + i, n - i); },
     floor(ch = '#', x0 = 0, x1 = W - 1) { fill(x0, x1, 13, 14, ch); },

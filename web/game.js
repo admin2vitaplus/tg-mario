@@ -417,6 +417,26 @@ const BUG_LEGS = [
   ['.KK..KK..KK..KK.', '..KK..KK..KK..KK'],
 ];
 
+// Bullet from a cannon, flying left: a dark shell with an angry eye and a fin at the back.
+const BULLET = [
+  '................',
+  '.....KKKKKKK..K.',
+  '...KKKKKKKKKKKK.',
+  '..KKKWWKKKKKKKK.',
+  '.KKKWKKWKKKKKKK.',
+  '.KKKWKKWKKKKKKK.',
+  'KKKKKWWKKKKKKKKK',
+  'KKKKKKKKKKKKKKKK',
+  'KKKKKKKKKKKKKKKK',
+  'KWWWWWKKKKKKKKKK',
+  '.KKKKKKKKKKKKKK.',
+  '.KKKKKKKKKKKKKK.',
+  '..KKKKKKKKKKKKK.',
+  '...KKKKKKKKKKKK.',
+  '.....KKKKKKK..K.',
+  '................',
+];
+
 // Vine: a stem with leaves on both sides, one tile per piece, and its curled tip.
 const VINE = [
   '.......GN.......',
@@ -513,6 +533,7 @@ function makeTextures(scene) {
   // Green berry gives an extra life: same shape, other colors.
   pix(scene, 'berry1', BERRY.map((r) => r.replace(/V/g, 'N').replace(/D/g, 'G')));
 
+  pix(scene, 'bullet', BULLET);
   pix(scene, 'vine', VINE);
   pix(scene, 'vineTop', VINE_TOP);
   pix(scene, 'debris', ['.UUU.', 'UOOOU', 'UOOOU', '.UUU.']);
@@ -710,9 +731,10 @@ const T = {
   GROUND: 0, BRICK: 1, BONUS: 2, USED: 3, HARD: 4, PIPE_TL: 5, PIPE_TR: 6, PIPE_L: 7, PIPE_R: 8, POLE: 9, POLE_TOP: 10,
   LAVA_TOP: 11, LAVA: 12, TREE_L: 13, TREE_M: 14, TREE_R: 15, TRUNK: 16, BRIDGE: 17,
   SIDE_LIP_T: 18, SIDE_LIP_B: 19, SIDE_T: 20, SIDE_B: 21, WATER_TOP: 22, WATER: 23, CLOUD: 24,
+  CANNON: 25, CANNON_BASE: 26,
 };
-const SOLID = [0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 17, 18, 19, 20, 21, 24];
-const TILE_COUNT = 25;
+const SOLID = [0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 17, 18, 19, 20, 21, 24, 25, 26];
+const TILE_COUNT = 27;
 // Draw order: scenery, items rising out of blocks, tiles, items, enemies, hero.
 const DEPTH = { SCENERY: -10, SPROUT: -5, TILES: 0, ITEM: 5, ENEMY: 6, HERO: 10 };
 
@@ -879,6 +901,20 @@ function drawTiles(scene, key, colors) {
   r(24, 0, 9, 16, 5, '#ffffff');
   r(24, 1, 13, 14, 2, '#a8d0f8');
   r(24, 6, 4, 2, 1, '#e0f0ff');
+
+  // cannon barrel: a dark drum with a muzzle on each side and a bright band; its stand below
+  r(25, 0, 1, 16, 15, '#202028');
+  r(25, 1, 2, 14, 13, '#484858');
+  r(25, 0, 5, 3, 7, '#000000');
+  r(25, 13, 5, 3, 7, '#000000');
+  r(25, 5, 2, 6, 13, '#606070');
+  r(25, 7, 4, 2, 9, '#c8c8d0');
+  r(25, 3, 0, 10, 2, '#202028');
+  r(26, 2, 0, 12, 16, '#202028');
+  r(26, 3, 0, 10, 16, '#383844');
+  r(26, 5, 3, 6, 6, '#585868');
+  r(26, 7, 4, 2, 4, '#202028');
+  r(26, 3, 14, 10, 2, '#101014');
 
   c.refresh();
   for (let i = 0; i < count; i++) c.add(i, 0, i * TILE, 0, TILE, TILE);
@@ -1090,7 +1126,8 @@ function drawScenery(scene) {
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
 // ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
 // h hidden block with an extra life, k hidden block with a coin (invisible until hit from below),
-// v water surface, y water, s fish, p springboard, t bolt thrower, n spiky, V brick with a vine, c cloud.
+// v water surface, y water, s fish, p springboard, t bolt thrower, n spiky, V brick with a vine, c cloud,
+// u cannon barrel (fires bullets at the hero), j cannon stand.
 const TILE_OF = {
   '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'L': T.BONUS, 'H': T.HARD, 'r': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
@@ -1098,6 +1135,7 @@ const TILE_OF = {
   '(': T.TREE_L, '-': T.TREE_M, ')': T.TREE_R, 'i': T.TRUNK, '_': T.BRIDGE,
   'q': T.SIDE_LIP_T, 'w': T.SIDE_LIP_B, 'z': T.SIDE_T, 'x': T.SIDE_B,
   'v': T.WATER_TOP, 'y': T.WATER, 'V': T.BRICK, 'c': T.CLOUD,
+  'u': T.CANNON, 'j': T.CANNON_BASE,
 };
 
 // Level maps live in levels.js and worlds.js (loaded before this file): worlds of four levels each.
@@ -1410,6 +1448,7 @@ class Play extends Phaser.Scene {
     this.hidden = new Set();
     this.vineList = [];
     this.climb = null;
+    this.cannons = [];
     const coinSpots = [];
     const enemySpots = [];
     const ballSpots = [];
@@ -1439,6 +1478,7 @@ class Play extends Phaser.Scene {
         if (ch === 'p') springSpots.push([x, y]);
         if (ch === 't') throwerSpots.push([x, y]);
         if (ch === 'n') spikySpots.push([x, y]);
+        if (ch === 'u') this.cannons.push({ x: x * TILE + 8, y: y * TILE + 8, next: 1500 + (x % 4) * 500 });
       }
     }
 
@@ -1717,11 +1757,12 @@ class Play extends Phaser.Scene {
       this.climb = v;
       b.allowGravity = false;
       p.setFlipX(false);
-      p.x = v.x - 5;
+      p.x = v.x - 2;
       this.climbStep = 0;
     }
     const letGo = (vx, vy) => {
       this.climb = null;
+      b.checkCollision.none = false;
       this.vineFreeAt = time + 350;
       b.allowGravity = true;
       b.setVelocity(vx, vy);
@@ -1766,9 +1807,11 @@ class Play extends Phaser.Scene {
     const x = to.x * TILE + 8;
     for (let y = to.y; y < this.lvl.H; y++) this.add.image(x, y * TILE, y === to.y ? 'vineTop' : 'vine').setOrigin(0.5, 0).setDepth(DEPTH.SPROUT);
     this.climb = { x, top: to.y * TILE, bottom: VIEW_H + 64, auto: true };
-    p.setPosition(x - 5, VIEW_H + 4);
+    p.setPosition(x - 2, VIEW_H + 4);
     b.reset(p.x, p.y);
     b.allowGravity = false;
+    // Up through the ground, if the vine comes out of it.
+    b.checkCollision.none = true;
     this.prevX = p.x;
     this.lead = 0;
     this.cameras.main.scrollX = Phaser.Math.Clamp(x - VIEW_W * 0.3, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
@@ -2542,6 +2585,26 @@ class Play extends Phaser.Scene {
       r.setData('stomp', true);
       r.setData('next', time + 1500);
       this.rider = r;
+    }
+    // Cannons on screen fire a bullet at the hero now and then, unless he stands right by them.
+    for (const cn of this.cannons) {
+      if (this.dead || this.won || time < cn.next) continue;
+      if (cn.x < cam.scrollX - 8 || cn.x > cam.scrollX + VIEW_W + 8) continue;
+      const dx = this.player.x - cn.x;
+      if (Math.abs(dx) < 2.5 * TILE) continue;
+      cn.next = time + 3200 + Math.random() * 2000;
+      const dir = dx < 0 ? -1 : 1;
+      const f = this.foes.create(cn.x + dir * 10, cn.y, 'bullet').setDepth(DEPTH.TILES - 1);
+      f.body.allowGravity = false;
+      f.body.setSize(14, 12).setOffset(1, 2);
+      f.body.setVelocityX(dir * 75);
+      f.setFlipX(dir > 0);
+      f.setData('kind', 'bullet');
+      f.setData('stomp', true);
+      // Out of the barrel, then in front of everything.
+      this.time.delayedCall(250, () => f.active && f.setDepth(DEPTH.ENEMY));
+      tone(120, 60, 0.12, 'square', 0.06);
+      this.cameras.main.shake(60, 0.003);
     }
     for (const f of this.foes.getChildren().slice()) {
       const kind = f.getData('kind');
