@@ -495,5 +495,13 @@
     "body": "Новая кнопка «👥 Бой на четверых»: три или четыре бомбера на одном поле, у каждого три жизни, побеждает последний, у кого они остались. Создайте комнату и отправьте код друзьям или найдите случайных соперников: полная комната начинает бой сама. Очки и жетоны в этом бою не идут.",
     "titleEn": "Bomb Field: battle for four",
     "bodyEn": "New «👥 Battle for four» button: three or four bombers on one field, three lives each, the last one with lives left wins. Create a room and send the code to friends, or find random opponents: a full room starts the battle by itself. This battle gives no points and no ◆."
+  },
+  {
+    "id": "2026-10-24-landscape-titles",
+    "size": "minor",
+    "title": "Заставки игр на телефоне боком",
+    "body": "Если держать телефон горизонтально, все кнопки заставки, включая «← Все игры», теперь помещаются на экран.",
+    "titleEn": "Game title screens on a phone held sideways",
+    "bodyEn": "With the phone held sideways, every title screen button, «← All games» included, now fits on the screen."
   }
 ]
