@@ -23,7 +23,10 @@ const SHIELD = 180;         // spawn protection in a duel after losing a life
 const MYSTERY = 600;        // «?» item: 10 s of protection
 const MAX_ENEMIES = 16;
 const SPEED = [6, 8];       // player, without and with the speed item
-const STARTS = [[1, 1], [COLS - 2, ROWS - 2]]; // left edge and right edge
+// Starts: the left edge and the right edge (alone and in a duel), then the other two corners
+// for the third and the fourth bomber («Бой на четверых»).
+const STARTS = [[1, 1], [COLS - 2, ROWS - 2], [COLS - 2, 1], [1, ROWS - 2]];
+const MAX_PLAYERS = STARTS.length;
 
 // Enemies. speed — units per frame (a cell is 128), wall — goes through soft blocks,
 // smart — chance to turn towards the nearest player at a crossing, turn — chance to turn anyway.
@@ -148,8 +151,10 @@ const itemOpen = (s) => s.item && !s.item.taken && s.cells[idx(s.item.x, s.item.
 
 // ---------- Game setup ----------
 // opts: { rules } — see RULES.
+// Two to four players play against each other (s.duel): the last one with lives left wins.
 function newGame(players, seed, opts = {}) {
-  const s = { rules: opts.rules || 1, seed: seed | 0, frame: 0, duel: players === 2, players: [], events: [], won: false, winner: -1 };
+  players = Math.max(1, Math.min(MAX_PLAYERS, players | 0));
+  const s = { rules: opts.rules || 1, seed: seed | 0, frame: 0, duel: players >= 2, players: [], events: [], won: false, winner: -1 };
   for (let i = 0; i < players; i++) {
     s.players.push({
       pi: i, lives: 3, score: 0, wins: 0, out: false,
@@ -163,7 +168,7 @@ function newGame(players, seed, opts = {}) {
 
 // Soft blocks never lie on the start cell and the two cells next to it.
 function safeZone(s, cx, cy) {
-  const starts = s.duel ? STARTS : STARTS.slice(0, 1);
+  const starts = STARTS.slice(0, s.players.length);
   return starts.some(([sx, sy]) => Math.abs(cx - sx) + Math.abs(cy - sy) <= 2 && (cx === sx || cy === sy));
 }
 
@@ -202,7 +207,7 @@ function startStage(s, n) {
   for (let cy = 1; cy < ROWS - 1; cy++) {
     for (let cx = 1; cx < COLS - 1; cx++) {
       if (s.cells[idx(cx, cy)] !== EMPTY) continue;
-      const far = (s.duel ? STARTS : STARTS.slice(0, 1)).every(([sx, sy]) => Math.abs(cx - sx) + Math.abs(cy - sy) >= 7);
+      const far = STARTS.slice(0, s.players.length).every(([sx, sy]) => Math.abs(cx - sx) + Math.abs(cy - sy) >= 7);
       if (far) free.push([cx, cy]);
     }
   }
@@ -385,9 +390,11 @@ function afterDeath(s, p) {
     return;
   }
   if (p.lives <= 0) {
-    // A duel ends when one of the two has no lives left; the other one wins.
+    // Out of the game; it ends when only one has lives left, and that one wins.
     p.out = true;
-    s.winner = 1 - p.pi;
+    const left = s.players.filter((o) => !o.out);
+    if (left.length > 1) return;
+    s.winner = left.length ? left[0].pi : -1;
     s.phase = 'over';
     s.phaseT = 0;
     s.events.push('over');
@@ -658,7 +665,7 @@ function step(s, inputs) {
 
 root.BombSim = {
   COLS, ROWS, TILE, SUB, TS, EMPTY, HARD, SOFT, BURN, UP, RIGHT, DOWN, LEFT, DX, DY,
-  FUSE, FLAME, DIE, INTRO, STAGE_TIME, ENEMY, ITEMS, STAGES, STARTS, LIFE_STAGES,
+  FUSE, FLAME, DIE, INTRO, STAGE_TIME, ENEMY, ITEMS, STAGES, STARTS, MAX_PLAYERS, LIFE_STAGES,
   RULES, NEW_ITEMS, DUEL_ITEMS, SHRINK_AT, SHRINK_EVERY, SPIRAL, SLIDE, THROW,
   newGame, startStage, step, cellOf, explode,
 };

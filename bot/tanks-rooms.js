@@ -24,11 +24,23 @@ import { verifyInitData } from "./auth.js";
 //
 // Те же комнаты служат дуэли «Бомбодрома» на своём пути (path: "/ws/bombs", см. app.js).
 //
+// Комната на 3–4 места («Бой на четверых» «Бомбодрома»): { t: "create", seats: 3…4 } или
+// { t: "find", kind: "party" } (комната на 4). Гость получает { t: "joined", code, token, seat, size },
+// хозяин — { t: "peer", seat }. Сообщения хозяина уходят всем гостям как есть; сообщение гостя
+// приходит хозяину обёрнутым: { t: "g", s: место, m: "текст сообщения" }. Хозяин закрывает комнату
+// для новых игроков сообщением {"t":"lock"} (оно никуда не пересылается). Гость, который вышел
+// или не вернулся за 20 с, освобождает место: хозяину приходит { t: "gone", seat }; обрыв связи
+// у гостя — хозяину { t: "wait", seat }, возвращение — { t: "back", seat }. Уход хозяина
+// закрывает комнату для всех ({ t: "left" }), его обрыв связи — всем { t: "wait" }.
+//
 // Подключение: wss://<сервер>/ws/tanks?auth=<initData> (initData необязателен,
 // с ним лимит соединений считается на игрока Telegram, без него — на адрес).
 
 const PATH = "/ws/tanks";
 const PING = '{"t":"ping"}';
+const LOCK = '{"t":"lock"}';
+export const MAX_SEATS = 4;
+const PARTY_SEATS = 4;
 
 export const LIMITS = {
   maxMessage: 16 * 1024, // байт в одном сообщении
@@ -55,6 +67,7 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
   // онлайн-матча, который присылает хозяин (см. tanks-results.js). Хранится час.
   const players = new Map(); // code -> { host, guest, at }
   const remember = (room) => {
+    if (room.seats.length > 2) return; // итог боя на четверых сервер не засчитывает
     const [h, g] = room.seats;
     players.set(room.code, { host: h?.ws?.userId ?? h?.userId ?? null, guest: g?.ws?.userId ?? g?.userId ?? null, at: Date.now() });
   };
@@ -120,11 +133,25 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
     if (!room) return;
     const i = room.seats.findIndex((s) => s && s.ws === ws);
     if (i < 0) return;
-    if (leaving) return closeRoom(room, { t: "left" });
+    const multi = room.seats.length > 2;
+    if (leaving) {
+      // Гость боя на четверых уходит один: его место свободно, остальные играют дальше.
+      if (multi && i > 0) {
+        room.seats[i] = null;
+        return send(room.seats[0].ws, { t: "gone", seat: i });
+      }
+      return closeRoom(room, { t: "left" });
+    }
     room.seats[i].ws = null;
     room.seats[i].gone = Date.now();
-    if (room.seats[1 - i]) send(room.seats[1 - i].ws, { t: "wait" });
+    if (!multi) {
+      if (room.seats[1 - i]) send(room.seats[1 - i].ws, { t: "wait" });
+    } else if (i === 0) {
+      for (const g of room.seats.slice(1)) if (g) send(g.ws, { t: "wait" });
+    } else send(room.seats[0].ws, { t: "wait", seat: i });
   };
+  const freeSeat = (room) => (room.locked ? -1 : room.seats.findIndex((s, i) => i > 0 && !s));
+  const sameUser = (room, ws) => !!ws.userId && room.seats.some((s) => s && s.userId === ws.userId);
 
   const failedTry = (ws) => {
     const now = Date.now();
@@ -151,8 +178,16 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
       const room = ws.room && rooms.get(ws.room);
       if (room) {
         // Пересылка без разбора: так быстрее, и серверу не нужно знать правила игры.
-        const other = room.seats[0].ws === ws ? room.seats[1] : room.seats[0];
-        if (other) send(other.ws, text);
+        if (room.seats.length === 2) {
+          const other = room.seats[0].ws === ws ? room.seats[1] : room.seats[0];
+          if (other) send(other.ws, text);
+          return;
+        }
+        const i = room.seats.findIndex((s) => s && s.ws === ws);
+        if (i === 0) {
+          if (text === LOCK) { room.locked = true; room.open = false; return; }
+          for (const g of room.seats.slice(1)) if (g) send(g.ws, text);
+        } else if (i > 0) send(room.seats[0].ws, JSON.stringify({ t: "g", s: i, m: text }));
         return;
       }
       let msg;
@@ -160,19 +195,21 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
       if (!msg || typeof msg !== "object") return;
 
       // Случайный соперник: самая давняя открытая комната, хозяин которой на связи и не этот же игрок.
-      const kind = msg.kind === "duel" ? "duel" : "";
+      const kind = msg.kind === "duel" || msg.kind === "party" ? msg.kind : "";
       if (msg.t === "find") {
         for (const room of rooms.values()) {
           const host = room.seats[0];
-          if (!room.open || room.kind !== kind || room.seats[1] || !host.ws || host.ws === ws || (ws.userId && host.userId === ws.userId)) continue;
+          const i = freeSeat(room);
+          if (!room.open || room.kind !== kind || i < 0 || !host.ws || host.ws === ws || sameUser(room, ws)) continue;
           const token = newToken();
-          room.seats[1] = { ws, token, gone: 0, userId: ws.userId };
-          room.open = false;
+          room.seats[i] = { ws, token, gone: 0, userId: ws.userId };
+          if (freeSeat(room) < 0) room.open = false;
           room.met = true;
           remember(room);
           ws.room = room.code;
-          send(ws, { t: "joined", code: room.code, token, random: true });
-          send(host.ws, { t: "peer" });
+          const multi = room.seats.length > 2;
+          send(ws, multi ? { t: "joined", code: room.code, token, random: true, seat: i, size: room.seats.length } : { t: "joined", code: room.code, token, random: true });
+          send(host.ws, multi ? { t: "peer", seat: i } : { t: "peer" });
           return;
         }
       }
@@ -186,9 +223,13 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
         if (!code) return send(ws, { t: "error", code: "create", msg: "Не удалось создать комнату" });
         const token = newToken();
         const open = msg.t === "find";
-        rooms.set(code, { code, ip: ws.ip, open, kind, seats: [{ ws, token, gone: 0, userId: ws.userId }, null], created: Date.now() });
+        const want = Math.floor(Number(msg.seats));
+        const size = open ? (kind === "party" ? PARTY_SEATS : 2) : want >= 3 && want <= MAX_SEATS ? want : 2;
+        const seats = [{ ws, token, gone: 0, userId: ws.userId }, ...Array(size - 1).fill(null)];
+        rooms.set(code, { code, ip: ws.ip, open, kind, seats, created: Date.now() });
         ws.room = code;
-        send(ws, open ? { t: "room", code, token, random: true } : { t: "room", code, token });
+        const reply = open ? { t: "room", code, token, random: true } : { t: "room", code, token };
+        send(ws, size > 2 ? { ...reply, size } : reply);
       } else if (msg.t === "join" || msg.t === "rejoin") {
         if (tooManyTries(ws)) return send(ws, { t: "error", code: "tries", msg: "Слишком много попыток, подождите минуту" });
         const code = String(msg.code || "").trim();
@@ -208,18 +249,29 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
           seat.ws = ws;
           seat.gone = 0;
           ws.room = code;
+          if (room.seats.length > 2) {
+            const host = room.seats[0];
+            const peer = i === 0 ? room.seats.slice(1).some((g) => g && g.ws) : !!host.ws;
+            send(ws, { t: "rejoined", code, role: i === 0 ? "host" : "guest", peer, seat: i, size: room.seats.length });
+            if (i === 0) for (const g of room.seats.slice(1)) send(g?.ws, { t: "back" });
+            else send(host.ws, { t: "back", seat: i });
+            return;
+          }
           const other = room.seats[1 - i];
           send(ws, { t: "rejoined", code, role: i === 0 ? "host" : "guest", peer: !!(other && other.ws) });
           if (other && other.ws) { room.met = true; send(other.ws, { t: "back" }); }
           return;
         }
-        if (room.seats[1]) return send(ws, { t: "error", code: "full", msg: "В комнате уже двое" });
+        const i = freeSeat(room);
+        if (i < 0) return send(ws, { t: "error", code: "full", msg: room.seats.length > 2 ? "Комната заполнена" : "В комнате уже двое" });
         const token = newToken();
-        room.seats[1] = { ws, token, gone: 0, userId: ws.userId };
+        room.seats[i] = { ws, token, gone: 0, userId: ws.userId };
+        if (freeSeat(room) < 0) room.open = false;
         remember(room);
         ws.room = code;
-        send(ws, { t: "joined", code, token });
-        if (room.seats[0].ws) { room.met = true; send(room.seats[0].ws, { t: "peer" }); }
+        const multi = room.seats.length > 2;
+        send(ws, multi ? { t: "joined", code, token, seat: i, size: room.seats.length } : { t: "joined", code, token });
+        if (room.seats[0].ws) { room.met = true; send(room.seats[0].ws, multi ? { t: "peer", seat: i } : { t: "peer" }); }
         else send(ws, { t: "wait" });
       }
     });
@@ -246,6 +298,21 @@ export function attachTanksRooms(server, { allowedOrigins = ["*"], botToken = ""
     for (const ws of wss.clients) if (now - ws.last > L.idleMs) ws.terminate();
     for (const room of [...rooms.values()]) {
       const host = room.seats[0];
+      if (room.seats.length > 2) {
+        // Бой на четверых: хозяин не вернулся — комната закрыта; гость не вернулся — место свободно.
+        const guests = room.seats.slice(1).some(Boolean);
+        if ((!room.locked && now - room.created > L.waitMs) || (!host.ws && now - host.gone > (room.met || guests ? L.rejoinMs : L.hostAwayMs))) {
+          if (!room.locked && !guests) closeRoom(room, { t: "error", code: "expired", msg: "Никто не пришёл, комната закрыта" });
+          else closeRoom(room, { t: "left" });
+          continue;
+        }
+        room.seats.forEach((g, i) => {
+          if (i === 0 || !g || g.ws || now - g.gone <= L.rejoinMs) return;
+          room.seats[i] = null;
+          send(host.ws, { t: "gone", seat: i });
+        });
+        continue;
+      }
       if (!room.seats[1]) {
         if (now - room.created > L.waitMs || (!host.ws && now - host.gone > L.hostAwayMs)) {
           closeRoom(room, { t: "error", code: "expired", msg: "Никто не пришёл, комната закрыта" });
