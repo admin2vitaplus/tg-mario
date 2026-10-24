@@ -21,80 +21,9 @@ const SOLID = new Set(['#', 'B', '?', 'M', 'L', 'C', 'H', '[', ']', '{', '}', '(
 const at = (lvl, x, y) => lvl.grid[y]?.[x];
 const areaOf = (lvl, x) => lvl.areas.findIndex((a) => x >= a.x0 && x < a.x1);
 
-// Rough reachability on the tile grid for a small hero (one tile tall): walking, falling,
-// jumps up to 4 tiles high (6 wide when 2 high or less), lifts along their whole track, springboards,
-// pipes, vines up to the clouds, falling off the clouds and swimming in water areas.
-// Returns the set of reachable body cells "x,y".
-function reach(lvl, from) {
-  const solid = (x, y) => SOLID.has(at(lvl, x, y));
-  const free = (x, y) => x >= 0 && x < lvl.W && y >= 0 && y < lvl.H && !solid(x, y) && !'~=f'.includes(at(lvl, x, y));
-  const liftTop = new Set();
-  for (const l of lvl.lifts) {
-    const xs = l.axis === 'x' ? l.w + l.dist : l.w;
-    const ys = l.axis === 'y' ? l.dist : 0;
-    for (let dx = 0; dx < xs; dx++) for (let dy = 0; dy <= ys; dy++) liftTop.add(`${l.x + dx},${l.y + dy - 1}`);
-  }
-  const water = (x) => !!(lvl.areas[areaOf(lvl, x)] || {}).water;
-  const stand = (x, y) => free(x, y) && (solid(x, y + 1) || liftTop.has(`${x},${y}`));
-  const loopOk = (x, y, x2, y2) => (lvl.loops || []).every((lp) => {
-    const crosses = (x < lp.x) !== (x2 < lp.x);
-    return !crosses || (y >= lp.rows[0] && y <= lp.rows[1]);
-  });
-  const land = (x, y) => {
-    while (y < lvl.H && free(x, y) && !stand(x, y)) y++;
-    if (y < lvl.H && stand(x, y)) return [x, y];
-    // Off the bonus clouds the hero drops back onto the main course from the top.
-    const drop = y >= lvl.H ? (lvl.areas[areaOf(lvl, x)] || {}).drop : undefined;
-    return drop !== undefined ? land(drop, 0) : null;
-  };
-  const seen = new Set();
-  const queue = [];
-  const push = (c, x, y) => {
-    if (!c) return;
-    const k = `${c[0]},${c[1]}`;
-    if (seen.has(k) || !loopOk(x, y, c[0], c[1])) return;
-    seen.add(k);
-    queue.push(c);
-  };
-  push(land(from[0], from[1] - 1), from[0], from[1] - 1);
-  while (queue.length) {
-    const [x, y] = queue.shift();
-    if (water(x)) {
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        if (free(x + dx, y + dy) && y + dy >= 2) push([x + dx, y + dy], x, y);
-      }
-    }
-    const spring = at(lvl, x, y + 1) === 'p';
-    const up = spring ? 12 : 4;
-    for (let dy = -up; dy <= lvl.H; dy++) {
-      const reachX = dy > 0 ? 6 + Math.floor(dy / 2) : spring || dy >= -2 ? 6 : dy === -3 ? 5 : 4;
-      // Room to rise straight up before the jump.
-      let clear = true;
-      for (let yy = y - 1; yy >= y + dy - 1 && yy >= 0; yy--) if (!free(x, yy)) { clear = false; break; }
-      if (dy < 0 && !clear) continue;
-      for (let dx = -reachX; dx <= reachX; dx++) {
-        const x2 = x + dx;
-        const y2 = y + dy;
-        if (stand(x2, y2)) push([x2, y2], x, y);
-      }
-    }
-    for (const dx of [-1, 1]) if (free(x + dx, y)) push(land(x + dx, y), x, y);
-    // A vine brick hit from below (head up to 4 tiles above the feet) grows a vine to the clouds.
-    for (const v of lvl.vines || []) {
-      if (v.x !== x || v.y >= y || y - v.y > 5) continue;
-      let open = true;
-      for (let yy = v.y + 1; yy < y; yy++) if (!free(x, yy)) open = false;
-      if (open) push([v.to.x + 1, v.to.y - 1], x, y);
-    }
-    for (const p of lvl.pipes) {
-      const on = p.type === 'down' ? (y === p.y - 1 && (x === p.x || x === p.x + 1)) : (y === p.y + 1 && x === p.x - 1);
-      if (!on || p.to.world) continue;
-      if (p.to.pipeX !== undefined) push([p.to.pipeX, p.to.pipeY - 1], p.to.pipeX, p.to.pipeY - 1);
-      else push(land(p.to.x, p.to.y - 1), p.to.x, p.to.y - 1);
-    }
-  }
-  return seen;
-}
+// Rough reachability on the tile grid (web/levels.js, PrygLevels.reach): the set of cells
+// "x,y" where a small hero can stand.
+const reach = (lvl, from) => window.PrygLevels.reach(lvl, from);
 
 const finished = (lvl, cells) => [...cells].some((k) => Number(k.split(',')[0]) >= lvl.goalX);
 
@@ -252,4 +181,18 @@ test('4-2: warp pipes to worlds 5-8, over the ceiling and up the vine', () => {
   assert.deepEqual([...warps.map((p) => p.to.world)].sort(), [5, 6, 7, 8]);
   const cells = reach(lvl, lvl.start || [3, 13]);
   for (const p of warps) assert.ok(cells.has(`${p.x},${p.y - 1}`), `warp pipe ${p.to.world} reachable`);
+});
+
+test('three medals on every level, each on a coin the hero can reach', () => {
+  const { medalSpots } = window.PrygLevels;
+  for (const { id, lvl } of all) {
+    const spots = medalSpots(lvl);
+    assert.equal(spots.length, 3, id);
+    assert.equal(new Set(spots.map(String)).size, 3, id + ': two medals in one place');
+    const cells = reach(lvl, lvl.start || [3, 13]);
+    for (const [x, y] of spots) {
+      assert.equal(at(lvl, x, y), 'o', `${id}: medal at ${x},${y} is not on a coin`);
+      assert.ok(window.PrygLevels.touches(lvl, cells, x, y), `${id}: medal at ${x},${y} cannot be reached`);
+    }
+  }
 });

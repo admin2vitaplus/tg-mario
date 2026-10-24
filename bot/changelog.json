@@ -445,5 +445,13 @@
     "body": "Новый режим «⚔ Дуэль»: танк против танка на маленьких аренах, одна жизнь на раунд, побеждает тот, кто первым выиграет три раунда. В центре арены падают бонусы. Играть можно с другом по коду комнаты, со случайным соперником или вдвоём за одной клавиатурой.",
     "titleEn": "Tank Field duel",
     "bodyEn": "New «⚔ Duel» mode: tank against tank on small arenas, one life a round, the first to win three rounds wins. Bonuses drop in the middle. Play a friend by room code, a random opponent or two at one keyboard."
+  },
+  {
+    "id": "2026-10-24-pryg-medals",
+    "size": "major",
+    "title": "Медали в «Прыг-Скоке»",
+    "body": "На каждом уровне спрятаны три медали: в бонусных комнатах и в самых труднодоступных местах. На заставке уровня видно, какие уже найдены, а на экране выбора уровня под каждым уровнем есть три точки и общий счёт медалей.",
+    "titleEn": "Medals in Hop-Skip",
+    "bodyEn": "Every level hides three medals: in bonus rooms and in the hardest places to reach. The level title card shows the medals you have found, and the level choice shows three dots under each level and your total."
   }
 ]

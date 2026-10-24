@@ -530,6 +530,24 @@ function makeTextures(scene) {
 
   pix(scene, 'berry', BERRY);
 
+  // A medal (three hidden on every level, levels.js medalSpots): ribbon and a gold disc with a star.
+  pix(scene, 'medal', [
+    '....RRR..PPP....',
+    '....RRR..PPP....',
+    '.....RRRPPP.....',
+    '......RRPP......',
+    '.......UU.......',
+    '.....QQQQQQ.....',
+    '....QYYYYYYQ....',
+    '...QYYQWWQQUQ...',
+    '...QYQWWWWQUQ...',
+    '...QYQQWWQQUQ...',
+    '...QYQWQQWQUQ...',
+    '...QYYQQQQUUQ...',
+    '....QUUUUUUQ....',
+    '.....QQQQQQ.....',
+  ]);
+
   // Green berry gives an extra life: same shape, other colors.
   pix(scene, 'berry1', BERRY.map((r) => r.replace(/V/g, 'N').replace(/D/g, 'G')));
 
@@ -1577,8 +1595,18 @@ class Play extends Phaser.Scene {
     this.pipeWait = 0;
     this.inPipe = false;
 
+    // Three of the coins are medals (levels.js); one found before shows faint and gives nothing new.
+    this.medalLevel = absLevel(this.s.world, this.s.level);
+    const medalSpots = window.PrygLevels.medalSpots ? window.PrygLevels.medalSpots(lvl) : [];
+    const isMedal = new Set(medalSpots.map(([x, y]) => x + ',' + y));
+    const found = this.medalsFound();
+    this.medalItems = this.physics.add.staticGroup();
+    medalSpots.forEach(([x, y], i) => {
+      const m = this.medalItems.create(x * TILE + 8, y * TILE + 8, 'medal').setData('bit', 1 << i);
+      if (found & (1 << i)) m.setAlpha(0.35);
+    });
     this.coinItems = this.physics.add.staticGroup();
-    for (const [x, y] of coinSpots) this.coinItems.create(x * TILE + 8, y * TILE + 8, 'coin');
+    for (const [x, y] of coinSpots) if (!isMedal.has(x + ',' + y)) this.coinItems.create(x * TILE + 8, y * TILE + 8, 'coin');
 
     // No foe is placed right next to where the hero appears, so a respawn never lands on an enemy.
     const clear = ([x]) => Math.abs(x - sx) > SPAWN_CLEAR;
@@ -1628,6 +1656,7 @@ class Play extends Phaser.Scene {
       this.killFoe(f);
     });
     this.physics.add.overlap(this.player, this.coinItems, (p, c) => { c.destroy(); this.gainCoin(); });
+    this.physics.add.overlap(this.player, this.medalItems, (p, m) => this.takeMedal(m));
     this.physics.add.overlap(this.player, this.items, (p, it) => {
       if (!it.body.enable) return;
       const kind = it.getData('kind');
@@ -2084,6 +2113,9 @@ class Play extends Phaser.Scene {
       this.add.image(VIEW_W / 2 - 14, 150, this.heroTex() + '0').setOrigin(0.5, 1),
       this.add.text(VIEW_W / 2 + 2, 142, `× ${this.s.lives}`, { fontFamily: 'Courier New, monospace', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', resolution: 4 }).setOrigin(0, 0.5),
     ];
+    // The level's medals: found ones bright, the rest faint.
+    const found = this.medalsFound();
+    for (let i = 0; i < 3; i++) items.push(this.add.image(VIEW_W / 2 + (i - 1) * 20, 178, 'medal').setAlpha(found & (1 << i) ? 1 : 0.3));
     for (const it of items) it.setScrollFactor(0).setDepth(100);
     this.time.delayedCall(1600, () => {
       for (const it of items) it.destroy();
@@ -2181,6 +2213,26 @@ class Play extends Phaser.Scene {
     }
     const t = this.add.image(Math.round(obj.x), Math.round(obj.y) - 14, key).setDepth(DEPTH.HERO + 1);
     this.tweens.add({ targets: t, y: t.y - 18, duration: 700, onComplete: () => t.destroy() });
+  }
+
+  // Medals of this level found so far, bits 1, 2, 4 (kept by lib/progress.js, also on the server).
+  medalsFound() {
+    return window.Progress && window.Progress.medals ? window.Progress.medals('mario', this.medalLevel) : 0;
+  }
+
+  takeMedal(m) {
+    const bit = m.getData('bit');
+    const x = m.x, y = m.y;
+    m.destroy();
+    const had = this.medalsFound();
+    if (had & bit) { SFX.coin(); return; }
+    if (window.Progress) window.Progress.addMedal('mario', this.medalLevel, bit);
+    SFX.power();
+    haptic('success');
+    const n = [1, 2, 4].filter((b) => (had | bit) & b).length;
+    const t = this.add.text(x, y - 10, `${L('МЕДАЛЬ', 'MEDAL')} ${n}/3`, { fontFamily: 'Courier New, monospace', fontSize: '10px', fontStyle: 'bold', color: '#f8d020', stroke: '#222222', strokeThickness: 3, resolution: 4 })
+      .setOrigin(0.5).setDepth(DEPTH.HERO + 1);
+    this.tweens.add({ targets: t, y: t.y - 22, duration: 1200, onComplete: () => t.destroy() });
   }
 
   gainCoin() {
@@ -2985,7 +3037,7 @@ class Play extends Phaser.Scene {
   }
 
   finishLevel() {
-    api.levelDone(this.s.level, this.s.score, this.s.timeLeft, this.s.world);
+    api.levelDone(this.s.level, this.s.score, this.s.timeLeft, this.s.world, this.medalsFound());
     if (window.Progress) window.Progress.mark('mario', absLevel(this.s.world, this.s.level));
     this.s.cleared++;
     this.addScore(this.s.timeLeft * 50);

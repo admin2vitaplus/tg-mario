@@ -244,7 +244,7 @@ test("progress: passed levels open for a new game, the rest stay closed, all wor
   withServer(async (call, _n, wait) => {
     const level = (body) => call("POST", "/api/mario/level", { user: alice, body: { deaths: 0, ...body } });
     const run = (body) => call("POST", "/api/mario/run", { user: alice, body: { deaths: 0, coins: 0, ...body } });
-    assert.deepEqual((await call("GET", "/api/progress", { user: alice })).json, { mario: [], tanks: [], bombs: [], range: [] });
+    assert.deepEqual((await call("GET", "/api/progress", { user: alice })).json, { mario: [], tanks: [], bombs: [], range: [], medals: { mario: {} } });
     assert.equal((await call("GET", "/api/progress")).status, 401);
     // С 1-2 сразу — нельзя: 1-1 ещё не пройден.
     assert.equal((await level({ level: 1, score: 3000, timeLeft: 200, start: true })).status, 409);
@@ -274,3 +274,18 @@ test("level times on the server are the game's own", async () => {
     .matchAll(/\btime: (\d+)/g)].map((m) => Number(m[1]));
   assert.deepEqual([...times("levels.js"), ...times("worlds.js")], WORLD_TIMES.flat());
 });
+
+// Медали «Прыг-Скока»: отчёт об уровне несёт собранные на нём, выбор уровня получает их все.
+test("medals of a level come with its report and add up in the progress", () =>
+  withServer(async (call, _n, wait) => {
+    const level = (body) => call("POST", "/api/mario/level", { user: alice, body: { deaths: 0, ...body } });
+    assert.equal((await level({ level: 0, score: 3000, timeLeft: 250, medals: 8 })).status, 400);
+    assert.equal((await level({ level: 0, score: 3000, timeLeft: 250, medals: 5 })).status, 200);
+    wait(90);
+    assert.equal((await level({ level: 1, score: 6000, timeLeft: 250 })).status, 200, "an old game sends no medals");
+    wait(90);
+    assert.equal((await level({ level: 0, score: 3000, timeLeft: 250, start: true, medals: 2 })).status, 200);
+    const r = await call("GET", "/api/progress", { user: alice });
+    assert.deepEqual(r.json.mario, [0, 1]);
+    assert.deepEqual(r.json.medals, { mario: { 0: 7 } });
+  }));

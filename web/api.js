@@ -56,14 +56,15 @@ function track(kind) {
 
 const canSave = () => !!(base && initData && server.online !== false);
 
-function levelDone(level, score, timeLeft, world) {
+// medals — the level's medals found so far (bits 1, 2, 4), kept on the server for the level choice.
+function levelDone(level, score, timeLeft, world, medals = 0) {
   const deaths = run.levelDeaths;
   const start = run.first;
   run.levelDeaths = 0;
   run.first = false;
   if (!canSave()) return;
   const r0 = run;
-  r0.pending = request('POST', '/level', { world: world || 1, level, score, timeLeft, deaths, start })
+  r0.pending = request('POST', '/level', { world: world || 1, level, score, timeLeft, deaths, start, medals })
     .then((r) => { r0.reported++; showAchievements(r.newAchievements); if (window.Wallet) window.Wallet.grants(r.wallet); })
     .catch(() => {});
 }
