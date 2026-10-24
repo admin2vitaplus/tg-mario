@@ -112,6 +112,8 @@ const JUMP_GRAVITY = [[450, 1575], [422, 1350], [562, 2025]];
 // Forgiving jump, ms: a press this long before landing, or this long after leaving a ledge, still jumps.
 const JUMP_BUFFER = 110;
 const COYOTE = 90;
+// Feet this many pixels below the top of a step in front still put the hero on the step.
+const LEDGE_STEP = 6;
 // Share of the screen the camera shifts forward while the hero runs right.
 const LOOK_AHEAD = 0.12;
 const TURBO_MS = 67; // about 7.5 presses per second, like a turbo button
@@ -1613,6 +1615,24 @@ class Play extends Phaser.Scene {
     });
   }
 
+  // Feet just below the top of the block in front, and room above it: step onto it, keeping the speed.
+  stepUp(dir) {
+    const p = this.player;
+    const b = p.body;
+    const tx = Math.floor((dir > 0 ? b.right + 1 : b.left - 1) / TILE);
+    const layer = this.layerAt(tx);
+    const wall = layer.getTileAt(tx, Math.floor((b.bottom - 1) / TILE));
+    if (!wall || !wall.collides) return;
+    const lift = b.bottom - wall.pixelY;
+    if (lift <= 0 || lift > LEDGE_STEP) return;
+    const top = Math.floor((wall.pixelY - b.height) / TILE);
+    const solid = (x, y) => { const t = layer.getTileAt(x, y); return t && t.collides; };
+    for (let y = top; y < wall.y; y++) if (solid(tx, y)) return;
+    for (let x = Math.floor(b.left / TILE); x <= Math.floor((b.right - 1) / TILE); x++) if (solid(x, top)) return;
+    p.y -= lift;
+    b.setVelocity(dir * Math.max(Math.abs(this.lastVx || 0), 40), 0);
+  }
+
   layerAt(tx) {
     const i = this.lvl.areas.findIndex((ar) => tx >= ar.x0 && tx < ar.x1);
     return this.layers[Math.max(0, i)];
@@ -2058,6 +2078,12 @@ class Play extends Phaser.Scene {
       b.setMaxVelocity(300, 270);
     }
     if (this.updatePipes(time, down, right && !left, onGround)) return;
+    // Landing on the corner of a step (stairs, a pipe, a block) the physics may push the
+    // hero off sideways, so he slides down the wall instead of standing on it.
+    if (!onGround && !this.inWater && b.velocity.y > -100) {
+      const dir = b.blocked.right && right && !left ? 1 : b.blocked.left && left && !right ? -1 : 0;
+      if (dir) this.stepUp(dir);
+    }
     const dt = delta / 1000;
 
     // Big hero crouches on the ground while down is held and slides to a stop.
@@ -2088,6 +2114,7 @@ class Play extends Phaser.Scene {
     else acc = run ? 200 : 134;
     const vx = b.velocity.x;
     b.setVelocityX(vx < target ? Math.min(vx + acc * dt, target) : Math.max(vx - acc * dt, target));
+    this.lastVx = b.velocity.x;
     // Dust from under the feet: a hard landing, and a skid when the hero turns at speed.
     if (onGround && !this.inWater) {
       if (!this.wasOnGround && this.fallV > 150) {
