@@ -112,6 +112,8 @@ const JUMP_GRAVITY = [[450, 1575], [422, 1350], [562, 2025]];
 // Forgiving jump, ms: a press this long before landing, or this long after leaving a ledge, still jumps.
 const JUMP_BUFFER = 110;
 const COYOTE = 90;
+// Feet this many pixels below the top of a step in front still put the hero on the step.
+const LEDGE_STEP = 6;
 // Share of the screen the camera shifts forward while the hero runs right.
 const LOOK_AHEAD = 0.12;
 const TURBO_MS = 67; // about 7.5 presses per second, like a turbo button
@@ -415,6 +417,64 @@ const BUG_LEGS = [
   ['.KK..KK..KK..KK.', '..KK..KK..KK..KK'],
 ];
 
+// Bullet from a cannon, flying left: a dark shell with an angry eye and a fin at the back.
+const BULLET = [
+  '................',
+  '.....KKKKKKK..K.',
+  '...KKKKKKKKKKKK.',
+  '..KKKWWKKKKKKKK.',
+  '.KKKWKKWKKKKKKK.',
+  '.KKKWKKWKKKKKKK.',
+  'KKKKKWWKKKKKKKKK',
+  'KKKKKKKKKKKKKKKK',
+  'KKKKKKKKKKKKKKKK',
+  'KWWWWWKKKKKKKKKK',
+  '.KKKKKKKKKKKKKK.',
+  '.KKKKKKKKKKKKKK.',
+  '..KKKKKKKKKKKKK.',
+  '...KKKKKKKKKKKK.',
+  '.....KKKKKKK..K.',
+  '................',
+];
+
+// Vine: a stem with leaves on both sides, one tile per piece, and its curled tip.
+const VINE = [
+  '.......GN.......',
+  '.......GN.......',
+  '..LLL..GN.......',
+  '.LNNNL.GN.......',
+  '.LNNNNLGN.......',
+  '..LLLLNGN.......',
+  '.......GN.......',
+  '.......GN.......',
+  '.......GN.......',
+  '.......GN.......',
+  '.......GN..LLL..',
+  '.......GNLNNNNL.',
+  '.......GNLNNNL..',
+  '.......GN.LLL...',
+  '.......GN.......',
+  '.......GN.......',
+];
+const VINE_TOP = [
+  '................',
+  '................',
+  '.....GGG........',
+  '....G...N.......',
+  '....G...N.......',
+  '.....N..N.......',
+  '........GN......',
+  '.......GN.......',
+  '..LLL..GN.......',
+  '.LNNNL.GN.......',
+  '.LNNNNLGN.......',
+  '..LLLLNGN.......',
+  '.......GN.......',
+  '.......GN.......',
+  '.......GN.......',
+  '.......GN.......',
+];
+
 const BERRY = [
     '.......G........',
     '......GGG.......',
@@ -473,6 +533,9 @@ function makeTextures(scene) {
   // Green berry gives an extra life: same shape, other colors.
   pix(scene, 'berry1', BERRY.map((r) => r.replace(/V/g, 'N').replace(/D/g, 'G')));
 
+  pix(scene, 'bullet', BULLET);
+  pix(scene, 'vine', VINE);
+  pix(scene, 'vineTop', VINE_TOP);
   pix(scene, 'debris', ['.UUU.', 'UOOOU', 'UOOOU', '.UUU.']);
 
   pix(scene, 'lavaball', [
@@ -667,10 +730,11 @@ function makeTextures(scene) {
 const T = {
   GROUND: 0, BRICK: 1, BONUS: 2, USED: 3, HARD: 4, PIPE_TL: 5, PIPE_TR: 6, PIPE_L: 7, PIPE_R: 8, POLE: 9, POLE_TOP: 10,
   LAVA_TOP: 11, LAVA: 12, TREE_L: 13, TREE_M: 14, TREE_R: 15, TRUNK: 16, BRIDGE: 17,
-  SIDE_LIP_T: 18, SIDE_LIP_B: 19, SIDE_T: 20, SIDE_B: 21, WATER_TOP: 22, WATER: 23,
+  SIDE_LIP_T: 18, SIDE_LIP_B: 19, SIDE_T: 20, SIDE_B: 21, WATER_TOP: 22, WATER: 23, CLOUD: 24,
+  CANNON: 25, CANNON_BASE: 26,
 };
-const SOLID = [0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 17, 18, 19, 20, 21];
-const TILE_COUNT = 24;
+const SOLID = [0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 17, 18, 19, 20, 21, 24, 25, 26];
+const TILE_COUNT = 27;
 // Draw order: scenery, items rising out of blocks, tiles, items, enemies, hero.
 const DEPTH = { SCENERY: -10, SPROUT: -5, TILES: 0, ITEM: 5, ENEMY: 6, HERO: 10 };
 
@@ -830,6 +894,27 @@ function drawTiles(scene, key, colors) {
   r(23, 0, 0, 16, 16, '#2050d0');
   r(23, 4, 5, 3, 1, '#4078e8');
   r(23, 10, 11, 3, 1, '#4078e8');
+
+  // cloud block: a white puff with a soft blue shade underneath
+  ctx.fillStyle = '#ffffff';
+  for (const [cx, cy, rad] of [[4, 9, 4], [8, 6, 5], [12, 9, 4]]) pxDisc(ctx, 24 * TILE + cx, cy, rad, '#ffffff');
+  r(24, 0, 9, 16, 5, '#ffffff');
+  r(24, 1, 13, 14, 2, '#a8d0f8');
+  r(24, 6, 4, 2, 1, '#e0f0ff');
+
+  // cannon barrel: a dark drum with a muzzle on each side and a bright band; its stand below
+  r(25, 0, 1, 16, 15, '#202028');
+  r(25, 1, 2, 14, 13, '#484858');
+  r(25, 0, 5, 3, 7, '#000000');
+  r(25, 13, 5, 3, 7, '#000000');
+  r(25, 5, 2, 6, 13, '#606070');
+  r(25, 7, 4, 2, 9, '#c8c8d0');
+  r(25, 3, 0, 10, 2, '#202028');
+  r(26, 2, 0, 12, 16, '#202028');
+  r(26, 3, 0, 10, 16, '#383844');
+  r(26, 5, 3, 6, 6, '#585868');
+  r(26, 7, 4, 2, 4, '#202028');
+  r(26, 3, 14, 10, 2, '#101014');
 
   c.refresh();
   for (let i = 0; i < count; i++) c.add(i, 0, i * TILE, 0, TILE, TILE);
@@ -1041,14 +1126,16 @@ function drawScenery(scene) {
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
 // ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
 // h hidden block with an extra life, k hidden block with a coin (invisible until hit from below),
-// v water surface, y water, s fish, p springboard, t bolt thrower, n spiky.
+// v water surface, y water, s fish, p springboard, t bolt thrower, n spiky, V brick with a vine, c cloud,
+// u cannon barrel (fires bullets at the hero), j cannon stand.
 const TILE_OF = {
   '#': T.GROUND, 'B': T.BRICK, 'C': T.BRICK, '?': T.BONUS, 'M': T.BONUS, 'L': T.BONUS, 'H': T.HARD, 'r': T.HARD,
   '[': T.PIPE_TL, ']': T.PIPE_TR, '{': T.PIPE_L, '}': T.PIPE_R, '|': T.POLE, 'T': T.POLE_TOP,
   '~': T.LAVA_TOP, '=': T.LAVA, 'f': T.LAVA_TOP,
   '(': T.TREE_L, '-': T.TREE_M, ')': T.TREE_R, 'i': T.TRUNK, '_': T.BRIDGE,
   'q': T.SIDE_LIP_T, 'w': T.SIDE_LIP_B, 'z': T.SIDE_T, 'x': T.SIDE_B,
-  'v': T.WATER_TOP, 'y': T.WATER,
+  'v': T.WATER_TOP, 'y': T.WATER, 'V': T.BRICK, 'c': T.CLOUD,
+  'u': T.CANNON, 'j': T.CANNON_BASE,
 };
 
 // Level maps live in levels.js and worlds.js (loaded before this file): worlds of four levels each.
@@ -1359,6 +1446,9 @@ class Play extends Phaser.Scene {
     this.W = lvl.W;
     this.contents = new Map();
     this.hidden = new Set();
+    this.vineList = [];
+    this.climb = null;
+    this.cannons = [];
     const coinSpots = [];
     const enemySpots = [];
     const ballSpots = [];
@@ -1379,6 +1469,7 @@ class Play extends Phaser.Scene {
         if (ch === 'k') this.contents.set(x + ',' + y, { kind: 'coin', left: 1 });
         if (ch === 'k' || (ch === 'h' && !lifeGone)) this.hidden.add(x + ',' + y);
         if (ch === 'C') this.contents.set(x + ',' + y, { kind: 'coin', left: 8 });
+        if (ch === 'V') this.contents.set(x + ',' + y, { kind: 'vine', left: 1 });
         if (ch === 'o') coinSpots.push([x, y]);
         if (ch === 'e') enemySpots.push([x, y]);
         if (ch === 'f') ballSpots.push([x, y]);
@@ -1387,6 +1478,7 @@ class Play extends Phaser.Scene {
         if (ch === 'p') springSpots.push([x, y]);
         if (ch === 't') throwerSpots.push([x, y]);
         if (ch === 'n') spikySpots.push([x, y]);
+        if (ch === 'u') this.cannons.push({ x: x * TILE + 8, y: y * TILE + 8, next: 1500 + (x % 4) * 500 });
       }
     }
 
@@ -1613,6 +1705,131 @@ class Play extends Phaser.Scene {
     });
   }
 
+  // Feet just below the top of the block in front, and room above it: step onto it, keeping the speed.
+  stepUp(dir) {
+    const p = this.player;
+    const b = p.body;
+    const tx = Math.floor((dir > 0 ? b.right + 1 : b.left - 1) / TILE);
+    const layer = this.layerAt(tx);
+    const wall = layer.getTileAt(tx, Math.floor(b.bottom / TILE));
+    if (!wall || !wall.collides) return;
+    // Zero when the feet are level with the top: the hero only caught its edge.
+    const lift = b.bottom - wall.pixelY + 0.5;
+    if (lift > LEDGE_STEP) return;
+    const top = Math.floor((wall.pixelY - b.height) / TILE);
+    const solid = (x, y) => { const t = layer.getTileAt(x, y); return t && t.collides; };
+    for (let y = top; y < wall.y; y++) if (solid(tx, y)) return;
+    for (let x = Math.floor(b.left / TILE); x <= Math.floor((b.right - 1) / TILE); x++) if (solid(x, top)) return;
+    p.y -= lift;
+    b.setVelocity(dir * Math.max(Math.abs(this.lastVx || 0), 40), 0);
+  }
+
+  // ---------- Vines ----------
+  // A vine grows out of the top of the brick, one piece at a time, up to the top of the screen.
+  growVine(tx, ty) {
+    SFX.sprout();
+    const def = (this.lvl.vines || []).find((v) => v.x === tx && v.y === ty);
+    const v = { x: tx * TILE + 8, top: ty * TILE, bottom: ty * TILE, to: def && def.to, imgs: [] };
+    this.vineList.push(v);
+    let y = ty;
+    const grow = () => {
+      if (!this.scene.isActive() || y <= 0) return;
+      y--;
+      if (v.imgs.length) v.imgs[v.imgs.length - 1].setTexture('vine');
+      v.imgs.push(this.add.image(v.x, y * TILE, 'vineTop').setOrigin(0.5, 0).setDepth(DEPTH.SPROUT));
+      v.top = y * TILE;
+      this.time.delayedCall(90, grow);
+    };
+    grow();
+  }
+
+  // On a vine up and down climb, left or right or A lets go. A vine with clouds above
+  // carries the hero out of the top of the screen into them.
+  updateVine(time, up, down, left, right, jump, onGround) {
+    const p = this.player;
+    const b = p.body;
+    let v = this.climb;
+    if (!v) {
+      if (!this.vineList.length || time < (this.vineFreeAt || 0) || this.big && this.crouch) return false;
+      v = this.vineList.find((vv) => Math.abs(p.x - vv.x) < 9 && b.bottom > vv.top + 6 && b.top < vv.bottom - 2);
+      // Grab it by pressing up, or by touching it in the air.
+      if (!v || !(up || !onGround)) return false;
+      this.climb = v;
+      b.allowGravity = false;
+      p.setFlipX(false);
+      p.x = v.x - 2;
+      this.climbStep = 0;
+    }
+    const letGo = (vx, vy) => {
+      this.climb = null;
+      b.checkCollision.none = false;
+      this.vineFreeAt = time + 350;
+      b.allowGravity = true;
+      b.setVelocity(vx, vy);
+      this.prevJump = jump;
+      return true;
+    };
+    if (v.auto) {
+      // Coming up into the clouds: climb on its own to the cloud row, then step off onto it.
+      b.setVelocity(0, -70);
+      if (b.bottom <= v.top) {
+        p.y = v.top;
+        return letGo(70, -120);
+      }
+    } else {
+      if (jump && !this.prevJump) return letGo(left ? -80 : right ? 80 : 0, -200);
+      if ((left || right) && !up && !down) return letGo(left ? -70 : 70, 0);
+      if (down && onGround) return letGo(0, 0);
+      let vy = up ? -60 : down ? 70 : 0;
+      if (b.bottom - 10 <= v.top && vy < 0) {
+        if (v.to && v.top <= 0) { this.climbTo(v.to); return true; }
+        vy = 0;
+      }
+      b.setVelocity(0, vy);
+    }
+    // Hands over hands: the hero turns from side to side while moving.
+    if (b.velocity.y !== 0) {
+      this.climbStep += Math.abs(b.velocity.y) * 0.016;
+      p.setFlipX(Math.floor(this.climbStep / 8) % 2 === 1);
+    }
+    const frame = this.heroTex() + '2';
+    if (p.texture.key !== frame) p.setTexture(frame);
+    this.prevJump = jump;
+    return true;
+  }
+
+  // Through the top of the screen into the clouds: the hero comes up the vine from below.
+  climbTo(to) {
+    const p = this.player;
+    const b = p.body;
+    const ar = this.lvl.areas[to.area];
+    this.setArea(to.area);
+    const x = to.x * TILE + 8;
+    for (let y = to.y; y < this.lvl.H; y++) this.add.image(x, y * TILE, y === to.y ? 'vineTop' : 'vine').setOrigin(0.5, 0).setDepth(DEPTH.SPROUT);
+    this.climb = { x, top: to.y * TILE, bottom: VIEW_H + 64, auto: true };
+    p.setPosition(x - 2, VIEW_H + 4);
+    b.reset(p.x, p.y);
+    b.allowGravity = false;
+    // Up through the ground, if the vine comes out of it.
+    b.checkCollision.none = true;
+    this.prevX = p.x;
+    this.lead = 0;
+    this.cameras.main.scrollX = Phaser.Math.Clamp(x - VIEW_W * 0.3, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
+  }
+
+  // Off the clouds the hero falls back in from the top of the main course.
+  dropFromClouds(tx) {
+    const p = this.player;
+    const i = this.lvl.areas.findIndex((ar) => tx >= ar.x0 && tx < ar.x1);
+    const ar = this.lvl.areas[i];
+    this.setArea(i);
+    p.setPosition(tx * TILE + 8, 0);
+    p.body.reset(p.x, p.y);
+    this.prevX = p.x;
+    this.lead = 0;
+    this.cameras.main.scrollX = Phaser.Math.Clamp(p.x - VIEW_W * 0.42, ar.x0 * TILE, ar.x1 * TILE - VIEW_W);
+  }
+
   layerAt(tx) {
     const i = this.lvl.areas.findIndex((ar) => tx >= ar.x0 && tx < ar.x1);
     return this.layers[Math.max(0, i)];
@@ -1726,7 +1943,10 @@ class Play extends Phaser.Scene {
   liftTarget(lift, t) {
     const def = lift.getData('def');
     const [hx, hy] = lift.getData('home');
-    const k = (1 - Math.cos((t / def.period + def.phase) * Math.PI * 2)) / 2;
+    // A carrying lift waits for the hero, then takes him to the end of its track once.
+    const go = lift.getData('go');
+    const k = def.carry ? (go ? Math.min(1, (t - go) * def.carry / def.dist) : 0)
+      : (1 - Math.cos((t / def.period + def.phase) * Math.PI * 2)) / 2;
     const d = k * def.dist * TILE;
     return def.axis === 'x' ? [hx + d, hy] : [hx, hy + d];
   }
@@ -1744,6 +1964,7 @@ class Play extends Phaser.Scene {
       const [x, y] = this.liftTarget(lift, t + dt);
       const lb = lift.body;
       const riding = pb.enable && pb.right > lb.left && pb.left < lb.right && Math.abs(pb.bottom - lb.top) < 3;
+      if (riding && lift.getData('def').carry && !lift.getData('go')) lift.setData('go', t);
       const dx = x - lb.x;
       const dy = y - lb.y;
       if (dt > 0) lb.setVelocity(dx / dt, dy / dt);
@@ -2014,7 +2235,13 @@ class Play extends Phaser.Scene {
       return;
     }
 
-    if (p.y > VIEW_H + 24) { this.die(true); return; }
+    if (p.y > VIEW_H + 24) {
+      // Off the bonus clouds: back down onto the main course.
+      const drop = this.lvl.areas[this.area].drop;
+      if (drop !== undefined) this.dropFromClouds(drop);
+      else this.die(true);
+      return;
+    }
     const cp = this.lvl.checkpoint;
     // Only the main course counts: bonus rooms lie further right on the map.
     if (cp && this.area === 0 && p.x > cp.x * TILE) this.passedCheckpoint = true;
@@ -2058,6 +2285,14 @@ class Play extends Phaser.Scene {
       b.setMaxVelocity(300, 270);
     }
     if (this.updatePipes(time, down, right && !left, onGround)) return;
+    if (this.updateVine(time, up, down, left, right, jump, onGround)) return;
+    // Landing on the corner of a step (stairs, a pipe, a block) the physics may push the
+    // hero off sideways, so he slides down the wall instead of standing on it; walking off
+    // a lift onto ground at the same height he may catch on its edge.
+    if (!this.inWater && b.velocity.y > -100) {
+      const dir = b.blocked.right && right && !left ? 1 : b.blocked.left && left && !right ? -1 : 0;
+      if (dir) this.stepUp(dir);
+    }
     const dt = delta / 1000;
 
     // Big hero crouches on the ground while down is held and slides to a stop.
@@ -2088,6 +2323,7 @@ class Play extends Phaser.Scene {
     else acc = run ? 200 : 134;
     const vx = b.velocity.x;
     b.setVelocityX(vx < target ? Math.min(vx + acc * dt, target) : Math.max(vx - acc * dt, target));
+    this.lastVx = b.velocity.x;
     // Dust from under the feet: a hard landing, and a skid when the hero turns at speed.
     if (onGround && !this.inWater) {
       if (!this.wasOnGround && this.fallV > 150) {
@@ -2350,6 +2586,26 @@ class Play extends Phaser.Scene {
       r.setData('next', time + 1500);
       this.rider = r;
     }
+    // Cannons on screen fire a bullet at the hero now and then, unless he stands right by them.
+    for (const cn of this.cannons) {
+      if (this.dead || this.won || time < cn.next) continue;
+      if (cn.x < cam.scrollX - 8 || cn.x > cam.scrollX + VIEW_W + 8) continue;
+      const dx = this.player.x - cn.x;
+      if (Math.abs(dx) < 2.5 * TILE) continue;
+      cn.next = time + 3200 + Math.random() * 2000;
+      const dir = dx < 0 ? -1 : 1;
+      const f = this.foes.create(cn.x + dir * 10, cn.y, 'bullet').setDepth(DEPTH.TILES - 1);
+      f.body.allowGravity = false;
+      f.body.setSize(14, 12).setOffset(1, 2);
+      f.body.setVelocityX(dir * 75);
+      f.setFlipX(dir > 0);
+      f.setData('kind', 'bullet');
+      f.setData('stomp', true);
+      // Out of the barrel, then in front of everything.
+      this.time.delayedCall(250, () => f.active && f.setDepth(DEPTH.ENEMY));
+      tone(120, 60, 0.12, 'square', 0.06);
+      this.cameras.main.shake(60, 0.003);
+    }
     for (const f of this.foes.getChildren().slice()) {
       const kind = f.getData('kind');
       if (f.y > VIEW_H + 48 || f.x < cam.scrollX - 64 || (kind !== 'fish' && f.x > cam.scrollX + VIEW_W + 64)) {
@@ -2429,6 +2685,7 @@ class Play extends Phaser.Scene {
       content.left--;
       if (content.kind === 'life') this.s.lifeTaken.push(this.lifeKey(tx, ty));
       if (content.kind === 'coin') this.popCoin(tx, ty);
+      else if (content.kind === 'vine') this.growVine(tx, ty);
       else this.spawnBerry(tx, ty, content.kind);
       let idx = tile.index;
       if (content.left <= 0) {
