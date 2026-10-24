@@ -478,5 +478,14 @@
     "body": "Новая кнопка «🛠 Своя карта»: рисуйте поле пальцем из кирпича, стали, воды, леса и льда или возьмите за основу карту любого уровня. Сыграйте на ней против двадцати врагов и отправьте ссылку другу: она откроет вашу карту у него. Очки и жетоны на своей карте не идут.",
     "titleEn": "Tank Field: your own map",
     "bodyEn": "New «🛠 Own map» button: draw the field with your finger from brick, steel, water, forest and ice, or start from any stage map. Play it against twenty enemies and send a link to a friend: it opens your map for them. An own map gives no points and no ◆."
+  },
+  {
+    "id": "2026-10-24-pryg-star-bloom",
+    "date": "2026-10-24",
+    "size": "minor",
+    "title": "«Прыг-Скок»: звёзды и огненный цветок",
+    "body": "В кирпичах, где они были в классике, снова прячутся звёзды: пока герой мигает, враги ему не страшны. Если герой уже большой, из блока вырастает огненный цветок и стоит на месте. Кирпичи с жизнью больше не выдают себя мерцанием.",
+    "titleEn": "Hop-Skip: stars and the fire bloom",
+    "bodyEn": "Stars hide in bricks again where the classic had them: while the hero flashes, enemies can't hurt him. When the hero is already big, a fire bloom grows from the block and stays put. Bricks with an extra life no longer give themselves away by flashing."
   }
 ]

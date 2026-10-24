@@ -17,7 +17,7 @@ const byId = Object.fromEntries(all.map((l) => [l.id, l.lvl]));
 const built = WORLDS[0].map((_, i) => all[i].lvl);
 
 const EMPTY = new Set(['.', 'o', 'e', 's', 't', 'n', 'v', 'y']);
-const SOLID = new Set(['#', 'B', '?', 'M', 'L', 'C', 'H', '[', ']', '{', '}', '(', '-', ')', '_', 'q', 'w', 'z', 'x', 'r', 'p', 'V', 'c', 'u', 'j']);
+const SOLID = new Set(['#', 'B', '?', 'M', 'L', 'C', 'H', '[', ']', '{', '}', '(', '-', ')', '_', 'q', 'w', 'z', 'x', 'r', 'p', 'V', 'c', 'u', 'j', 'W', 'S', 'U']);
 const at = (lvl, x, y) => lvl.grid[y]?.[x];
 const areaOf = (lvl, x) => lvl.areas.findIndex((a) => x >= a.x0 && x < a.x1);
 

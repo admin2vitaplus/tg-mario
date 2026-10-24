@@ -7,7 +7,8 @@
 // ~ lava surface, = lava, f lava ball jumping from below, r fire bar around this block,
 // ( - ) treetop cap, i tree trunk, _ castle bridge, q w side pipe mouth, z x side pipe body,
 // h hidden block with an extra life, k hidden block with a coin (invisible until hit from below),
-// V brick with a vine, c cloud block, u cannon barrel (fires bullets), j cannon stand.
+// V brick with a vine, c cloud block, u cannon barrel (fires bullets), j cannon stand,
+// W brick with a berry, S brick with a lucky star, U brick with an extra life.
 (function () {
 'use strict';
 
@@ -93,7 +94,7 @@ function grid(W) {
 }
 
 // Tiles the hero stands on or bumps into (tests/levels.test.mjs uses the same).
-const SOLID = new Set(['#', 'B', '?', 'M', 'L', 'C', 'H', '[', ']', '{', '}', '(', '-', ')', '_', 'q', 'w', 'z', 'x', 'r', 'p', 'V', 'c', 'u', 'j']);
+const SOLID = new Set(['#', 'B', '?', 'M', 'L', 'C', 'H', '[', ']', '{', '}', '(', '-', ')', '_', 'q', 'w', 'z', 'x', 'r', 'p', 'V', 'c', 'u', 'j', 'W', 'S', 'U']);
 
 // Rough reachability on the tile grid for a small hero (one tile tall): walking, falling,
 // jumps up to 4 tiles high (7 wide when 2 high or less), lifts along their whole track, springboards,
