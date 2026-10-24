@@ -188,30 +188,43 @@ html, body {
 
 /* Phone turned sideways: d-pad on the left, buttons on the right, field in the middle */
 @media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
-  #app {
-    display: grid;
-    /* The field takes the whole height; the score moves to the top of the left column. */
-    grid-template-columns: minmax(150px, 1fr) minmax(0, calc(100vh * 1.15)) minmax(150px, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    grid-template-areas: "hud game actions" "dpad game actions";
-    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  }
+  /* The field fills the screen; the score and the buttons float over it, see-through,
+     and keep clear of Telegram's own buttons at the top in full screen (--band, ui.css). */
+  #app { display: block; padding: 0; }
+  #game { position: absolute; inset: 0; }
   #hud {
-    grid-area: hud;
+    position: absolute;
+    top: calc(42px + var(--band));
+    left: calc(10px + env(safe-area-inset-left));
+    z-index: 2;
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
-    padding: 42px 0 0 10px;
-    font-size: 10px;
+    padding: 0;
+    font-size: 11px;
     line-height: 1.2;
     text-align: left;
+    text-shadow: 1px 1px 0 #000;
+    pointer-events: none;
   }
+  body.tgFull #hud { top: calc(6px + var(--band)); }
   #hud br { display: none; }
   #hud br + span { margin-left: 6px; }
-  #game { grid-area: game; }
-  #controls { display: contents; }
-  #dpad { grid-area: dpad; place-self: center; }
-  #actions { grid-area: actions; place-self: center; }
+  #controls {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    height: auto;
+    padding: 12px calc(20px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+    pointer-events: none;
+  }
+  #controls > * { pointer-events: auto; }
+  .btn, .pad { opacity: 0.6; }
   #overlay { justify-content: safe center; overflow-y: auto; padding: 8px 16px; }
   #overlay h1 { font-size: 22px; margin-bottom: 6px; }
   #overlay p { margin-bottom: 10px; font-size: 13px; }
@@ -243,7 +256,7 @@ html, body {
 #overlay { z-index: 4; }
 
 @media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
-  .withBack #hud, .withFs #hud { padding-left: 10px; padding-right: 0; }
+  .withBack #hud, .withFs #hud { padding-left: 0; padding-right: 0; }
 }
 
 /* Keyboard help only where there is a keyboard and a mouse. */

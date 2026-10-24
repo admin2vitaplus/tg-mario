@@ -3,10 +3,19 @@
 
 // Retro 8-bit resolution: 16 tiles wide, 15 tiles high. A phone held upright sees
 // 13 tiles across instead, so the picture fills more of the tall screen and the hero is
-// bigger; turning the phone switches between the two (see refit at the end).
+// bigger; a phone on its side sees as far as its wide screen allows (up to 25 tiles),
+// so the picture fills it from side to side. Turning the phone switches (refit at the end).
 const TILE = 16;
-const WIDE_W = 256, TALL_W = 208;
-const pickViewW = () => (window.innerHeight > window.innerWidth ? TALL_W : WIDE_W);
+const WIDE_W = 256, TALL_W = 208, MAX_W = 400;
+function pickViewW() {
+  const box = document.getElementById('game');
+  const r = box && box.getBoundingClientRect();
+  const w = r && r.width ? r.width : window.innerWidth;
+  const h = r && r.height ? r.height : window.innerHeight;
+  if (h > w) return TALL_W;
+  if (!window.matchMedia || !matchMedia('(max-height: 560px)').matches) return WIDE_W; // a computer screen
+  return Math.max(WIDE_W, Math.min(MAX_W, Math.floor((240 * w) / h / 2) * 2));
+}
 let VIEW_W = pickViewW();
 const VIEW_H = 240;
 let behindColor = '';

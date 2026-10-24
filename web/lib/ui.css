@@ -160,9 +160,24 @@
 .withFs #hud { padding-right: 40px; }
 /* Full-screen Telegram draws its close and menu buttons over the page:
    the page starts below them and keeps clear of the notch. */
+:root { --band: 0px; }
 body.tgFull #app {
   top: calc(var(--tg-safe-area-inset-top, 0px) + var(--tg-content-safe-area-inset-top, 0px));
   left: var(--tg-safe-area-inset-left, 0px);
   right: var(--tg-safe-area-inset-right, 0px);
   bottom: var(--tg-safe-area-inset-bottom, 0px);
+}
+
+/* A phone on its side in full-screen Telegram: the page goes up to the status bar and
+   the game uses the space between Telegram's buttons at the top too. What floats in the
+   corners (the score) moves down by --band, the height of those buttons; our own ←
+   gives way to Telegram's «Назад» right there. */
+@media (orientation: landscape) and (max-height: 560px) {
+  body.tgFull { --band: var(--tg-content-safe-area-inset-top, 0px); }
+  body.tgFull #app { top: var(--tg-safe-area-inset-top, 0px); }
+  body.tgFull #backBtn { display: none; }
+  /* The see-through buttons would show through a title or pause screen. */
+  #app:has(#overlay:not(.hidden)) #controls { visibility: hidden; }
+  /* ⛶ sits in the strip too, left of Telegram's «⌄ ⋮». */
+  body.tgFull #fsBtn { top: max(4px, calc((var(--band) - 32px) / 2)); right: calc(110px + env(safe-area-inset-right)); }
 }
