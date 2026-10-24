@@ -909,16 +909,27 @@ function render(s) {
 }
 
 // ---------- HUD and screens ----------
+// A phone held upright shows only the battlefield with a thin frame (the side panel's
+// count of foes is in the score line too), so the field gets the whole width.
+const CROP = 4;
 function fitCanvas() {
   const box = $('game').getBoundingClientRect();
-  const full = Math.min(box.width / W, box.height / H);
+  const tall = box.height > box.width;
+  const vx = tall ? OX - CROP : 0, vy = tall ? OY - CROP : 0;
+  const vw = tall ? FIELD + 2 * CROP : W, vh = tall ? FIELD + 2 * CROP : H;
+  const full = Math.min(box.width / vw, box.height / vh);
   // Whole screen pixels per field pixel keep every pixel the same size. That is
   // used when it costs at most a tenth of the size; otherwise the field fills the space.
   const dpr = window.devicePixelRatio || 1;
   const n = Math.floor(full * dpr);
   const k = n >= 1 && n / dpr >= full * 0.9 ? n / dpr : full;
-  canvas.style.width = Math.floor(W * k * dpr) / dpr + 'px';
-  canvas.style.height = Math.floor(H * k * dpr) / dpr + 'px';
+  const px = (v) => Math.round(v * k * dpr) / dpr;
+  canvas.style.width = px(W) + 'px';
+  canvas.style.height = px(H) + 'px';
+  // The parts outside the view are pulled out of the layout and clipped off.
+  const cut = [px(vy), px(W - vx - vw), px(H - vy - vh), px(vx)];
+  canvas.style.margin = cut.map((v) => (v ? -v + 'px' : '0')).join(' ');
+  canvas.style.clipPath = tall ? `inset(${cut.map((v) => v + 'px').join(' ')})` : '';
 }
 window.addEventListener('resize', fitCanvas);
 // Rotating the phone or showing the Telegram header changes the space without a window resize.

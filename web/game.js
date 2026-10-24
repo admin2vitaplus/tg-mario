@@ -1,9 +1,13 @@
 (() => {
 'use strict';
 
-// Retro 8-bit resolution: 16 tiles wide, 15 tiles high.
+// Retro 8-bit resolution: 16 tiles wide, 15 tiles high. A phone held upright sees
+// 13 tiles across instead, so the picture fills more of the tall screen and the hero is
+// bigger; turning the phone switches between the two (see refit at the end).
 const TILE = 16;
-const VIEW_W = 256;
+const WIDE_W = 256, TALL_W = 208;
+const pickViewW = () => (window.innerHeight > window.innerWidth ? TALL_W : WIDE_W);
+let VIEW_W = pickViewW();
 const VIEW_H = 240;
 let behindColor = '';
 const BEST_KEY = 'prygskok_best';
@@ -3409,8 +3413,19 @@ const game = new Phaser.Game({
 window.__game = game;
 window.__touch = touch;
 
-// Turning the phone changes the layout; refit the picture once the new size settles.
-const refit = () => setTimeout(() => game.scale.refresh(), 150);
+// Turning the phone changes the layout; refit the picture once the new size settles,
+// with the view as wide as suits the new shape.
+const refit = () => setTimeout(() => {
+  const w = pickViewW();
+  if (w !== VIEW_W) {
+    VIEW_W = w;
+    game.scale.setGameSize(VIEW_W, VIEW_H);
+    const scene = window.__scene;
+    if (scene && scene.cameras && scene.cameras.main) scene.cameras.main.setSize(VIEW_W, VIEW_H);
+  }
+  game.scale.refresh();
+}, 150);
 window.addEventListener('orientationchange', refit);
+window.addEventListener('resize', refit);
 if (tg) try { tg.onEvent('viewportChanged', refit); } catch (e) { /* old client */ }
 })();

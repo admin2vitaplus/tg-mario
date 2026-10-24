@@ -4,8 +4,12 @@
 
 const S = window.BombSim;
 const { COLS, ROWS, TILE, TS, EMPTY, HARD, SOFT, BURN, UP, RIGHT, DOWN, LEFT } = S;
-const VIEW_COLS = 15;
-const W = VIEW_COLS * TILE, H = ROWS * TILE; // 240 x 208: the screen follows the player
+// The screen follows the player: 15 columns (240 x 208), or 11 on a phone held upright,
+// so the field is bigger there (see fitCanvas).
+const WIDE_COLS = 15, TALL_COLS = 11;
+let VIEW_COLS = WIDE_COLS;
+let W = VIEW_COLS * TILE;
+const H = ROWS * TILE;
 const STEP = 1000 / 60;
 const BEST_KEY = 'bombodrom_best';
 const GAME = 'bombs';
@@ -745,6 +749,13 @@ function render(s) {
 // ---------- HUD and screens ----------
 function fitCanvas() {
   const box = $('game').getBoundingClientRect();
+  const cols = box.height > box.width ? TALL_COLS : WIDE_COLS;
+  if (cols !== VIEW_COLS) {
+    VIEW_COLS = cols;
+    W = cols * TILE;
+    canvas.width = W; // clears the picture and the drawing settings; the next frame redraws
+    canvas.getContext('2d').imageSmoothingEnabled = false;
+  }
   const full = Math.min(box.width / W, box.height / H);
   // Whole screen pixels per field pixel keep every pixel the same size. That is
   // used when it costs at most a tenth of the size; otherwise the field fills the space.
