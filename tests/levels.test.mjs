@@ -95,6 +95,14 @@ test('plants grow out of pipe lips', () => {
 
 test('1-2: bonus room under a pipe and a warp zone over the ceiling', () => {
   const lvl = built[1];
+
+  const bonusExit = lvl.pipes.find((p) => p.type === 'side' && areaOf(lvl, p.x) === 1);
+  assert.ok(bonusExit, 'bonus room has a side exit');
+  for (const y of [bonusExit.y, bonusExit.y + 1]) {
+    assert.ok(EMPTY.has(at(lvl, bonusExit.x - 1, y)), 'clear approach to the bonus exit');
+  }
+  assert.ok(SOLID.has(at(lvl, bonusExit.x - 1, bonusExit.y + 2)), 'floor in front of the bonus exit');
+
   const down = lvl.pipes.filter((p) => p.type === 'down' && p.to.area !== undefined);
   assert.ok(down.some((p) => lvl.areas[p.to.area].sky === '#000000' && p.to.area !== 0), 'pipe down to a bonus room');
 
