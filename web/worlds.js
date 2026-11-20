@@ -271,7 +271,7 @@ function level12() {
   row(182, 11, '{}');
   row(186, 11, '{}');
   row(242, 11, 'B');
-  row(254, 11, 'Bqz{}');
+  row(255, 11, 'qz{}');
   row(279, 11, '[]');
   row(298, 11, '|');
   row(16, 12, 'eH H H H H H e H H');
@@ -288,7 +288,7 @@ function level12() {
   row(182, 12, '{}');
   row(186, 12, '{}');
   row(242, 12, 'B');
-  row(254, 12, 'Bwx{}');
+  row(255, 12, 'wx{}');
   row(277, 12, 'e {}H');
   row(298, 12, 'H');
   L.pipes.push({ type: 'down', x: 178, y: 10, to: { world: 4 } });
