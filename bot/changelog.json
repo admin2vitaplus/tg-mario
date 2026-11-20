@@ -503,5 +503,13 @@
     "body": "Если держать телефон горизонтально, все кнопки заставки, включая «← Все игры», теперь помещаются на экран.",
     "titleEn": "Game title screens on a phone held sideways",
     "bodyEn": "With the phone held sideways, every title screen button, «← All games» included, now fits on the screen."
+  },
+  {
+    "id": "2026-11-20-pryg-bonus-pipe-exit",
+    "size": "minor",
+    "title": "«Прыг-Скок»: выход из подземелья 1-2",
+    "body": "Убрали два кирпича перед боковой трубой. Теперь из тайной комнаты можно вернуться на основной маршрут.",
+    "titleEn": "Hop-Skip: exit from the 1-2 bonus room",
+    "bodyEn": "Two bricks were removed from in front of the side pipe so players can return to the main route."
   }
 ]
